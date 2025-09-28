@@ -1,0 +1,12 @@
+{
+  "name": "bonio-booth",
+  "version": "1.0.0",
+  "description": "Bonio Booth - An Electron React Application",
+  "main": "./dist/main/main.js",
+  "author": {
+    "name": "Bonio Labs Thailand",
+    "email": "info@boniolabs.com"
+  },
+  "license": "MIT",
+  "dependencies": {}
+}
