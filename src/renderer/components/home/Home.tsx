@@ -1,0 +1,62 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import icon from '../../../../assets/icons/default_full.svg';
+import './Home.css';
+
+const EXTERNAL_LINKS = {
+  TERMS_AND_SERVICES: 'https://boniolabs.com',
+} as const;
+
+function Home(): React.JSX.Element {
+  const navigate = useNavigate();
+
+  const handleStartClick = React.useCallback(() => {
+    navigate('/select-print');
+  }, [navigate]);
+
+  const handleTermsClick = React.useCallback(() => {
+    window.open(
+      EXTERNAL_LINKS.TERMS_AND_SERVICES,
+      '_blank',
+      'noopener,noreferrer',
+    );
+  }, []);
+
+  return (
+    <main className="home-container">
+      <section className="logo-section">
+        <img
+          src={icon}
+          alt="Bonio Booth Logo"
+          className="logo-image"
+          width="200"
+          height="auto"
+        />
+      </section>
+
+      <section className="action-section">
+        <button
+          type="button"
+          onClick={handleStartClick}
+          className="start-button"
+          aria-label="Start using Bonio Booth"
+        >
+          TAB TO START
+        </button>
+      </section>
+
+      <footer className="footer-section">
+        <button
+          type="button"
+          onClick={handleTermsClick}
+          className="terms-link"
+          aria-label="Open Terms and Services"
+        >
+          Terms & Services
+        </button>
+      </footer>
+    </main>
+  );
+}
+
+export default Home;
