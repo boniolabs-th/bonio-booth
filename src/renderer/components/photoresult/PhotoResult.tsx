@@ -98,25 +98,6 @@ export default function PhotoResult() {
             <h2 className="section-title">Download Your .Gif</h2>
 
             <div className="download-container">
-              <div className="gif-preview">
-                {state.gifData ? (
-                  <video
-                    src={state.gifData}
-                    autoPlay
-                    loop
-                    muted
-                    className="gif-video"
-                  />
-                ) : (
-                  <div className="gif-placeholder">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
-                      <path d="M8 5v14l11-7z" fill="currentColor" />
-                    </svg>
-                    <p>Your GIF will appear here</p>
-                  </div>
-                )}
-              </div>
-
               <div className="qr-code-container">
                 <img
                   src={generateQRCode()}

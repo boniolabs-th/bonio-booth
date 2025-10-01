@@ -1,6 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import * as gifshot from 'gifshot';
 import { Header } from '..';
 import './MainShooting.css';
 
@@ -16,17 +17,16 @@ export default function MainShooting() {
 
   const [countdown, setCountdown] = useState(5);
   const [currentPhoto, setCurrentPhoto] = useState(0);
-  const [isRecording, setIsRecording] = useState(false);
   const [photos, setPhotos] = useState<string[]>([]);
   const [gifData, setGifData] = useState<string>('');
   const [showCountdown, setShowCountdown] = useState(false);
   const [showFlash, setShowFlash] = useState(false);
   const [isCameraLoading, setIsCameraLoading] = useState(true);
   const [cameraError, setCameraError] = useState<string>('');
+  const [isCreatingGif, setIsCreatingGif] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const handleBack = () => {
@@ -75,42 +75,48 @@ export default function MainShooting() {
     }
   };
 
-  const startGifRecording = async () => {
-    if (!streamRef.current) return;
+  const createGifFromPhotos = useCallback(async () => {
+    if (photos.length !== 6) return;
+
+    setIsCreatingGif(true);
 
     try {
-      const mediaRecorder = new MediaRecorder(streamRef.current, {
-        mimeType: 'video/webm',
-      });
-
-      const chunks: Blob[] = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        setGifData(url);
-      };
-
-      mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start();
-      setIsRecording(true);
+      gifshot.createGIF(
+        {
+          images: photos,
+          gifWidth: 640,
+          gifHeight: 480,
+          interval: 0.8, // 0.8 seconds between frames
+          numFrames: 6,
+          frameDuration: 0.8,
+          sampleInterval: 10,
+          numWorkers: 2,
+        },
+        (obj) => {
+          if (!obj.error && obj.image) {
+            // Convert data URL to blob
+            fetch(obj.image)
+              .then((res) => res.blob())
+              .then((blob) => {
+                const url = URL.createObjectURL(blob);
+                setGifData(url);
+                setIsCreatingGif(false);
+                return blob;
+              })
+              .catch(() => {
+                setIsCreatingGif(false);
+              });
+          } else {
+            // Error creating GIF
+            setIsCreatingGif(false);
+          }
+        },
+      );
     } catch {
-      // Error starting recording
+      // Error creating GIF
+      setIsCreatingGif(false);
     }
-  };
-
-  const stopGifRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
+  }, [photos]);
 
   const takePhoto = () => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -157,12 +163,9 @@ export default function MainShooting() {
         // Wait for camera to load before starting
         await startCamera();
 
-        // Start initial countdown and GIF recording after camera is ready
-        startGifRecording();
-
+        // Start initial countdown and first photo
         startCountdown(5, () => {
-          // Stop GIF recording and take first photo
-          stopGifRecording();
+          // Take first photo
           takePhoto();
           setCurrentPhoto(1);
 
@@ -202,6 +205,14 @@ export default function MainShooting() {
   // Navigate when we have all 6 photos
   useEffect(() => {
     if (photos.length === 6) {
+      // Create GIF from photos
+      createGifFromPhotos();
+    }
+  }, [photos.length, createGifFromPhotos]);
+
+  // Navigate when GIF is ready
+  useEffect(() => {
+    if (photos.length === 6 && gifData) {
       setTimeout(() => {
         navigate('/photo-confirmation', {
           state: {
@@ -212,7 +223,7 @@ export default function MainShooting() {
         });
       }, 1000);
     }
-  }, [photos.length, navigate, state, photos, gifData]);
+  }, [photos.length, gifData, navigate, state, photos]);
 
   return (
     <div className="main-shooting-container">
@@ -264,7 +275,7 @@ export default function MainShooting() {
             </div>
           )}
 
-          {!isCameraLoading && !cameraError && (
+          {!isCameraLoading && !cameraError && !isCreatingGif && (
             <div className="photo-progress">
               <div className="progress-text">
                 Photos taken: {photos.length} / 6
@@ -277,6 +288,14 @@ export default function MainShooting() {
                   />
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* GIF Creation Loading Overlay */}
+          {isCreatingGif && (
+            <div className="loading-overlay">
+              <div className="loading-spinner" />
+              <div className="loading-text">Creating your GIF...</div>
             </div>
           )}
 
