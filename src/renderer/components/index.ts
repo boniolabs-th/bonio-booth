@@ -1,5 +1,9 @@
+export { default as Header } from './header';
 export { default as Home } from './home';
 export { default as SelectPrint } from './selectprint';
 export { default as PaymentQR } from './paymentqr';
 export { default as PhotoPrepare } from './photoprepare';
 export { default as MainShooting } from './mainshooting';
+export { default as PhotoConfirmation } from './photoconfirmation';
+export { default as PhotoDecorate } from './photodecorate';
+export { default as PhotoResult } from './photoresult';

@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import icon from '../../../../assets/icons/default_full.svg';
+import { Header } from '..';
 import './PaymentQR.css';
 
 interface LocationState {
@@ -38,10 +38,6 @@ export default function PaymentQR() {
     return () => clearInterval(timer);
   }, [timeLeft, navigate]);
 
-  const handleBack = () => {
-    navigate('/select-print');
-  };
-
   const handlePriceClick = () => {
     navigate('/photo-prepare', {
       state: {
@@ -67,22 +63,7 @@ export default function PaymentQR() {
   return (
     <div className="payment-qr-container">
       {/* Header */}
-      <div className="header">
-        <button type="button" className="back-button" onClick={handleBack}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M15 18L9 12L15 6"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-        <div className="logo-container">
-          <img src={icon} alt="Bonio Booth" className="logo" />
-        </div>
-      </div>
+      <Header showBackButton backButtonPath="/select-print" />
 
       {/* Main Content */}
       <div className="main-content">

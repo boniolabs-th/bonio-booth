@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import icon from '../../../../assets/icons/default_full.svg';
+import { Header } from '..';
 import './PhotoPrepare.css';
 
 interface LocationState {
@@ -24,22 +24,7 @@ export default function PhotoPrepare() {
   return (
     <div className="photo-prepare-container">
       {/* Header */}
-      <div className="header">
-        <button type="button" className="back-button" onClick={handleBack}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M15 18L9 12L15 6"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-        <div className="logo-container">
-          <img src={icon} alt="Bonio Booth" className="logo" />
-        </div>
-      </div>
+      <Header showBackButton onBackClick={handleBack} />
 
       {/* Main Content */}
       <div className="main-content">

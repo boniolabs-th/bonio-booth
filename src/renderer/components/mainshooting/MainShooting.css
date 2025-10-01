@@ -1,7 +1,7 @@
 .main-shooting-container {
   width: 100vw;
   height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: white;
   display: flex;
   flex-direction: column;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -19,21 +19,6 @@
   box-sizing: border-box;
   position: relative;
   z-index: 10;
-}
-
-.back-button {
-  background: rgba(255, 255, 255, 0.9);
-  border: 2px solid rgba(255, 255, 255, 1);
-  border-radius: 50%;
-  width: 60px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  color: #333;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .back-button:hover {
@@ -62,4 +47,220 @@
   justify-content: center;
   padding: 20px;
   box-sizing: border-box;
+}
+
+/* Camera Styles */
+.camera-container {
+  position: relative;
+  width: 80%;
+  max-width: 800px;
+  height: 80%;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.camera-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 20px;
+}
+
+/* Countdown Overlay */
+.countdown-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.countdown-number {
+  font-size: 120px;
+  font-weight: bold;
+  color: #ffffff;
+  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.countdown-text {
+  font-size: 24px;
+  color: #ffffff;
+  margin-top: 20px;
+  text-align: center;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Photo Progress */
+.photo-progress {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  padding: 15px 25px;
+  border-radius: 15px;
+  text-align: center;
+  z-index: 10;
+}
+
+.progress-text {
+  color: white;
+  font-size: 16px;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.progress-dots {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.progress-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.progress-dot.completed {
+  background: #4caf50;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+}
+
+/* Flash Effect */
+.flash-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  z-index: 30;
+  animation: flash 0.15s ease-out;
+  pointer-events: none;
+}
+
+@keyframes flash {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Loading Overlay */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 25;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid #ffffff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  color: white;
+  font-size: 18px;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Error Overlay */
+.error-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(220, 53, 69, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 25;
+  text-align: center;
+  padding: 40px;
+  box-sizing: border-box;
+}
+
+.error-text {
+  color: white;
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 30px;
+  line-height: 1.4;
+}
+
+.retry-button {
+  background: white;
+  color: #dc3545;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 25px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.retry-button:hover {
+  background: #f8f9fa;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.retry-button:active {
+  transform: translateY(0);
 }

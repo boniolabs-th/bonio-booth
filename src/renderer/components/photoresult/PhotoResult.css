@@ -1,0 +1,314 @@
+.photo-result-container {
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  flex-direction: column;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: white;
+  overflow: hidden;
+}
+
+/* Header Styles */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 30px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.logo-container {
+  text-align: center;
+}
+
+.logo {
+  height: 40px;
+  width: auto;
+}
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.result-layout {
+  display: flex;
+  gap: 6rem;
+  /* flex: 1; */
+  min-height: 0;
+}
+
+/* Final Photo Section */
+.final-photo-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.section-title {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 30px;
+  text-align: center;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.final-photo-container {
+  text-align: center;
+  /* width: 100%; */
+  max-width: 350px;
+  aspect-ratio: 5/7;
+  /* background: white; */
+  /* border-radius: 15px; */
+  overflow: hidden;
+  /* box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3); */
+  margin-bottom: 30px;
+}
+
+.final-photo {
+  /* width: 100%; */
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder-photo {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(200, 200, 200, 0.9);
+  color: #666;
+}
+
+.placeholder-content {
+  text-align: center;
+}
+
+.placeholder-content svg {
+  margin-bottom: 15px;
+  opacity: 0.6;
+}
+
+.placeholder-content p {
+  margin: 0;
+  font-size: 16px;
+}
+
+/* Photo Details */
+.photo-details {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  padding: 20px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  width: 100%;
+  max-width: 400px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.detail-item:last-child {
+  border-bottom: none;
+}
+
+.label {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.value {
+  font-weight: 600;
+  color: white;
+}
+
+/* Download Section */
+.download-section {
+  width: 350px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.download-container {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 30px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  width: 100%;
+  text-align: center;
+}
+
+/* GIF Preview */
+.gif-preview {
+  width: 200px;
+  height: 200px;
+  border-radius: 15px;
+  overflow: hidden;
+  margin: 0 auto 30px;
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gif-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gif-placeholder {
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+}
+
+.gif-placeholder svg {
+  margin-bottom: 15px;
+  opacity: 0.6;
+}
+
+.gif-placeholder p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* QR Code */
+.qr-code-container {
+  margin-bottom: 30px;
+}
+
+.qr-code {
+  width: 120px;
+  height: 120px;
+  border-radius: 10px;
+  background: white;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.qr-text {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Download Button */
+.download-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 30px;
+  background: linear-gradient(45deg, #4caf50, #45a049);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+  width: 100%;
+  justify-content: center;
+}
+
+.download-button:hover:not(:disabled) {
+  background: linear-gradient(45deg, #45a049, #3d8b40);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+.download-button:disabled {
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Action Section */
+.action-section {
+  display: flex;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+.finish-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 40px;
+  background: linear-gradient(45deg, #ff6b35, #f7931e);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+}
+
+.finish-button:hover {
+  background: linear-gradient(45deg, #e55a2b, #e8851b);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .result-layout {
+    flex-direction: column;
+    gap: 30px;
+  }
+
+  .download-section {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .final-photo-container {
+    max-width: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 15px;
+  }
+
+  .section-title {
+    font-size: 24px;
+    margin-bottom: 20px;
+  }
+
+  .download-container {
+    padding: 20px;
+  }
+
+  .gif-preview {
+    width: 150px;
+    height: 150px;
+  }
+
+  .qr-code {
+    width: 100px;
+    height: 100px;
+  }
+}

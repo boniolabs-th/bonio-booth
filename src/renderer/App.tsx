@@ -5,6 +5,9 @@ import {
   PaymentQR,
   PhotoPrepare,
   MainShooting,
+  PhotoConfirmation,
+  PhotoDecorate,
+  PhotoResult,
 } from './components';
 import './App.css';
 
@@ -18,6 +21,9 @@ export default function App() {
         <Route path="/payment-qr" element={<PaymentQR />} />
         <Route path="/photo-prepare" element={<PhotoPrepare />} />
         <Route path="/main-shooting" element={<MainShooting />} />
+        <Route path="/photo-confirmation" element={<PhotoConfirmation />} />
+        <Route path="/photo-decorate" element={<PhotoDecorate />} />
+        <Route path="/photo-result" element={<PhotoResult />} />
       </Routes>
     </Router>
   );
