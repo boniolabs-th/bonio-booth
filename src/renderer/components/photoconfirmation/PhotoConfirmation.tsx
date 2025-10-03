@@ -7,7 +7,7 @@ interface LocationState {
   quantity: number;
   totalPrice: number;
   photos: string[];
-  gifData: string;
+  videoData: string;
 }
 
 export default function PhotoConfirmation() {

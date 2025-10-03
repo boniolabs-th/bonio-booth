@@ -1,5 +1,6 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState, useCallback } from 'react';
 import { Header } from '..';
 import './PhotoResult.css';
 
@@ -7,7 +8,7 @@ interface LocationState {
   quantity: number;
   totalPrice: number;
   photos: string[];
-  gifData: string;
+  videoData: string;
   finalImage: string;
   selectedFrame: string;
   selectedFilter: string;
@@ -17,15 +18,44 @@ export default function PhotoResult() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
+  const [printStatus, setPrintStatus] = useState<
+    'idle' | 'printing' | 'success' | 'error'
+  >('idle');
 
-  const handleDownloadGif = () => {
-    if (state.gifData) {
-      const link = document.createElement('a');
-      link.href = state.gifData;
-      link.download = 'bonio-booth-memories.webm';
-      link.click();
+  // Auto-print when component mounts
+  useEffect(() => {
+    const handleAutoPrint = async () => {
+      if (!state?.finalImage) {
+        setPrintStatus('error');
+        return;
+      }
+
+      setPrintStatus('printing');
+
+      try {
+        // Set up listener for print response
+        window.electron?.print?.onPrintResponse((response) => {
+          if (response.success) {
+            setPrintStatus('success');
+          } else {
+            setPrintStatus('error');
+          }
+
+          // Clean up listener
+          window.electron?.print?.removePrintResponseListener();
+        });
+
+        // Send print request
+        window.electron?.print?.printPhoto(state.finalImage);
+      } catch {
+        setPrintStatus('error');
+      }
+    };
+
+    if (state?.finalImage && printStatus === 'idle') {
+      handleAutoPrint();
     }
-  };
+  }, [state?.finalImage, printStatus]);
 
   const handleFinish = () => {
     navigate('/');
@@ -53,7 +83,7 @@ export default function PhotoResult() {
               {state.finalImage ? (
                 <img
                   src={state.finalImage}
-                  alt="Final photo"
+                  alt="Your captured memory"
                   className="final-photo"
                 />
               ) : (
@@ -106,44 +136,36 @@ export default function PhotoResult() {
                 />
                 <p className="qr-text">Scan to download</p>
               </div>
-
-              <button
-                type="button"
-                className="download-button"
-                onClick={handleDownloadGif}
-                disabled={!state.gifData}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M7 10l5 5 5-5"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M12 15V3"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                Download Your .Gif
-              </button>
             </div>
           </div>
         </div>
 
         {/* Finish Button */}
         <div className="action-section">
+          {/* Print Status Display */}
+          {/* {printStatus !== 'idle' && (
+            <div className={`print-status ${printStatus}`}>
+              {printStatus === 'printing' && (
+                <div className="print-message">
+                  <span className="print-icon">🖨️</span>
+                  Printing your photo...
+                </div>
+              )}
+              {printStatus === 'success' && (
+                <div className="print-message success">
+                  <span className="print-icon">✅</span>
+                  Photo printed successfully!
+                </div>
+              )}
+              {printStatus === 'error' && (
+                <div className="print-message error">
+                  <span className="print-icon">❌</span>
+                  Print failed. Please check your printer.
+                </div>
+              )}
+            </div>
+          )} */}
+
           <button
             type="button"
             className="finish-button"

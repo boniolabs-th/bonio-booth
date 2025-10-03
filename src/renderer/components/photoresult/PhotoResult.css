@@ -312,3 +312,43 @@
     height: 100px;
   }
 }
+
+/* Print Status Styles */
+.print-status {
+  margin-bottom: 20px;
+  padding: 15px 25px;
+  border-radius: 12px;
+  text-align: center;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.print-status.printing {
+  background: rgba(255, 193, 7, 0.2);
+  border: 2px solid #ffc107;
+  color: #ffc107;
+}
+
+.print-status.success {
+  background: rgba(40, 167, 69, 0.2);
+  border: 2px solid #28a745;
+  color: #28a745;
+}
+
+.print-status.error {
+  background: rgba(220, 53, 69, 0.2);
+  border: 2px solid #dc3545;
+  color: #dc3545;
+}
+
+.print-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 16px;
+}
+
+.print-icon {
+  font-size: 20px;
+}

@@ -33,11 +33,21 @@ declare module 'gifshot' {
 
   export function createGIF(
     options: GifShotOptions,
-    callback?: (obj: { image: string; error?: boolean; errorCode?: string; errorMsg?: string }) => void
+    callback?: (obj: {
+      image: string;
+      error?: boolean;
+      errorCode?: string;
+      errorMsg?: string;
+    }) => void,
   ): void;
 
   export function takeSnapShot(
     options: GifShotOptions,
-    callback?: (obj: { image: string; error?: boolean; errorCode?: string; errorMsg?: string }) => void
+    callback?: (obj: {
+      image: string;
+      error?: boolean;
+      errorCode?: string;
+      errorMsg?: string;
+    }) => void,
   ): void;
 }

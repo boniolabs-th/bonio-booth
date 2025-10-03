@@ -1,7 +1,6 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import * as gifshot from 'gifshot';
 import { Header } from '..';
 import './MainShooting.css';
 
@@ -18,12 +17,12 @@ export default function MainShooting() {
   const [countdown, setCountdown] = useState(5);
   const [currentPhoto, setCurrentPhoto] = useState(0);
   const [photos, setPhotos] = useState<string[]>([]);
-  const [gifData, setGifData] = useState<string>('');
+  const [videoData, setVideoData] = useState<string>('');
   const [showCountdown, setShowCountdown] = useState(false);
   const [showFlash, setShowFlash] = useState(false);
   const [isCameraLoading, setIsCameraLoading] = useState(true);
   const [cameraError, setCameraError] = useState<string>('');
-  const [isCreatingGif, setIsCreatingGif] = useState(false);
+  const [isCreatingVideo, setIsCreatingVideo] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -75,46 +74,79 @@ export default function MainShooting() {
     }
   };
 
-  const createGifFromPhotos = useCallback(async () => {
+  const createVideoFromPhotos = useCallback(async () => {
     if (photos.length !== 6) return;
 
-    setIsCreatingGif(true);
+    setIsCreatingVideo(true);
 
     try {
-      gifshot.createGIF(
-        {
-          images: photos,
-          gifWidth: 640,
-          gifHeight: 480,
-          interval: 0.8, // 0.8 seconds between frames
-          numFrames: 6,
-          frameDuration: 0.8,
-          sampleInterval: 10,
-          numWorkers: 2,
-        },
-        (obj) => {
-          if (!obj.error && obj.image) {
-            // Convert data URL to blob
-            fetch(obj.image)
-              .then((res) => res.blob())
-              .then((blob) => {
-                const url = URL.createObjectURL(blob);
-                setGifData(url);
-                setIsCreatingGif(false);
-                return blob;
-              })
-              .catch(() => {
-                setIsCreatingGif(false);
-              });
-          } else {
-            // Error creating GIF
-            setIsCreatingGif(false);
-          }
-        },
-      );
+      // Create canvas for video composition
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        setIsCreatingVideo(false);
+        return;
+      }
+
+      // Set canvas dimensions
+      canvas.width = 640;
+      canvas.height = 480;
+
+      // Create MediaRecorder to record canvas
+      const stream = canvas.captureStream(30); // 30 FPS
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'video/mp4; codecs=avc1.424028,mp4a.40.2',
+      });
+
+      const chunks: Blob[] = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/mp4' });
+        const url = URL.createObjectURL(blob);
+        setVideoData(url);
+        setIsCreatingVideo(false);
+      };
+
+      // Start recording
+      mediaRecorder.start();
+
+      // Animation function to display photos
+      let currentFrame = 0;
+      const frameDuration = 800; // 0.8 seconds per frame
+      const totalFrames = photos.length;
+
+      const animate = () => {
+        if (currentFrame < totalFrames) {
+          const img = new Image();
+          img.onload = () => {
+            // Clear canvas and draw image
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            currentFrame += 1;
+            setTimeout(animate, frameDuration);
+          };
+          img.src = photos[currentFrame];
+        } else {
+          // Stop recording after all frames
+          setTimeout(() => {
+            mediaRecorder.stop();
+          }, frameDuration);
+        }
+      };
+
+      // Start animation
+      animate();
     } catch {
-      // Error creating GIF
-      setIsCreatingGif(false);
+      // Error creating video
+      setIsCreatingVideo(false);
     }
   }, [photos]);
 
@@ -205,25 +237,25 @@ export default function MainShooting() {
   // Navigate when we have all 6 photos
   useEffect(() => {
     if (photos.length === 6) {
-      // Create GIF from photos
-      createGifFromPhotos();
+      // Create video from photos
+      createVideoFromPhotos();
     }
-  }, [photos.length, createGifFromPhotos]);
+  }, [photos.length, createVideoFromPhotos]);
 
-  // Navigate when GIF is ready
+  // Navigate when video is ready
   useEffect(() => {
-    if (photos.length === 6 && gifData) {
+    if (photos.length === 6 && videoData) {
       setTimeout(() => {
         navigate('/photo-confirmation', {
           state: {
             ...state,
             photos,
-            gifData,
+            videoData,
           },
         });
       }, 1000);
     }
-  }, [photos.length, gifData, navigate, state, photos]);
+  }, [photos.length, videoData, navigate, state, photos]);
 
   return (
     <div className="main-shooting-container">
@@ -275,7 +307,7 @@ export default function MainShooting() {
             </div>
           )}
 
-          {!isCameraLoading && !cameraError && !isCreatingGif && (
+          {!isCameraLoading && !cameraError && !isCreatingVideo && (
             <div className="photo-progress">
               <div className="progress-text">
                 Photos taken: {photos.length} / 6
@@ -291,11 +323,11 @@ export default function MainShooting() {
             </div>
           )}
 
-          {/* GIF Creation Loading Overlay */}
-          {isCreatingGif && (
+          {/* Video Creation Loading Overlay */}
+          {isCreatingVideo && (
             <div className="loading-overlay">
               <div className="loading-spinner" />
-              <div className="loading-text">Creating your GIF...</div>
+              <div className="loading-text">Creating your video...</div>
             </div>
           )}
 
