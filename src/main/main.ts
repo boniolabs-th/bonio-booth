@@ -32,7 +32,40 @@ ipcMain.on('ipc-example', async (event, arg) => {
   event.reply('ipc-example', msgTemplate('pong'));
 });
 
-ipcMain.on('print-photo', async (event, imageDataUrl: string) => {
+// Interface for print configuration
+interface PrintConfig {
+  imageDataUrl: string;
+  frameId: string;
+  frameName: string;
+}
+
+// Function to determine paper size and print settings based on frame
+function getPrintSettings(frameId: string, frameName: string) {
+  // Default settings
+  let pageSize: any = 'A4';
+  let scaleFactor = 1;
+  let cutInstruction = '';
+
+  // Configure based on frame type
+  if (frameId === 'classic_2x6' || frameName.includes('2x6')) {
+    // For 2x6 frame, use 4x6 paper and instruct printer to cut to 2x6
+    pageSize = { width: 152400, height: 101600 }; // 4x6 inches in microns
+    cutInstruction = '2x6_cut';
+    console.log('Print setting: 4x6 paper with 2x6 cut instruction for RX1HS');
+  } else if (frameId === 'modern_4x6' || frameName.includes('4x6')) {
+    // For 4x6 frame, use appropriate paper size
+    pageSize = { width: 152400, height: 203200 }; // 6x8 inches in microns
+    console.log('Print setting: 6x8 paper for 4x6 frame');
+  }
+
+  return {
+    pageSize,
+    scaleFactor,
+    cutInstruction,
+  };
+}
+
+ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
   try {
     if (!mainWindow) {
       event.reply('print-response', {
@@ -85,7 +118,7 @@ ipcMain.on('print-photo', async (event, imageDataUrl: string) => {
           </style>
         </head>
         <body>
-          <img src="${imageDataUrl}" alt="Photo to print" />
+          <img src="${printConfig.imageDataUrl}" alt="Photo to print" />
         </body>
       </html>
     `;
@@ -97,6 +130,9 @@ ipcMain.on('print-photo', async (event, imageDataUrl: string) => {
 
     // Wait for the content to load
     printWindow.webContents.once('did-finish-load', () => {
+      // Get print settings based on frame configuration
+      const printSettings = getPrintSettings(printConfig.frameId, printConfig.frameName);
+
       // Get the default printer
       printWindow.webContents
         .getPrintersAsync()
@@ -113,17 +149,33 @@ ipcMain.on('print-photo', async (event, imageDataUrl: string) => {
           // Use the default printer (first in the list)
           const defaultPrinter = printers[0];
 
+          console.log(`Printing with frame: ${printConfig.frameName} (${printConfig.frameId})`);
+          console.log('Print settings:', printSettings);
+
+          // Print configuration for different frame types
+          const printOptions: any = {
+            silent: true, // Print without showing dialog
+            printBackground: true,
+            deviceName: defaultPrinter.name,
+            pageSize: printSettings.pageSize,
+            margins: {
+              marginType: 'none', // Use no margins for photo printing
+            },
+          };
+
+          // Add special handling for RX1HS printer with 2x6 frames
+          if (printSettings.cutInstruction === '2x6_cut') {
+            // Add printer-specific options for cutting instruction
+            printOptions.dpi = { horizontal: 300, vertical: 300 };
+            printOptions.copies = 1;
+            // Note: Actual cutting instruction depends on RX1HS printer driver
+            // This may need to be implemented through printer-specific commands
+            console.log('RX1HS: Setting up 4x6 paper with 2x6 cut instruction');
+          }
+
           // Print without showing dialog
           printWindow.webContents.print(
-            {
-              silent: true, // Print without showing dialog
-              printBackground: true,
-              deviceName: defaultPrinter.name,
-              pageSize: 'A4',
-              margins: {
-                marginType: 'default',
-              },
-            },
+            printOptions,
             (success, failureReason) => {
               if (success) {
                 console.log('Print job sent successfully');
@@ -228,10 +280,10 @@ const createWindow = async () => {
     width: 1024,
     height: 728,
     icon: getAssetPath('icon.png'),
-    fullscreen: true,
+    fullscreen: false,
     kiosk: true,
     frame: false,
-    resizable: false,
+    resizable: true,
     webPreferences: {
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')

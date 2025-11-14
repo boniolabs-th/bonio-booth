@@ -98,7 +98,7 @@ export default function PaymentQR() {
       const status = await paymentService.checkPaymentStatus(referenceId);
       if (status.success && status.status) {
         setPaymentStatus(status.status as any); // Cast to any to handle all KSher statuses
-        
+
         if (status.status === 'NOTPAY') {
           // Payment successful, start countdown
           setSuccessCountdown(3);
@@ -120,8 +120,8 @@ export default function PaymentQR() {
     if (successCountdown === null) return;
 
     if (successCountdown <= 0) {
-      // Navigate to photo prepare after countdown
-      navigate('/photo-prepare', {
+      // Navigate to frame selection after countdown
+      navigate('/frame-selection', {
         state: {
           quantity: state.quantity,
           totalPrice: state.totalPrice,
@@ -139,7 +139,7 @@ export default function PaymentQR() {
 
   const handlePriceClick = () => {
     if (paymentStatus === 'SUCCESS') {
-      navigate('/photo-prepare', {
+      navigate('/frame-selection', {
         state: {
           quantity: state.quantity,
           totalPrice: state.totalPrice,
@@ -158,7 +158,7 @@ export default function PaymentQR() {
     if (successCountdown !== null) {
       return `ชำระเงินสำเร็จ (${successCountdown})`;
     }
-    
+
     switch (paymentStatus) {
       case 'pending':
         return 'Waiting for payment...';

@@ -3,11 +3,15 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Header } from '..';
 import './PhotoConfirmation.css';
 
+interface Capture {
+  video: string;
+  photo: string;
+}
+
 interface LocationState {
   quantity: number;
   totalPrice: number;
-  photos: string[];
-  videoData: string;
+  captures: Capture[];
 }
 
 export default function PhotoConfirmation() {
@@ -38,11 +42,11 @@ export default function PhotoConfirmation() {
           <h2 className="title">Confirm Your Photo Shoot</h2>
 
           <div className="photos-grid">
-            {state.photos &&
-              state.photos.map((photo, index) => (
+            {state.captures &&
+              state.captures.map((capture, index) => (
                 <div key={index} className="photo-frame">
                   <img
-                    src={photo}
+                    src={capture.photo}
                     alt={`Photo ${index + 1}`}
                     className="photo-image"
                   />

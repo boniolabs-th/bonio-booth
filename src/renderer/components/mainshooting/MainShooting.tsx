@@ -2,11 +2,18 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from '..';
+import { FrameConfig } from '../../utils/frameConfig';
 import './MainShooting.css';
 
 interface LocationState {
   quantity: number;
   totalPrice: number;
+  selectedFrame: FrameConfig;
+}
+
+interface Capture {
+  video: string; // Blob URL
+  photo: string; // Base64 data URL
 }
 
 export default function MainShooting() {
@@ -14,19 +21,20 @@ export default function MainShooting() {
   const location = useLocation();
   const state = location.state as LocationState;
 
-  const [countdown, setCountdown] = useState(5);
-  const [currentPhoto, setCurrentPhoto] = useState(0);
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [videoData, setVideoData] = useState<string>('');
+  const [countdown, setCountdown] = useState(3);
+  const [currentCapture, setCurrentCapture] = useState(0);
+  const [captures, setCaptures] = useState<Capture[]>([]);
   const [showCountdown, setShowCountdown] = useState(false);
   const [showFlash, setShowFlash] = useState(false);
   const [isCameraLoading, setIsCameraLoading] = useState(true);
   const [cameraError, setCameraError] = useState<string>('');
-  const [isCreatingVideo, setIsCreatingVideo] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
 
   const handleBack = () => {
     // Stop camera when going back
@@ -41,8 +49,14 @@ export default function MainShooting() {
       setIsCameraLoading(true);
       setCameraError('');
 
+      // Determine video constraints based on frame orientation
+      const isPortrait = state.selectedFrame?.orientation === 'portrait';
+      const videoConstraints = isPortrait
+        ? { width: 1080, height: 1920 } // Portrait mode
+        : { width: 1920, height: 1080 }; // Landscape mode
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 },
+        video: videoConstraints,
         audio: false,
       });
       streamRef.current = stream;
@@ -74,84 +88,62 @@ export default function MainShooting() {
     }
   };
 
-  const createVideoFromPhotos = useCallback(async () => {
-    if (photos.length !== 6) return;
-
-    setIsCreatingVideo(true);
+  const startRecording = useCallback(() => {
+    if (!videoRef.current || !streamRef.current) return;
 
     try {
-      // Create canvas for video composition
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) {
-        setIsCreatingVideo(false);
+      recordedChunksRef.current = [];
+      const options = { mimeType: 'video/webm;codecs=vp9' };
+
+      // Fallback to vp8 if vp9 is not supported
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options.mimeType = 'video/webm;codecs=vp8';
+      }
+
+      const mediaRecorder = new MediaRecorder(streamRef.current, options);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch {
+      // Error starting recording
+    }
+  }, []);
+
+  const stopRecording = useCallback((): Promise<string> => {
+    return new Promise((resolve) => {
+      if (!mediaRecorderRef.current) {
+        resolve('');
         return;
       }
 
-      // Set canvas dimensions
-      canvas.width = 640;
-      canvas.height = 480;
+      // Check if mediaRecorder is recording
+      if (mediaRecorderRef.current.state === 'inactive') {
+        resolve('');
+        return;
+      }
 
-      // Create MediaRecorder to record canvas
-      const stream = canvas.captureStream(30); // 30 FPS
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/mp4; codecs=avc1.424028,mp4a.40.2',
-      });
-
-      const chunks: Blob[] = [];
-      
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'video/mp4' });
+      mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, {
+          type: 'video/webm',
+        });
         const url = URL.createObjectURL(blob);
-        setVideoData(url);
-        setIsCreatingVideo(false);
+        setIsRecording(false);
+        resolve(url);
       };
 
-      // Start recording
-      mediaRecorder.start();
+      mediaRecorderRef.current.stop();
+    });
+  }, []);
 
-      // Animation function to display photos
-      let currentFrame = 0;
-      const frameDuration = 800; // 0.8 seconds per frame
-      const totalFrames = photos.length;
-
-      const animate = () => {
-        if (currentFrame < totalFrames) {
-          const img = new Image();
-          img.onload = () => {
-            // Clear canvas and draw image
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            
-            currentFrame += 1;
-            setTimeout(animate, frameDuration);
-          };
-          img.src = photos[currentFrame];
-        } else {
-          // Stop recording after all frames
-          setTimeout(() => {
-            mediaRecorder.stop();
-          }, frameDuration);
-        }
-      };
-
-      // Start animation
-      animate();
-    } catch {
-      // Error creating video
-      setIsCreatingVideo(false);
-    }
-  }, [photos]);
-
-  const takePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
+  const takePhoto = (): string => {
+    if (!videoRef.current || !canvasRef.current) return '';
 
     const canvas = canvasRef.current;
     const video = videoRef.current;
@@ -162,30 +154,39 @@ export default function MainShooting() {
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0);
 
-      const photoData = canvas.toDataURL('image/jpeg');
-      setPhotos((prev) => [...prev, photoData]);
+      const photoData = canvas.toDataURL('image/png');
 
       // Flash effect
       setShowFlash(true);
       setTimeout(() => setShowFlash(false), 150);
+
+      return photoData;
     }
+
+    return '';
   };
 
-  const startCountdown = (duration: number, callback: () => void) => {
-    setCountdown(duration);
-    setShowCountdown(true);
+  const startCountdown = (
+    duration: number,
+    callback: () => void,
+  ): Promise<void> => {
+    return new Promise((resolve) => {
+      setCountdown(duration);
+      setShowCountdown(true);
 
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setShowCountdown(false);
-          callback();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setShowCountdown(false);
+            callback();
+            resolve();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    });
   };
 
   // Initialize camera when component mounts
@@ -195,28 +196,46 @@ export default function MainShooting() {
         // Wait for camera to load before starting
         await startCamera();
 
-        // Start initial countdown and first photo
-        startCountdown(5, () => {
-          // Take first photo
-          takePhoto();
-          setCurrentPhoto(1);
+        // Capture loop for 6 captures
+        const captureLoop = async () => {
+          const newCaptures: Capture[] = [];
 
-          // Continue taking photos every 3 seconds
-          let photoCount = 1;
-          const photoTimer = setInterval(() => {
-            if (photoCount < 6) {
-              startCountdown(3, () => {
-                takePhoto();
-                photoCount += 1;
-                setCurrentPhoto(photoCount);
+          // eslint-disable-next-line no-plusplus
+          for (let i = 0; i < 6; i += 1) {
+            setCurrentCapture(i);
 
-                if (photoCount >= 6) {
-                  clearInterval(photoTimer);
-                }
-              });
+            // Start recording video
+            startRecording();
+
+            // Countdown 3 seconds
+            // eslint-disable-next-line no-await-in-loop
+            await startCountdown(3, () => {
+              // Callback when countdown reaches 0
+            });
+
+            // Stop recording and get video URL
+            // eslint-disable-next-line no-await-in-loop
+            const videoUrl = await stopRecording();
+
+            // Take photo immediately after countdown
+            const photoData = takePhoto();
+
+            // Add capture to array
+            if (videoUrl && photoData) {
+              newCaptures.push({ video: videoUrl, photo: photoData });
+              // Update state to show progress
+              setCaptures([...newCaptures]);
             }
-          }, 4000); // 3 seconds countdown + 1 second buffer
-        });
+
+            // Wait 1 second before next capture (unless it's the last one)
+            if (i < 5) {
+              // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+          }
+        };
+
+        captureLoop();
       } catch {
         // Camera initialization failed
         setCameraError('Failed to initialize camera');
@@ -230,32 +249,27 @@ export default function MainShooting() {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
+      // Stop recording if still recording
+      if (mediaRecorderRef.current && isRecording) {
+        mediaRecorderRef.current.stop();
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Navigate when we have all 6 photos
+  // Navigate when we have all 6 captures
   useEffect(() => {
-    if (photos.length === 6) {
-      // Create video from photos
-      createVideoFromPhotos();
-    }
-  }, [photos.length, createVideoFromPhotos]);
-
-  // Navigate when video is ready
-  useEffect(() => {
-    if (photos.length === 6 && videoData) {
+    if (captures.length === 6) {
       setTimeout(() => {
         navigate('/photo-confirmation', {
           state: {
             ...state,
-            photos,
-            videoData,
+            captures,
           },
         });
       }, 1000);
     }
-  }, [photos.length, videoData, navigate, state, photos]);
+  }, [captures.length, navigate, state, captures]);
 
   return (
     <div className="main-shooting-container">
@@ -264,7 +278,9 @@ export default function MainShooting() {
 
       {/* Main Content */}
       <div className="main-content">
-        <div className="camera-container">
+        <div
+          className={`camera-container ${state.selectedFrame?.orientation === 'portrait' ? 'portrait' : 'landscape'}`}
+        >
           <video
             ref={videoRef}
             autoPlay
@@ -299,35 +315,23 @@ export default function MainShooting() {
           {showCountdown && !isCameraLoading && (
             <div className="countdown-overlay">
               <div className="countdown-number">{countdown}</div>
-              <div className="countdown-text">
-                {currentPhoto === 0
-                  ? 'Get Ready!'
-                  : `Photo ${currentPhoto + 1}`}
-              </div>
+              <div className="countdown-text">Photo {currentCapture + 1}</div>
             </div>
           )}
 
-          {!isCameraLoading && !cameraError && !isCreatingVideo && (
+          {!isCameraLoading && !cameraError && (
             <div className="photo-progress">
               <div className="progress-text">
-                Photos taken: {photos.length} / 6
+                Captures: {captures.length} / 6
               </div>
               <div className="progress-dots">
                 {[1, 2, 3, 4, 5, 6].map((num) => (
                   <div
                     key={num}
-                    className={`progress-dot ${photos.length >= num ? 'completed' : ''}`}
+                    className={`progress-dot ${captures.length >= num ? 'completed' : ''}`}
                   />
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* Video Creation Loading Overlay */}
-          {isCreatingVideo && (
-            <div className="loading-overlay">
-              <div className="loading-spinner" />
-              <div className="loading-text">Creating your video...</div>
             </div>
           )}
 

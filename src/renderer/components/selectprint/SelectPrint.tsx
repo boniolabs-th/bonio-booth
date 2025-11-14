@@ -25,7 +25,7 @@ export default function SelectPrint() {
 
   const handleConfirm = () => {
     // Navigate to payment page with quantity and total price
-    navigate('/payment', {
+    navigate('/payment-qr', {
       state: {
         quantity,
         totalPrice: price * quantity,

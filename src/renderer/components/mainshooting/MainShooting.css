@@ -52,13 +52,26 @@
 /* Camera Styles */
 .camera-container {
   position: relative;
-  width: 80%;
-  max-width: 800px;
-  height: 80%;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* Landscape orientation (wider) */
+.camera-container.landscape {
+  width: 80%;
+  max-width: 1500px;
+  aspect-ratio: 16 / 9;
+  max-height: 70vh;
+}
+
+/* Portrait orientation (taller) */
+.camera-container.portrait {
+  width: 50%;
+  max-width: 500px;
+  aspect-ratio: 9 / 16;
+  max-height: 85vh;
 }
 
 .camera-feed {

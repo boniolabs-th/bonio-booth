@@ -1,6 +1,8 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
 import { Header } from '..';
+import { FRAME_CONFIGS, FrameConfig } from '../../utils/frameConfig';
 import './PhotoPrepare.css';
 
 interface LocationState {
@@ -12,13 +14,16 @@ export default function PhotoPrepare() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
+  const [selectedFrame, setSelectedFrame] = useState<FrameConfig>(
+    FRAME_CONFIGS[0],
+  );
 
   const handleBack = () => {
-    navigate('/payment-qr', { state });
+    navigate('/frame-selection', { state });
   };
 
   const handleConfirm = () => {
-    navigate('/main-shooting', { state });
+    navigate('/main-shooting', { state: { ...state, selectedFrame } });
   };
 
   return (

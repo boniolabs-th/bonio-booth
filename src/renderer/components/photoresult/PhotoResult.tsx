@@ -1,17 +1,22 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useState, useCallback } from 'react';
-import { Header } from '..';
+import { useEffect, useState, useRef } from 'react';
+import { FrameConfig } from '../../utils/frameConfig';
 import './PhotoResult.css';
+
+interface Capture {
+  video: string;
+  photo: string;
+}
 
 interface LocationState {
   quantity: number;
   totalPrice: number;
-  photos: string[];
-  videoData: string;
+  captures: Capture[];
   finalImage: string;
-  selectedFrame: string;
+  selectedFrame: FrameConfig;
   selectedFilter: string;
+  selectedCaptures: Capture[];
 }
 
 export default function PhotoResult() {
@@ -21,6 +26,241 @@ export default function PhotoResult() {
   const [printStatus, setPrintStatus] = useState<
     'idle' | 'printing' | 'success' | 'error'
   >('idle');
+  const [compiledVideoUrl, setCompiledVideoUrl] = useState<string | null>(null);
+  const [isCreatingVideo, setIsCreatingVideo] = useState(false);
+  const hasGeneratedVideo = useRef(false);
+
+  const generateFramedVideo = async (
+    captures: Capture[],
+    frame: FrameConfig,
+  ): Promise<string> => {
+    const loadFrameImage = () =>
+      new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('ไม่สามารถโหลดภาพกรอบได้'));
+        img.src = frame.image;
+      });
+
+    const loadVideoElement = (capture: Capture, index: number) =>
+      new Promise<HTMLVideoElement>((resolve, reject) => {
+        const videoElement = document.createElement('video');
+        videoElement.src = capture.video;
+        videoElement.muted = true;
+        videoElement.preload = 'auto';
+        videoElement.loop = true;
+        videoElement.playsInline = true;
+
+        const timeout = setTimeout(() => {
+          reject(new Error(`วิดีโอที่ ${index + 1} ใช้เวลานานเกินไปในการโหลด`));
+        }, 10000);
+
+        videoElement.onloadedmetadata = () => {
+          clearTimeout(timeout);
+          resolve(videoElement);
+        };
+
+        videoElement.onerror = () => {
+          clearTimeout(timeout);
+          reject(new Error(`ไม่สามารถโหลดวิดีโอที่ ${index + 1}`));
+        };
+      });
+
+    const [frameImg, videoElements] = await Promise.all([
+      loadFrameImage(),
+      Promise.all(captures.map(loadVideoElement)),
+    ]);
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      throw new Error('ไม่สามารถสร้าง canvas context ได้');
+    }
+
+    const frameWidth = frameImg.naturalWidth || frame.width;
+    const frameHeight = frameImg.naturalHeight || frame.height;
+
+    canvas.width = frameWidth;
+    canvas.height = frameHeight;
+
+    const scaleX = frameWidth / frame.width;
+    const scaleY = frameHeight / frame.height;
+
+    videoElements.forEach((video) => {
+      // eslint-disable-next-line no-param-reassign
+      video.currentTime = 0;
+    });
+
+    await Promise.all(videoElements.map((video) => video.play().catch(() => undefined)));
+
+    return new Promise<string>((resolve, reject) => {
+      const stream = canvas.captureStream(30);
+
+      const mimeTypes = [
+        'video/webm;codecs=vp9',
+        'video/webm',
+        'video/webm;codecs=vp8',
+      ];
+
+      const selectedMimeType =
+        mimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ||
+        mimeTypes[0];
+
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: selectedMimeType,
+        videoBitsPerSecond: 2500000,
+      });
+
+      const chunks: Blob[] = [];
+      let animationFrameId: number | null = null;
+      const maxDuration = 4;
+      const startTime = performance.now();
+      let recording = true;
+
+      const cleanup = () => {
+        recording = false;
+        if (animationFrameId !== null) {
+          cancelAnimationFrame(animationFrameId);
+        }
+        stream.getTracks().forEach((track) => track.stop());
+        videoElements.forEach((video) => {
+          video.pause();
+          // eslint-disable-next-line no-param-reassign
+          video.src = '';
+        });
+      };
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        cleanup();
+        const blob = new Blob(chunks, { type: selectedMimeType });
+        const url = URL.createObjectURL(blob);
+        resolve(url);
+      };
+
+      mediaRecorder.onerror = (event) => {
+        cleanup();
+        reject(
+          event.error || new Error('MediaRecorder เกิดปัญหาในระหว่างสร้างวิดีโอ'),
+        );
+      };
+
+      const drawFrame = () => {
+        if (!recording) {
+          return;
+        }
+
+        const elapsed = (performance.now() - startTime) / 1000;
+        if (elapsed >= maxDuration) {
+          recording = false;
+          mediaRecorder.stop();
+          return;
+        }
+
+        ctx.clearRect(0, 0, frameWidth, frameHeight);
+        ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+
+        frame.slots.forEach((slot, index) => {
+          const video = videoElements[index];
+          if (!video) {
+            return;
+          }
+
+          const slotAspect = slot.width / slot.height;
+          const videoAspect = video.videoWidth / video.videoHeight || 1;
+
+          let sourceWidth = video.videoWidth;
+          let sourceHeight = video.videoHeight;
+          let sourceX = 0;
+          let sourceY = 0;
+
+          if (videoAspect > slotAspect) {
+            sourceWidth = video.videoHeight * slotAspect;
+            sourceX = (video.videoWidth - sourceWidth) / 2;
+          } else {
+            sourceHeight = video.videoWidth / slotAspect;
+            sourceY = (video.videoHeight - sourceHeight) / 2;
+          }
+
+          const targetX = slot.x * scaleX;
+          const targetY = slot.y * scaleY;
+          const targetWidth = slot.width * scaleX;
+          const targetHeight = slot.height * scaleY;
+
+          ctx.drawImage(
+            video,
+            sourceX,
+            sourceY,
+            sourceWidth,
+            sourceHeight,
+            targetX,
+            targetY,
+            targetWidth,
+            targetHeight,
+          );
+        });
+
+        animationFrameId = requestAnimationFrame(drawFrame);
+      };
+
+      mediaRecorder.start();
+      drawFrame();
+    });
+  };
+
+  // Create compiled video from selected captures
+  useEffect(() => {
+    const createFramedVideo = async () => {
+      if (!state?.selectedCaptures || state.selectedCaptures.length === 0) {
+        return;
+      }
+
+      if (!state?.selectedFrame) {
+        return;
+      }
+
+      if (hasGeneratedVideo.current) {
+        return;
+      }
+
+      hasGeneratedVideo.current = true;
+      setIsCreatingVideo(true);
+
+      try {
+        const url = await generateFramedVideo(
+          state.selectedCaptures,
+          state.selectedFrame,
+        );
+        setCompiledVideoUrl(url);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error creating framed video:', error);
+        // eslint-disable-next-line no-alert
+        alert(
+          `เกิดข้อผิดพลาดในการสร้างวิดีโอ: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+        hasGeneratedVideo.current = false;
+      } finally {
+        setIsCreatingVideo(false);
+      }
+    };
+
+    createFramedVideo();
+  }, [state?.selectedCaptures, state?.selectedFrame]);
+
+  useEffect(() => {
+    return () => {
+      if (compiledVideoUrl) {
+        URL.revokeObjectURL(compiledVideoUrl);
+      }
+    };
+  }, [compiledVideoUrl]);
 
   // Auto-print when component mounts
   useEffect(() => {
@@ -45,8 +285,12 @@ export default function PhotoResult() {
           window.electron?.print?.removePrintResponseListener();
         });
 
-        // Send print request
-        window.electron?.print?.printPhoto(state.finalImage);
+        // Send print request with frame configuration
+        window.electron?.print?.printPhoto({
+          imageDataUrl: state.finalImage,
+          frameId: state.selectedFrame?.id || 'classic_2x6',
+          frameName: state.selectedFrame?.name || '2x6 Classic',
+        });
       } catch {
         setPrintStatus('error');
       }
@@ -55,7 +299,12 @@ export default function PhotoResult() {
     if (state?.finalImage && printStatus === 'idle') {
       handleAutoPrint();
     }
-  }, [state?.finalImage, printStatus]);
+  }, [
+    state?.finalImage,
+    state?.selectedFrame?.id,
+    state?.selectedFrame?.name,
+    printStatus,
+  ]);
 
   const handleFinish = () => {
     navigate('/');
@@ -67,129 +316,108 @@ export default function PhotoResult() {
     return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMTAgMTBoODB2ODBIMTBWMTB6IiBmaWxsPSJibGFjayIvPgo8cGF0aCBkPSJNMjAgMjBoNjB2NjBIMjBWMjB6IiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMzAgMzBoNDB2NDBIMzBWMzB6IiBmaWxsPSJibGFjayIvPgo8L3N2Zz4K';
   };
 
+  const handleDownloadGif = () => {
+    // Download compiled video
+    if (compiledVideoUrl) {
+      const link = document.createElement('a');
+      link.href = compiledVideoUrl;
+      link.download = `bonio-booth-video-${Date.now()}.webm`;
+      link.click();
+    }
+  };
+
   return (
     <div className="photo-result-container">
       {/* Header */}
-      <Header showLogo />
+      <div className="result-header">
+        <h1 className="result-title">รูปถ่ายของคุณ</h1>
+        <p className="result-subtitle">YOUR PHOTO</p>
+      </div>
 
-      {/* Main Content */}
-      <div className="main-content">
-        <div className="result-layout">
-          {/* Left side - Final photo */}
-          <div className="final-photo-section">
-            <h2 className="section-title">Your Beautiful Memory</h2>
+      {/* Main Layout */}
+      <div className="result-main">
+        {/* Left - Frame with Photos */}
+        <div className="frame-display-section">
+          <div className="frame-display-container">
+            {state.finalImage && (
+              <img
+                src={state.finalImage}
+                alt="Final result"
+                className="final-result-image"
+              />
+            )}
+          </div>
+        </div>
 
-            <div className="final-photo-container">
-              {state.finalImage ? (
-                <img
-                  src={state.finalImage}
-                  alt="Your captured memory"
-                  className="final-photo"
-                />
-              ) : (
-                <div className="placeholder-photo">
-                  <div className="placeholder-content">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+        {/* Right - QR Code & Download */}
+        <div className="download-section">
+          <div className="download-content">
+            <h2 className="download-title">ดาวน์โหลดวิดีโอ</h2>
+            <p className="download-subtitle">DOWNLOAD YOUR VIDEO</p>
+
+            {isCreatingVideo ? (
+              <div className="creating-video-message">
+                <div className="loading-spinner" />
+                <p>กำลังสร้างวิดีโอของคุณ...</p>
+              </div>
+            ) : (
+              <>
+                <div className="qr-display">
+                  <img
+                    src={generateQRCode()}
+                    alt="QR Code"
+                    className="qr-code"
+                  />
+                  <p className="qr-instruction">สแกน QR Code เพื่อดาวน์โหลด</p>
+                </div>
+
+                <div className="download-actions">
+                  <button
+                    type="button"
+                    className="download-button"
+                    onClick={handleDownloadGif}
+                    disabled={!compiledVideoUrl}
+                  >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                       <path
-                        d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"
-                        fill="currentColor"
+                        d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <polyline
+                        points="7 10 12 15 17 10"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <line
+                        x1="12"
+                        y1="15"
+                        x2="12"
+                        y2="3"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       />
                     </svg>
-                    <p>Your photo will appear here</p>
-                  </div>
+                    ดาวน์โหลดวิดีโอ
+                  </button>
                 </div>
-              )}
-            </div>
-
-            <div className="photo-details">
-              <div className="detail-item">
-                <span className="label">Frame:</span>
-                <span className="value">
-                  {state.selectedFrame || 'Classic'}
-                </span>
-              </div>
-              <div className="detail-item">
-                <span className="label">Filter:</span>
-                <span className="value">
-                  {state.selectedFilter || 'Original'}
-                </span>
-              </div>
-              <div className="detail-item">
-                <span className="label">Photos:</span>
-                <span className="value">
-                  {state.photos?.length || 0} images
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right side - Download options */}
-          <div className="download-section">
-            <h2 className="section-title">Download Your .Gif</h2>
-
-            <div className="download-container">
-              <div className="qr-code-container">
-                <img
-                  src={generateQRCode()}
-                  alt="QR Code for download"
-                  className="qr-code"
-                />
-                <p className="qr-text">Scan to download</p>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </div>
+      </div>
 
-        {/* Finish Button */}
-        <div className="action-section">
-          {/* Print Status Display */}
-          {/* {printStatus !== 'idle' && (
-            <div className={`print-status ${printStatus}`}>
-              {printStatus === 'printing' && (
-                <div className="print-message">
-                  <span className="print-icon">🖨️</span>
-                  Printing your photo...
-                </div>
-              )}
-              {printStatus === 'success' && (
-                <div className="print-message success">
-                  <span className="print-icon">✅</span>
-                  Photo printed successfully!
-                </div>
-              )}
-              {printStatus === 'error' && (
-                <div className="print-message error">
-                  <span className="print-icon">❌</span>
-                  Print failed. Please check your printer.
-                </div>
-              )}
-            </div>
-          )} */}
-
-          <button
-            type="button"
-            className="finish-button"
-            onClick={handleFinish}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M9 12l2 2 4-4"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c1.46 0 2.84.35 4.05.97"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Finish & Return Home
-          </button>
-        </div>
+      {/* Bottom Button */}
+      <div className="result-footer">
+        <button type="button" className="finish-button" onClick={handleFinish}>
+          เสร็จสิ้น
+        </button>
       </div>
     </div>
   );

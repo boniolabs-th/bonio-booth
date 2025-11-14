@@ -1,5 +1,5 @@
-import classic4x6 from '../../../assets/frames/4x6_classic.png';
-import modern6x8 from '../../../assets/frames/6x8_modern.png';
+import classic2x6 from '../../../assets/frames/2x6_classic.png';
+import modern4x6 from '../../../assets/frames/4x8_modern.png';
 
 export interface FrameConfig {
   id: string;
@@ -7,7 +7,15 @@ export interface FrameConfig {
   image: string;
   width: number; // Canvas width in pixels (300 DPI)
   height: number; // Canvas height in pixels (300 DPI)
+  orientation: 'portrait' | 'landscape'; // Camera orientation for shooting
   slots: {
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }[];
+  previewSlots?: {
     id: string;
     x: number;
     y: number;
@@ -18,24 +26,36 @@ export interface FrameConfig {
 
 export const FRAME_CONFIGS: FrameConfig[] = [
   {
-    id: 'classic_4x6',
-    name: '4x6 Classic',
-    image: classic4x6,
-    width: 600, // 4 inches × 300 DPI
-    height: 1800, // 6 inches × 300 DPI
+    id: 'classic_2x6',
+    name: '2x6 Classic',
+    image: classic2x6,
+    width: 2400,
+    height: 3600,
+    orientation: 'landscape' as const,
     slots: [
-      { id: 'classic_slot_1', x: 39, y: 36, width: 518.4, height: 297 }, // Top left photo slot
-      { id: 'classic_slot_2', x: 39, y: 378, width: 518.4, height: 297 }, // Top right photo slot
-      { id: 'classic_slot_3', x: 39, y: 718.2, width: 518.4, height: 297 }, // Middle left photo slot
-      { id: 'classic_slot_4', x: 39, y: 1056.6, width: 518.4, height: 297 },
+      { id: 'classic_slot_1', x: 35, y: 54, width: 1130, height: 1083 }, // Top left photo slot
+      { id: 'classic_slot_2', x: 1237, y: 55, width: 1130, height: 1083 }, // Top right photo slot
+      { id: 'classic_slot_3', x: 35, y: 1163, width: 1130, height: 1083 }, // Middle left photo slot
+      { id: 'classic_slot_4', x: 1233, y: 1162, width: 1130, height: 1083 },
+      { id: 'classic_slot_5', x: 37, y: 2275, width: 1130, height: 1083 },
+      { id: 'classic_slot_6', x: 1238, y: 2272, width: 1130, height: 1083 },
+    ],
+    previewSlots: [
+      { id: 'classic_slot_1', x: 151, y: 54, width: 1018, height: 1083 },
+      { id: 'classic_slot_2', x: 1237, y: 55, width: 1018, height: 1083 },
+      { id: 'classic_slot_3', x: 151, y: 1163, width: 1018, height: 1083 },
+      { id: 'classic_slot_4', x: 1237, y: 1162, width: 1018, height: 1083 },
+      { id: 'classic_slot_5', x: 151, y: 2275, width: 1018, height: 1083 },
+      { id: 'classic_slot_6', x: 1237, y: 2272, width: 1018, height: 1083 },
     ],
   },
   {
-    id: 'modern_6x8',
-    name: '6x8 Modern',
-    image: modern6x8,
+    id: 'modern_4x6',
+    name: '4x6 Modern',
+    image: modern4x6,
     width: 1200, // 6 inches × 300 DPI
     height: 1800, // 8 inches × 300 DPI
+    orientation: 'landscape' as const,
     slots: [
       { id: 'modern_slot_1', x: 150, y: 150, width: 450, height: 300 }, // Top left
       { id: 'modern_slot_2', x: 675, y: 150, width: 450, height: 300 }, // Top middle

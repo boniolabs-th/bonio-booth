@@ -2,6 +2,7 @@ import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
 import {
   Home,
   SelectPrint,
+  FrameSelection,
   PaymentQR,
   PhotoPrepare,
   MainShooting,
@@ -17,6 +18,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/select-print" element={<SelectPrint />} />
+        <Route path="/frame-selection" element={<FrameSelection />} />
         <Route path="/payment" element={<PaymentQR />} />
         <Route path="/payment-qr" element={<PaymentQR />} />
         <Route path="/photo-prepare" element={<PhotoPrepare />} />

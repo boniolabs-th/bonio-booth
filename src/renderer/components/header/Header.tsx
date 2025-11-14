@@ -50,14 +50,6 @@ export default function Header({
           </svg>
         </button>
       )}
-
-      {showLogo && (
-        <div className="logo-container">
-          <img src={icon} alt="Bonio Booth" className="logo" />
-        </div>
-      )}
-
-      {title && <h1 className="header-title">{title}</h1>}
     </header>
   );
 }

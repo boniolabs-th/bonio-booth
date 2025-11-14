@@ -1,41 +1,49 @@
+/* eslint-disable jsx-a11y/img-redundant-alt */
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useRef } from 'react';
-import { Header } from '..';
-import { FRAME_CONFIGS, FILTERS, FrameConfig } from '../../utils/frameConfig';
+import { FRAME_CONFIGS, FrameConfig } from '../../utils/frameConfig';
 import './PhotoDecorate.css';
+
+interface Capture {
+  video: string;
+  photo: string;
+}
 
 interface LocationState {
   quantity: number;
   totalPrice: number;
-  photos: string[];
-  videoData: string;
+  captures: Capture[];
 }
 
 export default function PhotoDecorate() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
-
-  const [activeTab, setActiveTab] = useState<'frame' | 'filter'>('frame');
-  const [selectedFrame, setSelectedFrame] = useState<FrameConfig>(
-    FRAME_CONFIGS[0],
-  );
-  const [selectedFilter, setSelectedFilter] = useState(FILTERS[0]);
+  const [selectedFrame] = useState<FrameConfig>(FRAME_CONFIGS[0]);
   const [photoAssignments, setPhotoAssignments] = useState<{
     [slotIndex: number]: number;
   }>({});
-  const [draggedPhoto, setDraggedPhoto] = useState<number | null>(null);
+  const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previewSlots = selectedFrame.previewSlots || selectedFrame.slots;
+  const frameAspectRatio = selectedFrame.height
+    ? selectedFrame.width / selectedFrame.height
+    : 1;
 
-  const handleReset = () => {
-    navigate('/main-shooting', { state });
-  };
-
-  const handleConfirm = () => {
-    // Generate final image
-    generateFinalImage();
+  const proceedToResult = (
+    finalImageData: string,
+    selectedCaptures: Capture[],
+  ) => {
+    navigate('/photo-result', {
+      state: {
+        ...state,
+        finalImage: finalImageData,
+        selectedFrame,
+        selectedCaptures,
+      },
+    });
   };
 
   const generateFinalImage = () => {
@@ -45,257 +53,216 @@ export default function PhotoDecorate() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size based on frame configuration (300 DPI for print quality)
-    canvas.width = selectedFrame.width;
-    canvas.height = selectedFrame.height;
-
     // Create the final composite image
     const frameImg = new Image();
     frameImg.onload = () => {
-      // Draw frame first
-      ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height);
+      const frameWidth = frameImg.naturalWidth || selectedFrame.width;
+      const frameHeight = frameImg.naturalHeight || selectedFrame.height;
+
+      canvas.width = frameWidth;
+      canvas.height = frameHeight;
+
+      const scaleX = frameWidth / selectedFrame.width;
+      const scaleY = frameHeight / selectedFrame.height;
 
       // Draw photos in their assigned slots
       let loadedPhotos = 0;
       const totalPhotos = Object.keys(photoAssignments).length;
 
       if (totalPhotos === 0) {
-        // No photos assigned, just proceed
-        proceedToResult(canvas.toDataURL('image/jpeg'));
+        // No photos assigned, draw frame only
+        ctx.clearRect(0, 0, frameWidth, frameHeight);
+        ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+        proceedToResult(canvas.toDataURL('image/png'), []);
         return;
       }
 
+      // Draw frame background before adding photos
+      ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+
       Object.entries(photoAssignments).forEach(([slotIndex, photoIndex]) => {
         const slot = selectedFrame.slots[parseInt(slotIndex, 10)];
+        const targetX = slot.x * scaleX;
+        const targetY = slot.y * scaleY;
+        const targetWidth = slot.width * scaleX;
+        const targetHeight = slot.height * scaleY;
         const photoImg = new Image();
 
         photoImg.onload = () => {
           ctx.save();
 
-          // Apply filter if selected
-          if (selectedFilter.filter) {
-            ctx.filter = selectedFilter.filter;
+          // Calculate crop dimensions (cover behavior - crop to fit slot)
+          const photoAspect = photoImg.width / photoImg.height;
+          const slotAspect = slot.width / slot.height;
+
+          let sourceX = 0;
+          let sourceY = 0;
+          let sourceWidth = photoImg.width;
+          let sourceHeight = photoImg.height;
+
+          if (photoAspect > slotAspect) {
+            // Photo is wider - crop sides
+            sourceWidth = photoImg.height * slotAspect;
+            sourceX = (photoImg.width - sourceWidth) / 2;
+          } else {
+            // Photo is taller - crop top/bottom
+            sourceHeight = photoImg.width / slotAspect;
+            sourceY = (photoImg.height - sourceHeight) / 2;
           }
 
-          // Draw photo in slot
+          // Draw cropped photo in slot
           ctx.drawImage(
             photoImg,
-            slot.x,
-            slot.y,
-            slot.width + 3,
-            slot.height + 6,
+            sourceX,
+            sourceY,
+            sourceWidth,
+            sourceHeight,
+            targetX,
+            targetY,
+            targetWidth,
+            targetHeight,
           );
 
           ctx.restore();
 
           loadedPhotos += 1;
           if (loadedPhotos === totalPhotos) {
-            proceedToResult(canvas.toDataURL('image/jpeg'));
+            // Preserve slot order when collecting the selected captures
+            const selectedCaptures = selectedFrame.slots.reduce<Capture[]>(
+              (acc, _, slotIdx) => {
+                const assignedIndex = photoAssignments[slotIdx];
+                if (assignedIndex !== undefined) {
+                  acc.push(state.captures[assignedIndex]);
+                }
+                return acc;
+              },
+              [],
+            );
+            proceedToResult(canvas.toDataURL('image/png'), selectedCaptures);
           }
         };
 
-        photoImg.src = state.photos[photoIndex];
+        photoImg.src = state.captures[photoIndex].photo;
       });
     };
 
     frameImg.src = selectedFrame.image;
   };
 
-  const proceedToResult = (finalImageData: string) => {
-    navigate('/photo-result', {
-      state: {
-        ...state,
-        finalImage: finalImageData,
-        selectedFrame: selectedFrame.name,
-        selectedFilter: selectedFilter.name,
-      },
-    });
+  const handleConfirm = () => {
+    // Generate final image
+    generateFinalImage();
   };
 
-  const handleDragStart = (photoIndex: number) => {
-    setDraggedPhoto(photoIndex);
-  };
+  const handlePhotoClick = (photoIndex: number) => {
+    // Check if photo is already selected
+    if (selectedPhotos.includes(photoIndex)) {
+      // Remove photo from selection
+      const newSelectedPhotos = selectedPhotos.filter((p) => p !== photoIndex);
+      setSelectedPhotos(newSelectedPhotos);
 
-  const handleDrop = (slotIndex: number) => {
-    if (draggedPhoto !== null) {
-      setPhotoAssignments((prev) => ({
-        ...prev,
-        [slotIndex]: draggedPhoto,
-      }));
-      setDraggedPhoto(null);
+      // Update photoAssignments to match new sequence
+      const newAssignments: { [slotIndex: number]: number } = {};
+      newSelectedPhotos.forEach((p, index) => {
+        newAssignments[index] = p;
+      });
+      setPhotoAssignments(newAssignments);
+    } else if (selectedPhotos.length < selectedFrame.slots.length) {
+      // Add photo to selection if there's space
+      const newSelectedPhotos = [...selectedPhotos, photoIndex];
+      setSelectedPhotos(newSelectedPhotos);
+
+      // Update photoAssignments
+      const newAssignments = { ...photoAssignments };
+      newAssignments[selectedPhotos.length] = photoIndex;
+      setPhotoAssignments(newAssignments);
     }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
   };
 
   return (
     <div className="photo-decorate-container">
       {/* Header */}
-      {/* <Header showLogo /> */}
+      <div className="decorate-header">
+        <h1 className="decorate-title">เลือกรูปของคุณ</h1>
+        <p className="decorate-subtitle">SELECT YOUR PHOTO</p>
+      </div>
 
-      {/* Main Content */}
-      <div className="main-content">
-        <div className="decoration-layout">
-          {/* Left Panel - Tools */}
-          <div className="tools-panel">
-            <div className="tabs">
-              <button
-                className={`tab ${activeTab === 'frame' ? 'active' : ''}`}
-                onClick={() => setActiveTab('frame')}
-              >
-                Frames
-              </button>
-              <button
-                className={`tab ${activeTab === 'filter' ? 'active' : ''}`}
-                onClick={() => setActiveTab('filter')}
-              >
-                Filters
-              </button>
-            </div>
-
-            <div className="tab-content">
-              {activeTab === 'frame' && (
-                <div className="frames-grid">
-                  {FRAME_CONFIGS.map((frame) => (
-                    <div
-                      key={frame.id}
-                      className={`frame-option ${selectedFrame.id === frame.id ? 'selected' : ''}`}
-                      onClick={() => setSelectedFrame(frame)}
-                    >
-                      <img src={frame.image} alt={frame.name} />
-                      <span>{frame.name}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {activeTab === 'filter' && (
-                <div className="filters-grid">
-                  {FILTERS.map((filter) => (
-                    <div
-                      key={filter.id}
-                      className={`filter-option ${selectedFilter.id === filter.id ? 'selected' : ''}`}
-                      onClick={() => setSelectedFilter(filter)}
-                    >
-                      <div
-                        className="filter-preview"
-                        style={{
-                          filter: filter.filter,
-                          backgroundImage: state.photos[0]
-                            ? `url(${state.photos[0]})`
-                            : 'none',
-                        }}
-                      />
-                      <span>{filter.name}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Panel - Preview */}
-          <div className="preview-panel">
-            <div className="preview-container">
-              {/* Frame with photo slots */}
-              <div className="frame-preview">
-                <img
-                  src={selectedFrame.image}
-                  alt="Frame"
-                  className="frame-image"
-                />
-
-                {selectedFrame.slots.map((slot, index) => (
-                  <div
-                    key={slot.id}
-                    className="photo-slot"
-                    style={{
-                      left: `${(slot.x / selectedFrame.width) * 4.3 * 100}%`,
-                      top: `${(slot.y / selectedFrame.height) * 100}%`,
-                      width: `${(slot.width / selectedFrame.width / 2) * 100}%`,
-                      height: `${(slot.height / selectedFrame.height) * 100}%`,
-                    }}
-                    onDrop={() => handleDrop(index)}
-                    onDragOver={handleDragOver}
-                  >
-                    {photoAssignments[index] !== undefined ? (
-                      <img
-                        src={state.photos[photoAssignments[index]]}
-                        alt={`Slot ${index + 1}`}
-                        className="slot-photo"
-                        style={{ filter: selectedFilter.filter }}
-                      />
-                    ) : (
-                      <div className="empty-slot">Drag photo here</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Available Photos */}
-              <div className="available-photos">
-                <h3>Your Photos</h3>
-                <div className="photos-list">
-                  {state.photos &&
-                    state.photos.map((photo, index) => (
-                      <div
-                        key={photo}
-                        className="draggable-photo"
-                        draggable
-                        onDragStart={() => handleDragStart(index)}
-                      >
-                        <img src={photo} alt={`Captured ${index + 1}`} />
-                        <div className="photo-label">{index + 1}</div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="action-buttons">
-          <button type="button" className="reset-button" onClick={handleReset}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M21 3v5h-5"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Reset
-          </button>
-
-          <button
-            type="button"
-            className="confirm-button"
-            onClick={handleConfirm}
+      {/* Main Layout */}
+      <div className="decorate-main">
+        {/* Left - Frame Preview */}
+        <div className="frame-preview-section">
+          <div
+            className="frame-preview-container"
+            style={{
+              aspectRatio: frameAspectRatio,
+              width: '100%',
+              maxWidth: '100%',
+            }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M9 2a1 1 0 000 2h11a1 1 0 100-2H9z"
-                fill="currentColor"
-              />
-              <path
-                d="M3 6a1 1 0 011-1h16a1 1 0 110 2H4a1 1 0 01-1-1zM5 10a1 1 0 011-1h12a1 1 0 110 2H6a1 1 0 01-1-1z"
-                fill="currentColor"
-              />
-            </svg>
-            Confirm
-          </button>
+            <img
+              src={selectedFrame.image}
+              alt="Frame"
+              className="frame-background-dec"
+            />
+            {previewSlots.map((slot, slotIndex) => (
+              <div
+                key={slot.id}
+                className="frame-slot-preview"
+                style={{
+                  position: 'absolute',
+                  left: `${(slot.x / selectedFrame.width) * 100}%`,
+                  top: `${(slot.y / selectedFrame.height) * 100}%`,
+                  width: `${(slot.width / selectedFrame.width) * 100}%`,
+                  height: `${(slot.height / selectedFrame.height) * 100}%`,
+                }}
+              >
+                {photoAssignments[slotIndex] !== undefined && (
+                  <img
+                    src={state.captures[photoAssignments[slotIndex]].photo}
+                    alt={`Photo ${slotIndex + 1}`}
+                    className="slot-photo"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
+
+        {/* Right - Photo Grid */}
+        <div className="photo-grid-section">
+          <div className="photo-grid">
+            {state.captures.map((capture, index) => {
+              const sequenceNumber = selectedPhotos.indexOf(index);
+              const isSelected = sequenceNumber !== -1;
+
+              return (
+                <button
+                  key={capture.video || capture.photo}
+                  type="button"
+                  className={`photo-card ${isSelected ? 'selected' : ''}`}
+                  onClick={() => handlePhotoClick(index)}
+                >
+                  <img src={capture.photo} alt={`Photo ${index + 1}`} />
+                  {isSelected && (
+                    <div className="sequence-badge">{sequenceNumber + 1}</div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Button */}
+      <div className="decorate-footer">
+        <button
+          type="button"
+          className="next-button"
+          onClick={handleConfirm}
+          disabled={selectedPhotos.length !== selectedFrame.slots.length}
+        >
+          ต่อไป
+        </button>
       </div>
 
       {/* Hidden canvas for image generation */}
