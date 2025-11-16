@@ -261,7 +261,7 @@ export default function MainShooting() {
   useEffect(() => {
     if (captures.length === 6) {
       setTimeout(() => {
-        navigate('/photo-confirmation', {
+        navigate('/photo-decorate', {
           state: {
             ...state,
             captures,
