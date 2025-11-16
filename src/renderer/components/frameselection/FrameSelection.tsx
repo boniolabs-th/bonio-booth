@@ -33,14 +33,19 @@ export default function FrameSelection() {
 
       {/* Main Content */}
       <div className="main-content">
-        <h1 className="title-frame">เลือกกรอบรูป</h1>
-        <p className="subtitle-frame">SELECT YOUR FRAME</p>
+        {/* Title Section */}
+        <div className="title-section">
+          <h1 className="title-frame">เลือกกรอบรูป</h1>
+          <p className="subtitle-frame">SELECT YOUR FRAME</p>
+        </div>
 
         {/* Frame Thumbnails - Horizontal Scroll */}
         <div className="frames-thumbnails">
           {FRAME_CONFIGS.map((frame) => {
             const thumbnailWidth =
-              frame.orientation === 'portrait' ? '200px' : '300px';
+              frame.orientation === 'portrait' ? '120px' : '160px';
+            const thumbnailHeight =
+              frame.orientation === 'portrait' ? '160px' : '120px';
 
             return (
               <div
@@ -50,6 +55,7 @@ export default function FrameSelection() {
                 className={`frame-thumbnail ${selectedFrame.id === frame.id ? 'selected' : ''}`}
                 style={{
                   width: thumbnailWidth,
+                  height: thumbnailHeight,
                 }}
                 onClick={() => setSelectedFrame(frame)}
                 onKeyDown={(e) => {
@@ -60,7 +66,7 @@ export default function FrameSelection() {
               >
                 {selectedFrame.id === frame.id && (
                   <div className="selected-badge">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                       <path
                         d="M20 6L9 17l-5-5"
                         stroke="white"
@@ -77,10 +83,15 @@ export default function FrameSelection() {
           })}
         </div>
 
+        {/* Large Preview */}
+        <div className="frame-preview-large">
+          <img src={selectedFrame.image} alt={selectedFrame.name} />
+        </div>
+
         {/* Confirm Button */}
         <button
           type="button"
-          className="confirm-button"
+          className="next-button-frame"
           onClick={handleConfirm}
         >
           ต่อไป
