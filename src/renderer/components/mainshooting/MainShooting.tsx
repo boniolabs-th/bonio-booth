@@ -276,6 +276,12 @@ export default function MainShooting() {
       {/* Header */}
       <Header showBackButton onBackClick={handleBack} />
 
+      {/* Title Section */}
+      <div className="title-section">
+        <h1 className="title-thai">มองกล้อง!</h1>
+        <p className="title-english">LET'S TAKE A PHOTO</p>
+      </div>
+
       {/* Main Content */}
       <div className="main-content">
         <div
@@ -315,27 +321,29 @@ export default function MainShooting() {
           {showCountdown && !isCameraLoading && (
             <div className="countdown-overlay">
               <div className="countdown-number">{countdown}</div>
-              <div className="countdown-text">Photo {currentCapture + 1}</div>
-            </div>
-          )}
-
-          {!isCameraLoading && !cameraError && (
-            <div className="photo-progress">
-              <div className="progress-text">
-                Captures: {captures.length} / 6
-              </div>
-              <div className="progress-dots">
-                {[1, 2, 3, 4, 5, 6].map((num) => (
-                  <div
-                    key={num}
-                    className={`progress-dot ${captures.length >= num ? 'completed' : ''}`}
-                  />
-                ))}
-              </div>
             </div>
           )}
 
           {showFlash && <div className="flash-overlay" />}
+        </div>
+      </div>
+
+      {/* Photo Thumbnails Grid */}
+      <div className="thumbnails-container">
+        <div className="thumbnails-grid">
+          {[0, 1, 2, 3, 4, 5].map((index) => (
+            <div key={index} className="thumbnail-slot">
+              {captures[index] ? (
+                <img
+                  src={captures[index].photo}
+                  alt={`Photo ${index + 1}`}
+                  className="thumbnail-image"
+                />
+              ) : (
+                <div className="thumbnail-placeholder" />
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>

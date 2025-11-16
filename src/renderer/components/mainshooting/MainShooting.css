@@ -39,6 +39,31 @@
   width: auto;
 }
 
+/* Title Section */
+.title-section {
+  text-align: center;
+  padding: 20px 40px 10px;
+  background: white;
+  z-index: 5;
+}
+
+.title-thai {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #2c2c2c;
+  margin: 0 0 8px 0;
+  line-height: 1.2;
+}
+
+.title-english {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #2c2c2c;
+  margin: 0;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
 /* Main Content */
 .main-content {
   flex: 1;
@@ -47,6 +72,7 @@
   justify-content: center;
   padding: 20px;
   box-sizing: border-box;
+  min-height: 0;
 }
 
 /* Camera Styles */
@@ -124,44 +150,7 @@
   }
 }
 
-/* Photo Progress */
-.photo-progress {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.8);
-  padding: 15px 25px;
-  border-radius: 15px;
-  text-align: center;
-  z-index: 10;
-}
-
-.progress-text {
-  color: white;
-  font-size: 16px;
-  margin-bottom: 10px;
-  font-weight: 500;
-}
-
-.progress-dots {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-}
-
-.progress-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  transition: all 0.3s ease;
-}
-
-.progress-dot.completed {
-  background: #4caf50;
-  box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
-}
+/* Photo Progress - Removed, using thumbnails instead */
 
 /* Flash Effect */
 .flash-overlay {
@@ -276,4 +265,43 @@
 
 .retry-button:active {
   transform: translateY(0);
+}
+
+/* Thumbnails Container */
+.thumbnails-container {
+  background: white;
+  padding: 20px 40px;
+  border-top: 1px solid #e8e8e8;
+  z-index: 5;
+}
+
+.thumbnails-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.thumbnail-slot {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f5f5f5;
+}
+
+.thumbnail-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #e8e8e8;
+  border-radius: 8px;
+}
+
+.thumbnail-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 8px;
 }
