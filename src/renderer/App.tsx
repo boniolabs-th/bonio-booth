@@ -8,6 +8,7 @@ import {
   MainShooting,
   PhotoConfirmation,
   PhotoDecorate,
+  PhotoFilter,
   PhotoResult,
 } from './components';
 import './App.css';
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/main-shooting" element={<MainShooting />} />
         <Route path="/photo-confirmation" element={<PhotoConfirmation />} />
         <Route path="/photo-decorate" element={<PhotoDecorate />} />
+        <Route path="/photo-filter" element={<PhotoFilter />} />
         <Route path="/photo-result" element={<PhotoResult />} />
       </Routes>
     </Router>
