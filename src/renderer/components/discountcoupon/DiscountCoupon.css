@@ -1,0 +1,176 @@
+/* DiscountCoupon - Portrait Touch Screen 16" optimized */
+
+.discount-coupon-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.discount-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  gap: 40px;
+  overflow-y: auto;
+}
+
+/* Title Section */
+.title-section {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.title-thai {
+  font-size: 32px;
+  font-weight: 700;
+  color: #2c2c2c;
+  margin: 0 0 8px 0;
+  line-height: 1.2;
+}
+
+.title-english {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c2c2c;
+  margin: 0;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* Code Input Display */
+.code-input-container {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.code-display {
+  width: 100%;
+  max-width: 300px;
+  height: 80px;
+  background: #f5f5f5;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  font-weight: 700;
+  color: #2c2c2c;
+  letter-spacing: 8px;
+  border: 2px solid #e8e8e8;
+}
+
+/* Numeric Keypad */
+.keypad-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 400px;
+  margin: 20px 0;
+}
+
+.keypad-row {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.keypad-button {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 2px solid #e8e8e8;
+  background: #ffffff;
+  color: #2c2c2c;
+  font-size: 32px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.keypad-button:hover {
+  background: #f5f5f5;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.keypad-button:active {
+  transform: scale(0.95);
+  background: #e8e8e8;
+}
+
+.keypad-button svg {
+  width: 24px;
+  height: 24px;
+  stroke: #2c2c2c;
+}
+
+/* Confirm Button Section */
+.confirm-section {
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+  border-top: 1px solid #e8e8e8;
+}
+
+.confirm-button {
+  width: 90%;
+  max-width: 500px;
+  padding: 18px 40px;
+  font-size: 26px;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #ffa500 0%, #ff8c00 100%);
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(255, 165, 0, 0.3);
+  min-height: 60px;
+  letter-spacing: 0.5px;
+}
+
+.confirm-button:hover {
+  background: linear-gradient(135deg, #ff8c00 0%, #ff7700 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(255, 165, 0, 0.4);
+}
+
+.confirm-button:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
+}
+
+/* Scrollbar Styling */
+.discount-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.discount-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+
+.discount-content::-webkit-scrollbar-thumb {
+  background: #ffa500;
+  border-radius: 3px;
+}
+
+.discount-content::-webkit-scrollbar-thumb:hover {
+  background: #ff8c00;
+}
+

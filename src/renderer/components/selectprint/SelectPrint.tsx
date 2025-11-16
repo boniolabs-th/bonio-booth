@@ -21,7 +21,12 @@ export default function SelectPrint() {
   };
 
   const handleDiscountCoupon = () => {
-    // TODO: Implement discount coupon functionality
+    navigate('/discount-coupon', {
+      state: {
+        quantity,
+        totalPrice: price * quantity,
+      },
+    });
   };
 
   const handleConfirm = () => {

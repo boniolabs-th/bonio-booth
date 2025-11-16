@@ -11,3 +11,4 @@ export { default as PhotoFilter } from './photofilter';
 export { default as PhotoResult } from './photoresult';
 export { default as TermsAndServices } from './termsandservices';
 export { default as GetHelp } from './gethelp';
+export { default as DiscountCoupon } from './discountcoupon';

@@ -12,6 +12,7 @@ import {
   PhotoResult,
   TermsAndServices,
   GetHelp,
+  DiscountCoupon,
 } from './components';
 import './App.css';
 
@@ -21,6 +22,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/select-print" element={<SelectPrint />} />
+        <Route path="/discount-coupon" element={<DiscountCoupon />} />
         <Route path="/frame-selection" element={<FrameSelection />} />
         <Route path="/payment" element={<PaymentQR />} />
         <Route path="/payment-qr" element={<PaymentQR />} />
