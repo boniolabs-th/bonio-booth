@@ -9,12 +9,30 @@ import './PaymentQR.css';
 interface LocationState {
   quantity: number;
   totalPrice: number;
+  discountCode?: string;
+  originalPrice?: number;
 }
+
+// Function to calculate discount based on code
+const calculateDiscount = (code: string, originalPrice: number): number => {
+  // Mock discount: 20 THB for any valid 4-digit code
+  if (code && code.length >= 4) {
+    return 20; // 20 THB discount
+  }
+  return 0;
+};
 
 export default function PaymentQR() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
+
+  // Calculate discount and final price
+  const originalPrice = state.originalPrice || state.totalPrice;
+  const discountAmount = state.discountCode
+    ? calculateDiscount(state.discountCode, originalPrice)
+    : 0;
+  const finalPrice = originalPrice - discountAmount;
 
   const [timeLeft, setTimeLeft] = useState(180); // 3 minutes in seconds
   const [qrCode, setQrCode] = useState<string>('');
@@ -49,7 +67,7 @@ export default function PaymentQR() {
     try {
       const orderNo = paymentService.generateOrderNo();
       const result = await paymentService.createPayment(
-        state.totalPrice,
+        finalPrice,
         orderNo,
       );
 
@@ -67,7 +85,7 @@ export default function PaymentQR() {
     } finally {
       setIsLoading(false);
     }
-  }, [state.totalPrice]);
+  }, [finalPrice]);
 
   // Create payment when component mounts
   useEffect(() => {
@@ -114,7 +132,7 @@ export default function PaymentQR() {
     }, 3000); // Check every 3 seconds
 
     return () => clearInterval(statusChecker);
-  }, [referenceId, paymentStatus, navigate, state]);
+  }, [referenceId, paymentStatus, navigate]);
 
   // Success countdown timer
   useEffect(() => {
@@ -125,7 +143,7 @@ export default function PaymentQR() {
       navigate('/frame-selection', {
         state: {
           quantity: state.quantity,
-          totalPrice: state.totalPrice,
+          totalPrice: finalPrice,
         },
       });
       return;
@@ -136,14 +154,14 @@ export default function PaymentQR() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [successCountdown, navigate, state]);
+  }, [successCountdown, navigate, state.quantity, finalPrice]);
 
   const handlePriceClick = () => {
     if (paymentStatus === 'SUCCESS') {
       navigate('/frame-selection', {
         state: {
           quantity: state.quantity,
-          totalPrice: state.totalPrice,
+          totalPrice: finalPrice,
         },
       });
     }
@@ -196,8 +214,8 @@ export default function PaymentQR() {
       {/* Main Content */}
       <div className="main-content">
         <div className="title-section">
-          <h1 className="title">แสกนจ่ายได้เลย</h1>
-          <p className="title-english">Scan to pay!</p>
+          <h1 className="title">สแกนจ่ายได้เลย!</h1>
+          <p className="title-english">SCAN TO PAY!</p>
         </div>
 
         {/* QR Code */}
@@ -263,19 +281,27 @@ export default function PaymentQR() {
         </div>
 
         {/* Price Display */}
-        <div
-          className={`price-container ${paymentStatus === 'SUCCESS' ? 'paid' : ''}`}
-          onClick={handlePriceClick}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              handlePriceClick();
-            }
-          }}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="price">{state.totalPrice}</span>
-          <span className="currency">THB</span>
+        <div className="price-section">
+          {discountAmount > 0 && (
+            <div className="discount-display">
+              <span className="discount-label">Discount</span>
+              <span className="discount-amount">{discountAmount} THB</span>
+            </div>
+          )}
+          <div
+            className={`price-container ${paymentStatus === 'SUCCESS' ? 'paid' : ''}`}
+            onClick={handlePriceClick}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                handlePriceClick();
+              }
+            }}
+            role="button"
+            tabIndex={0}
+          >
+            <span className="price">{finalPrice}</span>
+            <span className="currency">THB</span>
+          </div>
         </div>
 
         {/* Timer */}

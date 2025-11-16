@@ -150,9 +150,21 @@
   box-shadow: 0 8px 24px rgba(255, 165, 0, 0.4);
 }
 
-.confirm-button:active {
+.confirm-button:active:not(:disabled) {
   transform: translateY(0);
   box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
+}
+
+.confirm-button:disabled {
+  background: linear-gradient(135deg, #cccccc 0%, #aaaaaa 100%);
+  cursor: not-allowed;
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+.confirm-button:disabled:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 /* Scrollbar Styling */

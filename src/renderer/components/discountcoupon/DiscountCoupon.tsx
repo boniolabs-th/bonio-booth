@@ -13,7 +13,7 @@ export default function DiscountCoupon() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState('0000');
 
   const handleBack = () => {
     navigate('/select-print', { state });
@@ -21,7 +21,7 @@ export default function DiscountCoupon() {
 
   const handleNumberClick = (number: string) => {
     setCode((prev) => {
-      // Shift left and add new number
+      // Shift left and add new number, keep 4 digits
       const newCode = prev.slice(1) + number;
       return newCode;
     });
@@ -36,10 +36,18 @@ export default function DiscountCoupon() {
   };
 
   const handleConfirm = () => {
-    // Navigate back to SelectPrint with discount code
-    navigate('/select-print', {
+    // Check if code is at least 4 digits
+    if (code.length < 4) {
+      return; // Don't proceed if code is not complete
+    }
+
+    // Navigate directly to payment page with discount code
+    const originalPrice = state.totalPrice;
+    navigate('/payment-qr', {
       state: {
-        ...state,
+        quantity: state.quantity,
+        totalPrice: originalPrice,
+        originalPrice,
         discountCode: code,
       },
     });
@@ -58,7 +66,9 @@ export default function DiscountCoupon() {
 
         {/* Code Input Display */}
         <div className="code-input-container">
-          <div className="code-display">{code}</div>
+          <div className="code-display">
+            {code.padStart(4, '0').slice(0, 4)}
+          </div>
         </div>
 
         {/* Numeric Keypad */}
@@ -175,6 +185,7 @@ export default function DiscountCoupon() {
           type="button"
           className="confirm-button"
           onClick={handleConfirm}
+          disabled={code.length < 4}
         >
           ยืนยัน
         </button>

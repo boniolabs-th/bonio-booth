@@ -138,7 +138,7 @@
   box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.3),
               0 8px 24px rgba(255, 165, 0, 0.2);
 }
-
+ 
 /* Orange overlay for selected photos */
 .photo-card.selected::before {
   content: '';
@@ -147,7 +147,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(232, 164, 46, 0.567);
+  background: rgba(255, 177, 0, 0.6);
   z-index: 1;
   border-radius: 12px;
   pointer-events: none;
