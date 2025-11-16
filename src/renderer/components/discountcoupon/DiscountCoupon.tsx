@@ -13,7 +13,7 @@ export default function DiscountCoupon() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
-  const [code, setCode] = useState('0000');
+  const [code, setCode] = useState('');
 
   const handleBack = () => {
     navigate('/select-print', { state });
