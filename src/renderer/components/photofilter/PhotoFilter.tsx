@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/img-redundant-alt */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
-import { FrameConfig } from '../../utils/frameConfig';
+import { FrameConfig, FILTERS } from '../../utils/frameConfig';
 import './PhotoFilter.css';
 
 interface Capture {
@@ -23,17 +23,35 @@ export default function PhotoFilter() {
   const location = useLocation();
   const state = location.state as LocationState;
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number>(0);
+  const [selectedFilter, setSelectedFilter] = useState<string>('none');
 
   const handlePrint = () => {
     navigate('/photo-result', {
       state: {
         ...state,
+        selectedFilter,
       },
     });
   };
 
   const handlePhotoClick = (index: number) => {
     setSelectedPhotoIndex(index);
+  };
+
+  const handleFilterClick = (filterId: string) => {
+    setSelectedFilter(filterId);
+  };
+
+  const getCurrentImage = () => {
+    if (state.finalImage) {
+      return state.finalImage;
+    }
+    return state.selectedCaptures[selectedPhotoIndex]?.photo || '';
+  };
+
+  const getSelectedFilterStyle = () => {
+    const filter = FILTERS.find((f) => f.id === selectedFilter);
+    return filter?.filter || '';
   };
 
   return (
@@ -48,47 +66,54 @@ export default function PhotoFilter() {
       <div className="filter-main">
         {/* Left - Photo Strip */}
         <div className="photo-strip-section">
-          <div className="photo-strip">
-            {state.selectedCaptures.map((capture, index) => {
-              const isSelected = index === selectedPhotoIndex;
-              return (
-                <button
-                  key={capture.video || capture.photo}
-                  type="button"
-                  className={`photo-strip-item ${isSelected ? 'selected' : ''}`}
-                  onClick={() => handlePhotoClick(index)}
-                >
-                  <img src={capture.photo} alt={`Photo ${index + 1}`} />
-                  {isSelected && (
-                    <div className="strip-overlay">
-                      <div className="strip-badge">{index + 1}</div>
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+
+          {/* Filter Preview Section */}
+          {state.selectedCaptures.length > 0 && (
+            <div className="filter-preview-section">
+              <div className="filter-preview-title">เลือก Filter</div>
+              <div className="filter-preview-grid">
+                {FILTERS.map((filter) => {
+                  const getFilterStyle = (filterId: string) => {
+                    const f = FILTERS.find((fl) => fl.id === filterId);
+                    return f?.filter || '';
+                  };
+
+                  return (
+                    <button
+                      key={filter.id}
+                      type="button"
+                      className={`filter-preview-item ${
+                        selectedFilter === filter.id ? 'active' : ''
+                      }`}
+                      onClick={() => handleFilterClick(filter.id)}
+                    >
+                      <div className="filter-preview-image">
+                        <img
+                          src={state.selectedCaptures[0].photo}
+                          alt={filter.name}
+                          style={{ filter: getFilterStyle(filter.id) }}
+                        />
+                      </div>
+                      <div className="filter-preview-name">{filter.name}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right - Canvas Area */}
         <div className="canvas-section">
           <div className="canvas-container">
-            {state.finalImage ? (
+            {getCurrentImage() && (
               <img
-                src={state.finalImage}
+                src={getCurrentImage()}
                 alt="Photo to decorate"
                 className="canvas-image"
+                style={{ filter: getSelectedFilterStyle() }}
               />
-            ) : (
-              state.selectedCaptures[selectedPhotoIndex] && (
-                <img
-                  src={state.selectedCaptures[selectedPhotoIndex].photo}
-                  alt="Photo to decorate"
-                  className="canvas-image"
-                />
-              )
             )}
-            {/* Canvas area for future decoration features */}
           </div>
         </div>
       </div>
