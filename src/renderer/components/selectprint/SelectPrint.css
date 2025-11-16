@@ -16,36 +16,50 @@
   align-items: center;
   justify-content: center;
   padding: 0 40px;
-  margin-top: -80px; /* Adjust to center better */
+  gap: 40px;
 }
 
-.title {
-  font-size: 2.5rem;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 80px;
+.title-section {
   text-align: center;
+  margin-bottom: 20px;
+}
+
+.title-thai {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #2c2c2c;
+  margin: 0 0 8px 0;
+  line-height: 1.2;
+}
+
+.title-english {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #2c2c2c;
+  margin: 0;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .quantity-selector {
   display: flex;
   align-items: center;
-  gap: 60px;
-  margin-bottom: 60px;
+  gap: 30px;
+  margin: 20px 0;
 }
 
 .quantity-button {
   background: white;
-  border: 3px solid #333;
+  border: 2px solid #2c2c2c;
   border-radius: 50%;
-  width: 80px;
-  height: 80px;
+  width: 60px;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #333;
+  color: #2c2c2c;
   box-shadow: none;
   padding: 0;
 }
@@ -61,78 +75,129 @@
 }
 
 .quantity-display {
-  font-size: 8rem;
+  font-size: 4rem;
   font-weight: 700;
-  color: #333;
-  min-width: 120px;
+  color: #2c2c2c;
+  min-width: 100px;
   text-align: center;
+  border: 2px solid #e8e8e8;
+  border-radius: 50%;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
 }
 
 .price-container {
-  background: #2563eb;
-  color: white;
-  padding: 8px 24px;
-  border-radius: 12px;
-  margin-bottom: 60px;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
-  font-size: 1.2rem;
-  font-weight: 600;
+  margin: 20px 0;
 }
 
 .price {
-  font-size: 1.4rem;
+  font-size: 2rem;
+  font-weight: 600;
+  color: #2c2c2c;
 }
 
 .currency {
-  font-size: 1rem;
-  opacity: 0.9;
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #2c2c2c;
 }
 
 .action-buttons {
   display: flex;
   gap: 20px;
   width: 100%;
-  max-width: 500px;
+  max-width: 600px;
+  margin-top: 20px;
 }
 
-.discount-button {
+.discount-button,
+.qr-button,
+.confirm-button {
   flex: 1;
-  background: #e5e7eb;
-  color: #374151;
   border: none;
-  padding: 16px 24px;
-  border-radius: 12px;
-  font-size: 1.1rem;
-  font-weight: 600;
+  padding: 20px 16px;
+  border-radius: 16px;
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 140px;
+  justify-content: center;
+}
+
+.discount-button {
+  /* background: #fff8e1; */
+  background: transparent;
+  border: 2px solid #ffa500;
+  color: #ff8c00;
 }
 
 .discount-button:hover {
-  background: #d1d5db;
+  background: #fff3cd;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 165, 0, 0.2);
+}
+.qr-button {
+  background: #ff8c00 ;
+  border: 2px solid #ff8c00;
+  color: #fff;
+}
+
+.qr-button:hover {
+  background: #ffa500;
   transform: translateY(-2px);
 }
 
 .confirm-button {
-  flex: 1;
-  background: #2563eb;
+  background: #ffa500;
   color: white;
-  border: none;
-  padding: 16px 24px;
-  border-radius: 12px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: none;
 }
 
 .confirm-button:hover {
-  background: #1d4ed8;
+  background: #ff8c00;
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
+}
+
+.button-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.coupon-icon {
+  width: 100px;
+  height: 100px;
+  filter: brightness(0) saturate(100%) invert(60%) sepia(100%) saturate(2000%) hue-rotate(0deg) brightness(1.1) contrast(1);
+}
+
+.qr-code-icon {
+  width: 100px;
+  height: 100px;
+  filter: brightness(0) invert(1);
+}
+.button-text-thai {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.button-text-english {
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.2;
+  opacity: 0.95;
 }
 
 /* Reset button styles for this component */

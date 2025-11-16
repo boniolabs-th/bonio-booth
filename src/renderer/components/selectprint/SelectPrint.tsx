@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '..';
 import './SelectPrint.css';
-
+import couponIcon from '../../../../assets/icons/svg/coupon.svg';
+import qrIcon from '../../../../assets/icons/svg/qrcode.svg';
 export default function SelectPrint() {
   const [quantity, setQuantity] = useState(1);
   const [price] = useState(125); // Base price per print
@@ -40,7 +41,11 @@ export default function SelectPrint() {
 
       {/* Main Content */}
       <div className="main-content">
-        <h1 className="title">Select Number of Print</h1>
+        {/* Title Section */}
+        <div className="title-section">
+          <h1 className="title-thai">เลือกจำนวนการพิมพ์</h1>
+          <p className="title-english">SELECT NUMBER OF PRINT</p>
+        </div>
 
         {/* Quantity Selector */}
         <div className="quantity-selector">
@@ -80,8 +85,10 @@ export default function SelectPrint() {
 
         {/* Price Display */}
         <div className="price-container">
-          <span className="price">{price * quantity}</span>
-          <span className="currency">THB</span>
+          <h1 className="price-title">
+            <span className="price">{price * quantity}</span>
+            <span className="currency">THB</span>
+          </h1>
         </div>
 
         {/* Action Buttons */}
@@ -91,14 +98,18 @@ export default function SelectPrint() {
             className="discount-button"
             onClick={handleDiscountCoupon}
           >
-            Discount Coupon
+            <div className="button-icon">
+              <img src={couponIcon} alt="Coupon Icon" className="coupon-icon" />
+            </div>
+            <span className="button-text-thai">ใช้</span>
+            <span className="button-text-english">Discount Coupon</span>
           </button>
-          <button
-            type="button"
-            className="confirm-button"
-            onClick={handleConfirm}
-          >
-            Confirm
+          <button type="button" className="qr-button" onClick={handleConfirm}>
+            <div className="button-icon">
+              <img src={qrIcon} alt="QR Code Icon" className="qr-code-icon" />
+            </div>
+            <span className="button-text-thai">ชำระเงินผ่าน</span>
+            <span className="button-text-english">QR Payment</span>
           </button>
         </div>
       </div>

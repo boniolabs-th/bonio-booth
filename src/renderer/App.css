@@ -6,6 +6,8 @@ body {
   position: relative;
   color: white;
   height: 100vh;
+  /* height: 1080px;
+  width: 1920px; */
   background: white;
   font-family: sans-serif;
   overflow-y: hidden;

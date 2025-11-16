@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/img-redundant-alt */
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { FRAME_CONFIGS, FrameConfig } from '../../utils/frameConfig';
 import './PhotoDecorate.css';
 
@@ -25,12 +25,49 @@ export default function PhotoDecorate() {
     [slotIndex: number]: number;
   }>({});
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
+  const [scaleFactor, setScaleFactor] = useState({ x: 1, y: 1 });
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const frameImgRef = useRef<HTMLImageElement>(null);
   const previewSlots = selectedFrame.previewSlots || selectedFrame.slots;
   const frameAspectRatio = selectedFrame.height
     ? selectedFrame.width / selectedFrame.height
     : 1;
+
+  const calculateScaleFactor = () => {
+    const frameImg = frameImgRef.current;
+    if (frameImg) {
+      const actualWidth = frameImg.offsetWidth || frameImg.clientWidth;
+      const actualHeight = frameImg.offsetHeight || frameImg.clientHeight;
+      const scaleX = actualWidth / selectedFrame.width;
+      const scaleY = actualHeight / selectedFrame.height;
+      setScaleFactor({ x: scaleX, y: scaleY });
+    }
+  };
+
+  // Calculate scale factor when frame image loads
+  useEffect(() => {
+    const frameImg = frameImgRef.current;
+    if (frameImg && frameImg.complete) {
+      calculateScaleFactor();
+    }
+  }, [selectedFrame.width, selectedFrame.height]);
+
+  // Recalculate scale factor on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      calculateScaleFactor();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [selectedFrame.width, selectedFrame.height]);
+
+  const handleFrameImageLoad = () => {
+    calculateScaleFactor();
+  };
 
   const proceedToResult = (
     finalImageData: string,
@@ -200,31 +237,43 @@ export default function PhotoDecorate() {
             }}
           >
             <img
+              ref={frameImgRef}
               src={selectedFrame.image}
               alt="Frame"
               className="frame-background-dec"
+              onLoad={handleFrameImageLoad}
             />
-            {previewSlots.map((slot, slotIndex) => (
-              <div
-                key={slot.id}
-                className="frame-slot-preview"
-                style={{
-                  position: 'absolute',
-                  left: `${(slot.x / selectedFrame.width) * 100}%`,
-                  top: `${(slot.y / selectedFrame.height) * 100}%`,
-                  width: `${(slot.width / selectedFrame.width) * 100}%`,
-                  height: `${(slot.height / selectedFrame.height) * 100}%`,
-                }}
-              >
-                {photoAssignments[slotIndex] !== undefined && (
-                  <img
-                    src={state.captures[photoAssignments[slotIndex]].photo}
-                    alt={`Photo ${slotIndex + 1}`}
-                    className="slot-photo"
-                  />
-                )}
-              </div>
-            ))}
+            {previewSlots.map((slot, slotIndex) => {
+              // Calculate pixel positions and sizes based on previewSlots dimensions
+              const slotX = slot.x * scaleFactor.x;
+              const slotY = slot.y * scaleFactor.y;
+              const slotWidth = slot.width * scaleFactor.x;
+              const slotHeight = slot.height * scaleFactor.y;
+              const slotAspectRatio = slot.width / slot.height;
+
+              return (
+                <div
+                  key={slot.id}
+                  className="frame-slot-preview"
+                  style={{
+                    position: 'absolute',
+                    left: `${slotX}px`,
+                    top: `${slotY}px`,
+                    width: `${slotWidth}px`,
+                    height: `${slotHeight}px`,
+                    aspectRatio: slotAspectRatio,
+                  }}
+                >
+                  {photoAssignments[slotIndex] !== undefined && (
+                    <img
+                      src={state.captures[photoAssignments[slotIndex]].photo}
+                      alt={`Photo ${slotIndex + 1}`}
+                      className="slot-photo"
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
