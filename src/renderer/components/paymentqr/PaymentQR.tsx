@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Header } from '..';
 import paymentService from '../../services/paymentService';
+import checkCircleIcon from '../../../../assets/icons/svg/check-circle.svg';
 import './PaymentQR.css';
 
 interface LocationState {
@@ -194,11 +195,20 @@ export default function PaymentQR() {
 
       {/* Main Content */}
       <div className="main-content">
-        <h1 className="title">Pay through QR Payment</h1>
+        <div className="title-section">
+          <h1 className="title">แสกนจ่ายได้เลย</h1>
+          <p className="title-english">Scan to pay!</p>
+        </div>
 
         {/* QR Code */}
         <div className="qr-code-container">
-          {isLoading && <div className="loading-spinner">Loading...</div>}
+          {isLoading && (
+            <div className="loading-spinner">
+              <div className="spinner-ring"></div>
+              <div className="spinner-ring"></div>
+              <div className="spinner-ring"></div>
+            </div>
+          )}
           {error && (
             <div className="error-message">
               <p>{error}</p>
@@ -208,25 +218,30 @@ export default function PaymentQR() {
             </div>
           )}
           {!isLoading && !error && qrCode && (
-            <div className="qr-code-wrapper">
-              <img
-                src={qrCode}
-                alt="Payment QR Code"
-                className="qr-code-image"
-                style={{ width: '240px', height: '240px' }}
-              />
-              {(paymentStatus === 'SUCCESS' || successCountdown !== null) && (
-                <div className="payment-success-overlay">
-                  <div className="success-icon">
-                    <span className="checkmark">✓</span>
-                  </div>
-                  <div className="success-text">ชำระเงินสำเร็จ</div>
-                  {successCountdown !== null && (
+            <>
+              {paymentStatus === 'SUCCESS' || successCountdown !== null ? (
+                <div className="payment-success-container">
+                  <img
+                    src={checkCircleIcon}
+                    alt="Payment Success"
+                    className="check-circle-icon"
+                  />
+                  {/* <div className="success-text">ชำระเงินสำเร็จ</div> */}
+                  {/* {successCountdown !== null && (
                     <div className="countdown-text">{successCountdown}</div>
-                  )}
+                  )} */}
+                </div>
+              ) : (
+                <div className="qr-code-wrapper">
+                  <img
+                    src={qrCode}
+                    alt="Payment QR Code"
+                    className="qr-code-image"
+                    style={{ width: '240px', height: '240px' }}
+                  />
                 </div>
               )}
-            </div>
+            </>
           )}
           {!isLoading && !error && !qrCode && (
             <div className="qr-code-placeholder">
@@ -261,9 +276,6 @@ export default function PaymentQR() {
         >
           <span className="price">{state.totalPrice}</span>
           <span className="currency">THB</span>
-          {(paymentStatus === 'SUCCESS' || successCountdown !== null) && (
-            <span className="paid-indicator">✓ ชำระแล้ว</span>
-          )}
         </div>
 
         {/* Timer */}
@@ -271,7 +283,11 @@ export default function PaymentQR() {
           <div className="timer-circle">
             <span className="timer-text">{formatTime(timeLeft)}</span>
           </div>
-          <p className="timer-label">{getTimerLabel()}</p>
+          {/* <p className="timer-label">{getTimerLabel()}</p> */}
+          <p className="title-thai timer-label"> กรุณาชำระเงินภายในเวลาที่กำหนด</p>
+          <p className="title-english timer-label">
+            Please complete your payment within the time limit.
+          </p>
         </div>
       </div>
     </div>
