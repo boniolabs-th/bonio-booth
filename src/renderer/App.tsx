@@ -10,6 +10,8 @@ import {
   PhotoDecorate,
   PhotoFilter,
   PhotoResult,
+  TermsAndServices,
+  GetHelp,
 } from './components';
 import './App.css';
 
@@ -28,6 +30,8 @@ export default function App() {
         <Route path="/photo-decorate" element={<PhotoDecorate />} />
         <Route path="/photo-filter" element={<PhotoFilter />} />
         <Route path="/photo-result" element={<PhotoResult />} />
+        <Route path="/terms-and-services" element={<TermsAndServices />} />
+        <Route path="/get-help" element={<GetHelp />} />
       </Routes>
     </Router>
   );

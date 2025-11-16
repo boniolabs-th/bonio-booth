@@ -1,0 +1,145 @@
+/* GetHelp - Portrait Touch Screen 16" optimized */
+
+.get-help-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.help-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.help-illustration {
+  margin: 20px 0 30px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.help-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #2c2c2c;
+  margin: 0 0 5px 0;
+}
+
+.help-title-en {
+  font-size: 24px;
+  font-weight: 600;
+  color: #2c2c2c;
+  margin: 0 0 30px 0;
+  letter-spacing: 1px;
+}
+
+.help-instruction-thai {
+  font-size: 18px;
+  color: #2c2c2c;
+  line-height: 1.6;
+  margin: 0 0 10px 0;
+  max-width: 600px;
+}
+
+.help-instruction-en {
+  font-size: 16px;
+  color: #666666;
+  line-height: 1.6;
+  margin: 0 0 40px 0;
+  max-width: 600px;
+}
+
+.help-qr-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 20px 0;
+}
+
+.qr-code-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.qr-code-image {
+  width: 250px;
+  height: 250px;
+  border: 3px solid #2c2c2c;
+  border-radius: 8px;
+  padding: 10px;
+  background: white;
+}
+
+.qr-label {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2c2c2c;
+  margin: 0;
+  letter-spacing: 2px;
+}
+
+.help-back-button {
+  padding: 15px 20px 20px 20px;
+  display: flex;
+  justify-content: flex-start;
+  flex-shrink: 0;
+  border-top: 1px solid #e0e0e0;
+}
+
+.back-home-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  font-size: 18px;
+  font-weight: 500;
+  color: #2c2c2c;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+}
+
+.back-home-button:hover {
+  background: #f5f5f5;
+}
+
+.back-home-button:active {
+  background: #e8e8e8;
+}
+
+.back-home-button svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Scrollbar Styling */
+.help-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.help-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+
+.help-content::-webkit-scrollbar-thumb {
+  background: #ffa500;
+  border-radius: 3px;
+}
+
+.help-content::-webkit-scrollbar-thumb:hover {
+  background: #ff8c00;
+}
+

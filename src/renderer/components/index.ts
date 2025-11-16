@@ -9,3 +9,5 @@ export { default as PhotoConfirmation } from './photoconfirmation';
 export { default as PhotoDecorate } from './photodecorate';
 export { default as PhotoFilter } from './photofilter';
 export { default as PhotoResult } from './photoresult';
+export { default as TermsAndServices } from './termsandservices';
+export { default as GetHelp } from './gethelp';
