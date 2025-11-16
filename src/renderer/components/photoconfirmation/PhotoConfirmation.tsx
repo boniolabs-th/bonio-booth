@@ -96,7 +96,7 @@ export default function PhotoConfirmation() {
 
             <button
               type="button"
-              className="confirm-button"
+              className="confirm-photo-button"
               onClick={handleConfirm}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
