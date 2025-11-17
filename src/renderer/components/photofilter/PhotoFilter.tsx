@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/img-redundant-alt */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { FrameConfig, FILTERS } from '../../utils/frameConfig';
 import './PhotoFilter.css';
 
@@ -24,6 +24,7 @@ export default function PhotoFilter() {
   const state = location.state as LocationState;
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number>(0);
   const [selectedFilter, setSelectedFilter] = useState<string>('none');
+  const [previewImage, setPreviewImage] = useState<string>('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Filter รูปภาพแต่ละรูป
@@ -81,7 +82,8 @@ export default function PhotoFilter() {
       const frameImg = new Image();
       frameImg.onload = async () => {
         const frameWidth = frameImg.naturalWidth || state.selectedFrame.width;
-        const frameHeight = frameImg.naturalHeight || state.selectedFrame.height;
+        const frameHeight =
+          frameImg.naturalHeight || state.selectedFrame.height;
 
         canvas.width = frameWidth;
         canvas.height = frameHeight;
@@ -95,7 +97,7 @@ export default function PhotoFilter() {
         // Filter และ draw รูปภาพแต่ละรูป
         try {
           const filteredPhotos: string[] = [];
-          
+
           // Filter รูปภาพทั้งหมด
           for (let i = 0; i < state.selectedCaptures.length; i += 1) {
             // eslint-disable-next-line no-await-in-loop
@@ -221,15 +223,39 @@ export default function PhotoFilter() {
     setSelectedFilter(filterId);
   };
 
-  const getCurrentImage = () => {
-    // ใช้รูปจาก selectedCaptures เท่านั้น ไม่ใช้ finalImage
-    return state.selectedCaptures[selectedPhotoIndex]?.photo || '';
+  // สร้าง preview ของ finalImage ที่มี filter applied กับรูปภาพใน frame
+  const generatePreview = async () => {
+    if (
+      !state.finalImage ||
+      !state.selectedFrame ||
+      !state.selectedCaptures.length
+    ) {
+      setPreviewImage(state.finalImage || '');
+      return;
+    }
+
+    try {
+      const preview = await generateFinalImageWithFilteredPhotos();
+      setPreviewImage(preview);
+    } catch (error) {
+      console.error('Error generating preview:', error);
+      setPreviewImage(state.finalImage);
+    }
   };
 
-  const getSelectedFilterStyle = () => {
-    const filter = FILTERS.find((f) => f.id === selectedFilter);
-    return filter?.filter || '';
-  };
+  // Update preview when filter changes or component mounts
+  useEffect(() => {
+    generatePreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFilter]);
+
+  // Initial preview on mount
+  useEffect(() => {
+    if (state.finalImage && !previewImage) {
+      setPreviewImage(state.finalImage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="photo-filter-container">
@@ -242,8 +268,26 @@ export default function PhotoFilter() {
       {/* Main Layout */}
       <div className="filter-main">
         {/* Left - Photo Strip */}
-        <div className="photo-strip-section">
 
+        <div className="canvas-section">
+          <div className="canvas-container">
+            {previewImage ? (
+              <img
+                src={previewImage}
+                alt="Photo with frame preview"
+                className="canvas-image"
+              />
+            ) : state.finalImage ? (
+              <img
+                src={state.finalImage}
+                alt="Photo with frame"
+                className="canvas-image"
+              />
+            ) : null}
+          </div>
+        </div>
+        {/* Right - Canvas Area */}
+        <div className="photo-strip-section">
           {/* Filter Preview Section */}
           {state.selectedCaptures.length > 0 && (
             <div className="filter-preview-section">
@@ -279,20 +323,6 @@ export default function PhotoFilter() {
             </div>
           )}
         </div>
-
-        {/* Right - Canvas Area */}
-        <div className="canvas-section">
-          <div className="canvas-container">
-            {getCurrentImage() && (
-              <img
-                src={getCurrentImage()}
-                alt="Photo to decorate"
-                className="canvas-image"
-                style={{ filter: getSelectedFilterStyle() }}
-              />
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Bottom Button */}
@@ -321,4 +351,3 @@ export default function PhotoFilter() {
     </div>
   );
 }
-
