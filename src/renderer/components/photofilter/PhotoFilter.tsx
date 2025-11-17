@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/img-redundant-alt */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { FrameConfig, FILTERS } from '../../utils/frameConfig';
 import './PhotoFilter.css';
 
@@ -24,14 +24,193 @@ export default function PhotoFilter() {
   const state = location.state as LocationState;
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number>(0);
   const [selectedFilter, setSelectedFilter] = useState<string>('none');
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const handlePrint = () => {
-    navigate('/photo-result', {
-      state: {
-        ...state,
-        selectedFilter,
-      },
+  // Filter รูปภาพแต่ละรูป
+  const applyFilterToPhoto = (photoUrl: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        reject(new Error('ไม่สามารถสร้าง canvas context ได้'));
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        // Apply filter using canvas
+        const filter = FILTERS.find((f) => f.id === selectedFilter);
+        if (filter && filter.filter) {
+          ctx.filter = filter.filter;
+        }
+
+        ctx.drawImage(img, 0, 0);
+        const filteredImage = canvas.toDataURL('image/png');
+        resolve(filteredImage);
+      };
+
+      img.onerror = () => {
+        reject(new Error('ไม่สามารถโหลดรูปภาพได้'));
+      };
+
+      img.src = photoUrl;
     });
+  };
+
+  // สร้าง finalImage ใหม่โดยใช้รูปที่ filter แล้ว + frame
+  const generateFinalImageWithFilteredPhotos = (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!state.selectedFrame || !state.selectedCaptures.length) {
+        reject(new Error('ไม่มี frame หรือรูปภาพ'));
+        return;
+      }
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        reject(new Error('ไม่สามารถสร้าง canvas context ได้'));
+        return;
+      }
+
+      // Load frame image
+      const frameImg = new Image();
+      frameImg.onload = async () => {
+        const frameWidth = frameImg.naturalWidth || state.selectedFrame.width;
+        const frameHeight = frameImg.naturalHeight || state.selectedFrame.height;
+
+        canvas.width = frameWidth;
+        canvas.height = frameHeight;
+
+        const scaleX = frameWidth / state.selectedFrame.width;
+        const scaleY = frameHeight / state.selectedFrame.height;
+
+        // Draw frame background
+        ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+
+        // Filter และ draw รูปภาพแต่ละรูป
+        try {
+          const filteredPhotos: string[] = [];
+          
+          // Filter รูปภาพทั้งหมด
+          for (let i = 0; i < state.selectedCaptures.length; i += 1) {
+            // eslint-disable-next-line no-await-in-loop
+            const filteredPhoto = await applyFilterToPhoto(
+              state.selectedCaptures[i].photo,
+            );
+            filteredPhotos.push(filteredPhoto);
+          }
+
+          // Draw รูปภาพที่ filter แล้วเข้าไปใน frame
+          let loadedPhotos = 0;
+          const totalPhotos = state.selectedFrame.slots.length;
+
+          state.selectedFrame.slots.forEach((slot, slotIndex) => {
+            if (slotIndex >= filteredPhotos.length) {
+              loadedPhotos += 1;
+              if (loadedPhotos === totalPhotos) {
+                resolve(canvas.toDataURL('image/png'));
+              }
+              return;
+            }
+
+            const photoImg = new Image();
+            photoImg.onload = () => {
+              ctx.save();
+
+              // Calculate crop dimensions (cover behavior - crop to fit slot)
+              const photoAspect = photoImg.width / photoImg.height;
+              const slotAspect = slot.width / slot.height;
+
+              let sourceX = 0;
+              let sourceY = 0;
+              let sourceWidth = photoImg.width;
+              let sourceHeight = photoImg.height;
+
+              if (photoAspect > slotAspect) {
+                // Photo is wider - crop sides
+                sourceWidth = photoImg.height * slotAspect;
+                sourceX = (photoImg.width - sourceWidth) / 2;
+              } else {
+                // Photo is taller - crop top/bottom
+                sourceHeight = photoImg.width / slotAspect;
+                sourceY = (photoImg.height - sourceHeight) / 2;
+              }
+
+              const targetX = slot.x * scaleX;
+              const targetY = slot.y * scaleY;
+              const targetWidth = slot.width * scaleX;
+              const targetHeight = slot.height * scaleY;
+
+              // Draw filtered photo in slot
+              ctx.drawImage(
+                photoImg,
+                sourceX,
+                sourceY,
+                sourceWidth,
+                sourceHeight,
+                targetX,
+                targetY,
+                targetWidth,
+                targetHeight,
+              );
+
+              ctx.restore();
+
+              loadedPhotos += 1;
+              if (loadedPhotos === totalPhotos) {
+                resolve(canvas.toDataURL('image/png'));
+              }
+            };
+
+            photoImg.onerror = () => {
+              loadedPhotos += 1;
+              if (loadedPhotos === totalPhotos) {
+                resolve(canvas.toDataURL('image/png'));
+              }
+            };
+
+            photoImg.src = filteredPhotos[slotIndex];
+          });
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      frameImg.onerror = () => {
+        reject(new Error('ไม่สามารถโหลด frame image ได้'));
+      };
+
+      frameImg.src = state.selectedFrame.image;
+    });
+  };
+
+  const handlePrint = async () => {
+    try {
+      // Filter รูปภาพแต่ละรูป แล้วสร้าง finalImage ใหม่ (รูปที่ filter + frame)
+      const filteredFinalImage = await generateFinalImageWithFilteredPhotos();
+
+      navigate('/photo-result', {
+        state: {
+          ...state,
+          finalImage: filteredFinalImage,
+          selectedFilter,
+        },
+      });
+    } catch (error) {
+      // ถ้าเกิด error ให้ใช้ finalImage เดิม
+      console.error('Error applying filter:', error);
+      navigate('/photo-result', {
+        state: {
+          ...state,
+          selectedFilter,
+        },
+      });
+    }
   };
 
   const handlePhotoClick = (index: number) => {
@@ -43,9 +222,7 @@ export default function PhotoFilter() {
   };
 
   const getCurrentImage = () => {
-    if (state.finalImage) {
-      return state.finalImage;
-    }
+    // ใช้รูปจาก selectedCaptures เท่านั้น ไม่ใช้ finalImage
     return state.selectedCaptures[selectedPhotoIndex]?.photo || '';
   };
 
@@ -138,6 +315,9 @@ export default function PhotoFilter() {
           พิมพ์รูปภาพ
         </button>
       </div>
+
+      {/* Hidden canvas for applying filter */}
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
     </div>
   );
 }
