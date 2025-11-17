@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
-import { FrameConfig } from '../../utils/frameConfig';
+import { FrameConfig, FILTERS } from '../../utils/frameConfig';
 import './PhotoResult.css';
 
 interface Capture {
@@ -33,6 +33,7 @@ export default function PhotoResult() {
   const generateFramedVideo = async (
     captures: Capture[],
     frame: FrameConfig,
+    selectedFilterId?: string,
   ): Promise<string> => {
     const loadFrameImage = () =>
       new Promise<HTMLImageElement>((resolve, reject) => {
@@ -193,6 +194,13 @@ export default function PhotoResult() {
           const targetWidth = slot.width * scaleX;
           const targetHeight = slot.height * scaleY;
 
+          // Apply filter to video before drawing
+          ctx.save();
+          const filter = FILTERS.find((f) => f.id === selectedFilterId);
+          if (filter && filter.filter) {
+            ctx.filter = filter.filter;
+          }
+
           ctx.drawImage(
             video,
             sourceX,
@@ -204,6 +212,8 @@ export default function PhotoResult() {
             targetWidth,
             targetHeight,
           );
+
+          ctx.restore();
         });
 
         animationFrameId = requestAnimationFrame(drawFrame);
@@ -236,6 +246,7 @@ export default function PhotoResult() {
         const url = await generateFramedVideo(
           state.selectedCaptures,
           state.selectedFrame,
+          state.selectedFilter,
         );
         setCompiledVideoUrl(url);
       } catch (error) {
