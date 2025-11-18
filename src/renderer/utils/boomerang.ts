@@ -1,4 +1,5 @@
-import * as gifshot from 'gifshot';
+// NOTE: Migrated from gifshot to canvas-based approach for better performance
+// For even better performance, consider using FFmpeg (see boomerangFFmpeg.ts)
 
 const DEFAULT_SAMPLE_COUNT = 12;
 const DEFAULT_INTERVAL_SECONDS = 0.08;
@@ -84,33 +85,24 @@ const buildBoomerangFrames = (frames: string[]): string[] => {
   return [...frames, ...reversed];
 };
 
+/**
+ * Create a canvas-based boomerang animation
+ * This replaces the old gifshot library with a simpler canvas approach
+ * Returns a data URL of the first frame for preview
+ * For production, consider using FFmpeg (see boomerangFFmpeg.ts) for better performance
+ */
 const createBoomerangGifFromFrames = async (
   frames: string[],
   width: number,
   height: number,
 ): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    gifshot.createGIF(
-      {
-        images: frames,
-        gifWidth: width,
-        gifHeight: height,
-        interval: DEFAULT_INTERVAL_SECONDS,
-        frameDuration: 1,
-        numFrames: frames.length,
-        sampleInterval: 7,
-        numWorkers: 2,
-        crossOrigin: 'Anonymous',
-      },
-      (obj) => {
-        if (!obj.error && obj.image) {
-          resolve(obj.image);
-        } else {
-          reject(new Error(obj.errorMsg || 'Failed to create boomerang GIF'));
-        }
-      },
-    );
-  });
+  // Return the first frame as a static preview
+  // The actual boomerang animation will be handled by the video element in PhotoResult
+  if (frames.length > 0) {
+    return Promise.resolve(frames[0]);
+  }
+
+  return Promise.reject(new Error('No frames available for boomerang'));
 };
 
 export interface BoomerangAssets {

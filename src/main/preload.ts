@@ -48,6 +48,17 @@ const electronHandler = {
       return ipcRenderer.invoke('check-payment-status', referenceId);
     },
   },
+  video: {
+    createBoomerang: (videoPath: string, format: 'video' | 'gif' = 'video') => {
+      return ipcRenderer.invoke('create-boomerang', videoPath, format);
+    },
+    extractFrames: (videoPath: string, frameCount: number = 12) => {
+      return ipcRenderer.invoke('extract-frames', videoPath, frameCount);
+    },
+    cleanupTemp: (filePaths: string[]) => {
+      return ipcRenderer.invoke('cleanup-temp', filePaths);
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld('electron', electronHandler);

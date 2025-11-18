@@ -15,6 +15,13 @@ import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 import ksherService from './services/ksherService';
+import {
+  createBoomerangVideo,
+  createBoomerangGif,
+  extractFrames,
+  framesToDataUrls,
+  cleanupTempFiles,
+} from './services/videoService';
 
 class AppUpdater {
   constructor() {
@@ -232,6 +239,56 @@ ipcMain.handle('check-payment-status', async (event, referenceId: string) => {
     return result;
   } catch (error) {
     console.error('Error in check-payment-status handler:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+// Video processing IPC handlers using FFmpeg
+ipcMain.handle('create-boomerang', async (event, videoPath: string, format: 'video' | 'gif' = 'video') => {
+  try {
+    console.log('Creating boomerang effect for:', videoPath, 'format:', format);
+
+    let outputPath: string;
+    if (format === 'gif') {
+      outputPath = await createBoomerangGif(videoPath);
+    } else {
+      outputPath = await createBoomerangVideo(videoPath);
+    }
+
+    console.log('Boomerang created successfully:', outputPath);
+    return { success: true, path: outputPath };
+  } catch (error) {
+    console.error('Error creating boomerang:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('extract-frames', async (event, videoPath: string, frameCount: number = 12) => {
+  try {
+    console.log('Extracting frames from:', videoPath, 'count:', frameCount);
+
+    const framePaths = await extractFrames(videoPath, frameCount);
+    const dataUrls = await framesToDataUrls(framePaths);
+
+    console.log('Frames extracted successfully:', framePaths.length);
+    return { success: true, frames: dataUrls, paths: framePaths };
+  } catch (error) {
+    console.error('Error extracting frames:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('cleanup-temp', async (event, filePaths: string[]) => {
+  try {
+    console.log('Cleaning up temporary files:', filePaths.length);
+    await cleanupTempFiles(filePaths);
+    console.log('Cleanup completed');
+    return { success: true };
+  } catch (error) {
+    console.error('Error cleaning up temp files:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage };
   }
