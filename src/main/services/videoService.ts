@@ -227,6 +227,179 @@ export const framesToDataUrls = async (
 };
 
 /**
+ * Get absolute path to LUT file in assets
+ */
+const getLUTPath = (lutFileName: string): string => {
+  if (app.isPackaged) {
+    // Production: assets are in resources folder
+    return path.join(process.resourcesPath, 'assets', 'filters', lutFileName);
+  }
+
+  // Development: use app.getAppPath() to get project root
+  const appPath = app.getAppPath(); // This returns the project root in development
+  const lutPath = path.join(appPath, 'assets', 'filters', lutFileName);
+
+  // Debug log
+  console.log('LUT Path Debug:', {
+    appPath,
+    lutFileName,
+    fullPath: lutPath,
+    exists: fs.existsSync(lutPath),
+  });
+
+  return lutPath;
+};
+
+/**
+ * Apply .cube LUT to video using FFmpeg
+ */
+export const applyLutToVideo = async (
+  inputVideoPath: string,
+  lutFileName: string,
+  outputPath?: string,
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const lutPath = getLUTPath(lutFileName);
+
+    if (!fs.existsSync(lutPath)) {
+      reject(new Error(`LUT file not found: ${lutPath}`));
+      return;
+    }
+
+    const output =
+      outputPath ||
+      path.join(app.getPath('temp'), `lut-applied-${Date.now()}.mp4`);
+
+    console.log('LUT path:', lutPath);
+    console.log('LUT file exists:', fs.existsSync(lutPath));
+
+    // Use relative path from project root - simpler for FFmpeg
+    const relativeLutPath = `assets/filters/${lutFileName}`;
+
+    const args = [
+      '-i',
+      inputVideoPath,
+      '-vf',
+      `lut3d=${relativeLutPath}`,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-crf',
+      '23',
+      '-pix_fmt',
+      'yuv420p',
+      '-movflags',
+      '+faststart',
+      '-y',
+      output,
+    ];
+
+    const ffmpeg = spawn(ffmpegPath.path, args);
+
+    let stderrOutput = '';
+
+    ffmpeg.stderr.on('data', (data) => {
+      stderrOutput += data.toString();
+    });
+
+    ffmpeg.on('error', (error) => {
+      reject(new Error(`FFmpeg process error: ${error.message}`));
+    });
+
+    ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        if (fs.existsSync(output)) {
+          resolve(output);
+        } else {
+          reject(new Error('FFmpeg completed but output file not found'));
+        }
+      } else {
+        reject(
+          new Error(`FFmpeg exited with code ${code}\nOutput: ${stderrOutput}`),
+        );
+      }
+    });
+  });
+};
+
+/**
+ * Create boomerang with LUT applied
+ */
+export const createBoomerangWithLut = async (
+  inputVideoPath: string,
+  lutFileName: string,
+  outputPath?: string,
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const lutPath = getLUTPath(lutFileName);
+
+    if (!fs.existsSync(lutPath)) {
+      reject(new Error(`LUT file not found: ${lutPath}`));
+      return;
+    }
+
+    const output =
+      outputPath ||
+      path.join(app.getPath('temp'), `boomerang-lut-${Date.now()}.mp4`);
+
+    console.log('LUT path for boomerang:', lutPath);
+    console.log('LUT file exists:', fs.existsSync(lutPath));
+
+    // Use relative path from project root - simpler for FFmpeg
+    const relativeLutPath = `assets/filters/${lutFileName}`;
+
+    // Combine boomerang + LUT in one pass for better performance
+    const args = [
+      '-i',
+      inputVideoPath,
+      '-filter_complex',
+      `[0:v]reverse,fifo[r];[0:v][r]concat=n=2:v=1:a=0,scale=640:-2,setsar=1,lut3d=${relativeLutPath}[v]`,
+      '-map',
+      '[v]',
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-crf',
+      '23',
+      '-pix_fmt',
+      'yuv420p',
+      '-movflags',
+      '+faststart',
+      '-y',
+      output,
+    ];
+
+    const ffmpeg = spawn(ffmpegPath.path, args);
+
+    let stderrOutput = '';
+
+    ffmpeg.stderr.on('data', (data) => {
+      stderrOutput += data.toString();
+    });
+
+    ffmpeg.on('error', (error) => {
+      reject(new Error(`FFmpeg process error: ${error.message}`));
+    });
+
+    ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        if (fs.existsSync(output)) {
+          resolve(output);
+        } else {
+          reject(new Error('FFmpeg completed but output file not found'));
+        }
+      } else {
+        reject(
+          new Error(`FFmpeg exited with code ${code}\nOutput: ${stderrOutput}`),
+        );
+      }
+    });
+  });
+};
+
+/**
  * Cleanup temporary files
  */
 export const cleanupTempFiles = async (filePaths: string[]): Promise<void> => {

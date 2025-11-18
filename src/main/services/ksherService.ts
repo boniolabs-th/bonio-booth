@@ -27,41 +27,39 @@ export class KsherService {
   async initializeKSher() {
     try {
       const ksherLib = require('@kshersolution/ksher');
-      
+
       // Path to private key file
       let privateKeyPath = path.join(__dirname, '..', '..', '..', 'assets', 'ksher', 'Mch37500_PrivateKey.pem');
-      
+
       // Alternative paths for different environments
       if (!fs.existsSync(privateKeyPath)) {
         // Try development path
         privateKeyPath = path.join(process.cwd(), 'assets', 'ksher', 'Mch37500_PrivateKey.pem');
       }
-      
+
       if (!fs.existsSync(privateKeyPath)) {
         // Try release path
         privateKeyPath = path.join(process.resourcesPath, 'ksher', 'Mch37500_PrivateKey.pem');
       }
-      
+
       if (!fs.existsSync(privateKeyPath)) {
         // Try another release path
         privateKeyPath = path.join(__dirname, '..', '..', '..', 'release', 'ksher', 'Mch37500_PrivateKey.pem');
       }
 
-      console.log('Private key path:', privateKeyPath);
-      
+
       if (!fs.existsSync(privateKeyPath)) {
         throw new Error(`Private key file not found at: ${privateKeyPath}`);
       }
 
       const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
-      
+
       // Initialize KSher in agent mode for PromptPay
       this.ksherPay = new ksherLib(
         'mch37500', // appId (Merchant ID)
         privateKey, // privateKey
       );
       
-      console.log('KSher service initialized successfully in agent mode');
     } catch (error) {
       console.error('Failed to initialize KSher service:', error);
     }
@@ -80,11 +78,10 @@ export class KsherService {
         channel: channel,
         product: orderNo,
       };
-      
+
       const response = await this.ksherPay.native_pay(paymentData);
 
-      console.log('response create payment:', response);
-      
+
       if (response && response.data) {
         return {
           success: true,
@@ -115,7 +112,6 @@ export class KsherService {
         mch_order_no: referenceId,
       });
 
-      console.log('Payment status response:', response);
 
       if (response.data) {
         return {

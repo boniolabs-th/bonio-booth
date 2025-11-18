@@ -21,6 +21,8 @@ import {
   extractFrames,
   framesToDataUrls,
   cleanupTempFiles,
+  applyLutToVideo,
+  createBoomerangWithLut,
 } from './services/videoService';
 
 class AppUpdater {
@@ -35,7 +37,6 @@ let mainWindow: BrowserWindow | null = null;
 
 ipcMain.on('ipc-example', async (event, arg) => {
   const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
-  console.log(msgTemplate(arg));
   event.reply('ipc-example', msgTemplate('pong'));
 });
 
@@ -58,11 +59,9 @@ function getPrintSettings(frameId: string, frameName: string) {
     // For 2x6 frame, use 4x6 paper and instruct printer to cut to 2x6
     pageSize = { width: 152400, height: 101600 }; // 4x6 inches in microns
     cutInstruction = '2x6_cut';
-    console.log('Print setting: 4x6 paper with 2x6 cut instruction for RX1HS');
   } else if (frameId === 'modern_4x6' || frameName.includes('4x6')) {
     // For 4x6 frame, use appropriate paper size
     pageSize = { width: 152400, height: 203200 }; // 6x8 inches in microns
-    console.log('Print setting: 6x8 paper for 4x6 frame');
   }
 
   return {
@@ -156,8 +155,6 @@ ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
           // Use the default printer (first in the list)
           const defaultPrinter = printers[0];
 
-          console.log(`Printing with frame: ${printConfig.frameName} (${printConfig.frameId})`);
-          console.log('Print settings:', printSettings);
 
           // Print configuration for different frame types
           const printOptions: any = {
@@ -177,7 +174,6 @@ ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
             printOptions.copies = 1;
             // Note: Actual cutting instruction depends on RX1HS printer driver
             // This may need to be implemented through printer-specific commands
-            console.log('RX1HS: Setting up 4x6 paper with 2x6 cut instruction');
           }
 
           // Print without showing dialog
@@ -185,7 +181,6 @@ ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
             printOptions,
             (success, failureReason) => {
               if (success) {
-                console.log('Print job sent successfully');
                 event.reply('print-response', { success: true });
               } else {
                 console.error('Print failed:', failureReason);
@@ -222,7 +217,6 @@ ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
 // KSher Payment IPC handlers
 ipcMain.handle('create-payment', async (event, amount: number, orderNo: string) => {
   try {
-    console.log('Creating payment for amount:', amount, 'orderNo:', orderNo);
     const result = await ksherService.createPayment(amount, orderNo);
     return result;
   } catch (error) {
@@ -234,7 +228,6 @@ ipcMain.handle('create-payment', async (event, amount: number, orderNo: string) 
 
 ipcMain.handle('check-payment-status', async (event, referenceId: string) => {
   try {
-    console.log('Checking payment status for reference:', referenceId);
     const result = await ksherService.checkPaymentStatus(referenceId);
     return result;
   } catch (error) {
@@ -247,7 +240,6 @@ ipcMain.handle('check-payment-status', async (event, referenceId: string) => {
 // Video processing IPC handlers using FFmpeg
 ipcMain.handle('create-boomerang', async (event, videoPath: string, format: 'video' | 'gif' = 'video') => {
   try {
-    console.log('Creating boomerang effect for:', videoPath, 'format:', format);
 
     let outputPath: string;
     if (format === 'gif') {
@@ -256,7 +248,6 @@ ipcMain.handle('create-boomerang', async (event, videoPath: string, format: 'vid
       outputPath = await createBoomerangVideo(videoPath);
     }
 
-    console.log('Boomerang created successfully:', outputPath);
     return { success: true, path: outputPath };
   } catch (error) {
     console.error('Error creating boomerang:', error);
@@ -267,12 +258,10 @@ ipcMain.handle('create-boomerang', async (event, videoPath: string, format: 'vid
 
 ipcMain.handle('extract-frames', async (event, videoPath: string, frameCount: number = 12) => {
   try {
-    console.log('Extracting frames from:', videoPath, 'count:', frameCount);
 
     const framePaths = await extractFrames(videoPath, frameCount);
     const dataUrls = await framesToDataUrls(framePaths);
 
-    console.log('Frames extracted successfully:', framePaths.length);
     return { success: true, frames: dataUrls, paths: framePaths };
   } catch (error) {
     console.error('Error extracting frames:', error);
@@ -283,13 +272,70 @@ ipcMain.handle('extract-frames', async (event, videoPath: string, frameCount: nu
 
 ipcMain.handle('cleanup-temp', async (event, filePaths: string[]) => {
   try {
-    console.log('Cleaning up temporary files:', filePaths.length);
     await cleanupTempFiles(filePaths);
-    console.log('Cleanup completed');
     return { success: true };
   } catch (error) {
     console.error('Error cleaning up temp files:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+// LUT filter IPC handlers
+ipcMain.handle('save-temp-video', async (event, arrayBuffer: ArrayBuffer) => {
+  try {
+    const fs = await import('fs');
+    const tempPath = path.join(app.getPath('temp'), `temp-video-${Date.now()}.webm`);
+    const buffer = Buffer.from(arrayBuffer);
+    await fs.promises.writeFile(tempPath, buffer);
+    return { success: true, path: tempPath };
+  } catch (error) {
+    console.error('Error saving temp video:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle(
+  'apply-lut-to-video',
+  async (event, videoPath: string, lutFileName: string) => {
+    try {
+      const outputPath = await applyLutToVideo(videoPath, lutFileName);
+      return { success: true, path: outputPath };
+    } catch (error) {
+      console.error('Error applying LUT:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    }
+  },
+);
+
+ipcMain.handle(
+  'create-boomerang-with-lut',
+  async (event, videoPath: string, lutFileName: string) => {
+    try {
+      const outputPath = await createBoomerangWithLut(videoPath, lutFileName);
+      return { success: true, path: outputPath };
+    } catch (error) {
+      console.error('Error creating boomerang with LUT:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    }
+  },
+);
+
+// Add handler to read video file as buffer
+ipcMain.handle('read-video-file', async (event, filePath: string) => {
+  try {
+    const fs = require('fs').promises;
+    const buffer = await fs.readFile(filePath);
+    return { success: true, data: buffer };
+  } catch (error) {
+    console.error('Error reading video file:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage };
   }
 });

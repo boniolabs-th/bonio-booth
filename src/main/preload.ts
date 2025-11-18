@@ -58,6 +58,18 @@ const electronHandler = {
     cleanupTemp: (filePaths: string[]) => {
       return ipcRenderer.invoke('cleanup-temp', filePaths);
     },
+    saveTempVideo: (arrayBuffer: ArrayBuffer) => {
+      return ipcRenderer.invoke('save-temp-video', arrayBuffer);
+    },
+    applyLutToVideo: (videoPath: string, lutFileName: string) => {
+      return ipcRenderer.invoke('apply-lut-to-video', videoPath, lutFileName);
+    },
+    createBoomerangWithLut: (videoPath: string, lutFileName: string) => {
+      return ipcRenderer.invoke('create-boomerang-with-lut', videoPath, lutFileName);
+    },
+    readVideoFile: (filePath: string) => {
+      return ipcRenderer.invoke('read-video-file', filePath);
+    },
   },
 };
 

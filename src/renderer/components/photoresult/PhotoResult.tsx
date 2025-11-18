@@ -1,8 +1,13 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
-import { FrameConfig , FILTERS } from '../../utils/frameConfig';
+import { FrameConfig, FILTERS } from '../../utils/frameConfig';
 import { generateBoomerangAssets } from '../../utils/boomerang';
+import {
+  getCachedLUT,
+  applyLUTToCanvas,
+  getLUTFilePath,
+} from '../../utils/lutProcessor';
 
 import './PhotoResult.css';
 
@@ -242,8 +247,13 @@ const generateFramedVideo = async (
           // Apply filter to boomerang frame before drawing
           ctx.save();
           const filter = FILTERS.find((f) => f.id === selectedFilterId);
-          if (filter && filter.filter) {
+
+          // Use CSS filter for all filter types (including LUT approximation)
+          if (filter?.filter) {
             ctx.filter = filter.filter;
+          } else if (filter?.type === 'lut') {
+            // CSS approximation for LUT filters
+            ctx.filter = 'saturate(1.1) contrast(1.05) brightness(1.02)';
           }
 
           ctx.drawImage(
@@ -421,8 +431,13 @@ const generateFramedVideo = async (
         // Apply filter to video before drawing
         ctx.save();
         const filter = FILTERS.find((f) => f.id === selectedFilterId);
-        if (filter && filter.filter) {
+
+        // Use CSS filter for all filter types (including LUT approximation)
+        if (filter?.filter) {
           ctx.filter = filter.filter;
+        } else if (filter?.type === 'lut') {
+          // CSS approximation for LUT filters
+          ctx.filter = 'saturate(1.1) contrast(1.05) brightness(1.02)';
         }
 
         ctx.drawImage(
@@ -457,6 +472,7 @@ export default function PhotoResult() {
   >('idle');
   const [compiledVideoUrl, setCompiledVideoUrl] = useState<string | null>(null);
   const [isCreatingVideo, setIsCreatingVideo] = useState(false);
+  const [isApplyingLUT, setIsApplyingLUT] = useState(false);
   const hasGeneratedVideo = useRef(false);
   const [previewBoomerangGif, setPreviewBoomerangGif] = useState<string | null>(
     null,
@@ -517,13 +533,94 @@ export default function PhotoResult() {
       setIsCreatingVideo(true);
 
       try {
-        const url = await generateFramedVideo(
+        // Create video without filter first (fast)
+        const videoUrl = await generateFramedVideo(
           state.selectedCaptures,
           state.selectedFrame,
-          state.selectedFilter,
+          undefined, // No filter for initial video
           state.useBoomerang,
         );
-        setCompiledVideoUrl(url);
+
+        // If LUT filter is selected, apply it via FFmpeg
+        const filter = FILTERS.find((f) => f.id === state.selectedFilter);
+        // eslint-disable-next-line no-console
+        console.log('Filter check:', {
+          filterId: state.selectedFilter,
+          filter,
+          isLUT: filter?.type === 'lut',
+          lutFile: filter?.lutFile,
+        });
+
+        if (filter?.type === 'lut' && filter.lutFile) {
+          setIsApplyingLUT(true);
+          // eslint-disable-next-line no-console
+          console.log('Applying LUT filter:', filter.lutFile);
+
+          try {
+            // Convert blob URL to ArrayBuffer
+            const response = await fetch(videoUrl);
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+
+            // Save to temp file via IPC (send ArrayBuffer directly)
+            const saveResult = await window.electron.video.saveTempVideo(arrayBuffer);
+
+            if (!saveResult.success || !saveResult.path) {
+              throw new Error('Failed to save temp video file');
+            }
+
+            // Apply LUT via FFmpeg
+            let lutResult;
+            if (state.useBoomerang) {
+              // eslint-disable-next-line no-console
+              console.log('Creating boomerang with LUT...');
+              lutResult = await window.electron.video.createBoomerangWithLut(
+                saveResult.path,
+                filter.lutFile,
+              );
+            } else {
+              // eslint-disable-next-line no-console
+              console.log('Applying LUT to video...');
+              lutResult = await window.electron.video.applyLutToVideo(
+                saveResult.path,
+                filter.lutFile,
+              );
+            }
+
+            // eslint-disable-next-line no-console
+            console.log('LUT result:', lutResult);
+
+            if (lutResult.success && lutResult.path) {
+              // Read the processed file via IPC
+              const fileResult = await window.electron.video.readVideoFile(lutResult.path);
+
+              if (fileResult.success && fileResult.data) {
+                const processedBlob = new Blob([fileResult.data], { type: 'video/mp4' });
+                const processedUrl = URL.createObjectURL(processedBlob);
+                setCompiledVideoUrl(processedUrl);
+
+                // Clean up original URL
+                URL.revokeObjectURL(videoUrl);
+              } else {
+                // Fallback to original if read fails
+                setCompiledVideoUrl(videoUrl);
+              }
+            } else {
+              // Fallback to original if LUT fails
+              setCompiledVideoUrl(videoUrl);
+            }
+          } catch (lutError) {
+            // eslint-disable-next-line no-console
+            console.error('Failed to apply LUT via FFmpeg:', lutError);
+            // Fallback to original video
+            setCompiledVideoUrl(videoUrl);
+          } finally {
+            setIsApplyingLUT(false);
+          }
+        } else {
+          // No LUT filter or CSS filter - use video as-is
+          setCompiledVideoUrl(videoUrl);
+        }
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Error creating framed video:', error);
@@ -538,7 +635,7 @@ export default function PhotoResult() {
     };
 
     createFramedVideo();
-  }, [state?.selectedCaptures, state?.selectedFrame]);
+  }, [state?.selectedCaptures, state?.selectedFrame, state?.selectedFilter, state?.useBoomerang]);
 
   useEffect(() => {
     return () => {
@@ -720,6 +817,11 @@ export default function PhotoResult() {
               <div className="creating-video-message">
                 <div className="loading-spinner" />
                 <p>กำลังสร้างวิดีโอของคุณ...</p>
+              </div>
+            ) : isApplyingLUT ? (
+              <div className="creating-video-message">
+                <div className="loading-spinner" />
+                <p>กำลังประมวลผล Filter...</p>
               </div>
             ) : (
               <div className="qr-display">

@@ -2,6 +2,8 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
 import { FrameConfig, FILTERS } from '../../utils/frameConfig';
+import { getCachedLUT, getLUTFilePath } from '../../utils/lutProcessor';
+import { applyLUTWithWorker } from '../../utils/lutWorkerHelper';
 import './PhotoFilter.css';
 
 interface Capture {
@@ -26,33 +28,56 @@ export default function PhotoFilter() {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number>(0);
   const [selectedFilter, setSelectedFilter] = useState<string>('none');
   const [previewImage, setPreviewImage] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState<boolean>(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Filter รูปภาพแต่ละรูป
-  const applyFilterToPhoto = (photoUrl: string): Promise<string> => {
+  // Filter รูปภาพแต่ละรูป (รองรับทั้ง CSS และ LUT)
+  const applyFilterToPhoto = async (photoUrl: string): Promise<string> => {
+    const filter = FILTERS.find((f) => f.id === selectedFilter);
+
     return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-
-      if (!ctx) {
-        reject(new Error('ไม่สามารถสร้าง canvas context ได้'));
-        return;
-      }
-
       const img = new Image();
-      img.onload = () => {
+
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          reject(new Error('ไม่สามารถสร้าง canvas context ได้'));
+          return;
+        }
+
         canvas.width = img.width;
         canvas.height = img.height;
 
-        // Apply filter using canvas
-        const filter = FILTERS.find((f) => f.id === selectedFilter);
-        if (filter && filter.filter) {
-          ctx.filter = filter.filter;
-        }
+        // Check filter type
+        if (filter?.type === 'lut' && filter.lutFile) {
+          // Apply LUT filter using Web Worker (non-blocking)
+          try {
+            // Draw image to canvas first
+            ctx.drawImage(img, 0, 0);
 
-        ctx.drawImage(img, 0, 0);
-        const filteredImage = canvas.toDataURL('image/png');
-        resolve(filteredImage);
+            // Load and apply LUT in background thread
+            const lutPath = getLUTFilePath(filter.lutFile);
+            const lut = await getCachedLUT(lutPath);
+            const processedCanvas = await applyLUTWithWorker(canvas, lut);
+
+            resolve(processedCanvas.toDataURL('image/png'));
+          } catch (error) {
+            console.error('Failed to apply LUT:', error);
+            // Fallback to original
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+          }
+        } else {
+          // Apply CSS filter (traditional)
+          if (filter?.filter) {
+            ctx.filter = filter.filter;
+          }
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        }
       };
 
       img.onerror = () => {
@@ -193,6 +218,7 @@ export default function PhotoFilter() {
   };
 
   const handlePrint = async () => {
+    setIsProcessing(true);
     try {
       // Filter รูปภาพแต่ละรูป แล้วสร้าง finalImage ใหม่ (รูปที่ filter + frame)
       const filteredFinalImage = await generateFinalImageWithFilteredPhotos();
@@ -214,6 +240,8 @@ export default function PhotoFilter() {
           selectedFilter,
         },
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -236,12 +264,15 @@ export default function PhotoFilter() {
       return;
     }
 
+    setIsGeneratingPreview(true);
     try {
       const preview = await generateFinalImageWithFilteredPhotos();
       setPreviewImage(preview);
     } catch (error) {
       console.error('Error generating preview:', error);
       setPreviewImage(state.finalImage);
+    } finally {
+      setIsGeneratingPreview(false);
     }
   };
 
@@ -286,6 +317,32 @@ export default function PhotoFilter() {
                 className="canvas-image"
               />
             ) : null}
+            {isGeneratingPreview && (
+              <div className="preview-loading-overlay">
+                <div className="preview-spinner">
+                  <svg
+                    width="60"
+                    height="60"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      strokeOpacity="0.25"
+                    />
+                    <path
+                      d="M12 2a10 10 0 0 1 10 10"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+                <p className="preview-loading-text">กำลังประมวลผล Filter...</p>
+              </div>
+            )}
           </div>
         </div>
         {/* Right - Canvas Area */}
@@ -298,7 +355,11 @@ export default function PhotoFilter() {
                 {FILTERS.map((filter) => {
                   const getFilterStyle = (filterId: string) => {
                     const f = FILTERS.find((fl) => fl.id === filterId);
-                    return f?.filter || '';
+                    // Only return CSS filter (LUT preview handled separately)
+                    if (f?.type === 'css') {
+                      return f?.filter || '';
+                    }
+                    return '';
                   };
 
                   return (
@@ -316,6 +377,9 @@ export default function PhotoFilter() {
                           alt={filter.name}
                           style={{ filter: getFilterStyle(filter.id) }}
                         />
+                        {filter.type === 'lut' && (
+                          <div className="lut-badge">LUT</div>
+                        )}
                       </div>
                       <div className="filter-preview-name">{filter.name}</div>
                     </button>
@@ -329,7 +393,12 @@ export default function PhotoFilter() {
 
       {/* Bottom Button */}
       <div className="filter-footer">
-        <button type="button" className="print-button" onClick={handlePrint}>
+        <button
+          type="button"
+          className="print-button"
+          onClick={handlePrint}
+          disabled={isProcessing}
+        >
           <svg
             width="24"
             height="24"
@@ -344,7 +413,7 @@ export default function PhotoFilter() {
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
             <rect x="6" y="14" width="12" height="8" />
           </svg>
-          พิมพ์รูปภาพ
+          {isProcessing ? 'กำลังประมวลผล...' : 'พิมพ์รูปภาพ'}
         </button>
       </div>
 

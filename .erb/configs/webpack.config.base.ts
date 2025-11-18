@@ -29,6 +29,13 @@ const configuration: webpack.Configuration = {
           },
         },
       },
+      {
+        test: /\.cube$/,
+        type: 'asset/resource',
+        generator: {
+          filename: 'assets/filters/[name][ext]',
+        },
+      },
     ],
   },
 

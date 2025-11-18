@@ -8,9 +8,9 @@ export interface PaymentResult {
 
 export interface PaymentStatus {
   success: boolean;
-  status?: 
-    | 'paid' 
-    | 'pending' 
+  status?:
+    | 'paid'
+    | 'pending'
     | 'failed'
     | 'SUCCESS'
     | 'FAIL'
@@ -29,9 +29,7 @@ export interface PaymentStatus {
 class PaymentService {
   async createPayment(amount: number, orderNo: string): Promise<PaymentResult> {
     try {
-      console.log('PaymentService: Creating payment for', amount, orderNo);
       const result = await window.electron.payment.createPayment(amount, orderNo);
-      console.log('PaymentService: Payment result', result);
       return result;
     } catch (error) {
       console.error('Error creating payment:', error);
@@ -42,9 +40,7 @@ class PaymentService {
 
   async checkPaymentStatus(referenceId: string): Promise<PaymentStatus> {
     try {
-      console.log('PaymentService: Checking payment status for', referenceId);
       const result = await window.electron.payment.checkPaymentStatus(referenceId);
-      console.log('PaymentService: Payment status result', result);
       return result;
     } catch (error) {
       console.error('Error checking payment status:', error);

@@ -174,9 +174,15 @@ const configuration: webpack.Configuration = {
     compress: true,
     hot: true,
     headers: { 'Access-Control-Allow-Origin': '*' },
-    static: {
-      publicPath: '/',
-    },
+    static: [
+      {
+        publicPath: '/',
+      },
+      {
+        directory: path.join(webpackPaths.rootPath, 'assets'),
+        publicPath: '/assets',
+      },
+    ],
     historyApiFallback: {
       verbose: true,
     },

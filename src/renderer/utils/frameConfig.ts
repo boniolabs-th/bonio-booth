@@ -6,7 +6,7 @@ import burningcity2x2 from '../../../assets/frames/2x2_burningcity.png';
 import burningcity3x2 from '../../../assets/frames/3x2_burningcity.png';
 
 
-  export interface FrameConfig {
+export interface FrameConfig {
   id: string;
   name: string;
   image: string;
@@ -138,19 +138,35 @@ export const FRAME_CONFIGS: FrameConfig[] = [
   },
 ];
 
-export const FILTERS = [
-  { id: 'none', name: 'Original', filter: '' },
-  { id: 'sepia', name: 'Sepia', filter: 'sepia(100%)' },
-  { id: 'grayscale', name: 'B&W', filter: 'grayscale(100%)' },
-  {
-    id: 'vintage',
-    name: 'Vintage',
-    filter: 'sepia(50%) contrast(1.2) brightness(1.1)',
-  },
-  { id: 'cool', name: 'Cool', filter: 'hue-rotate(90deg) saturate(1.2)' },
-  {
-    id: 'warm',
-    name: 'Warm',
-    filter: 'hue-rotate(-30deg) saturate(1.1) brightness(1.1)',
-  },
+export interface FilterConfig {
+  id: string;
+  name: string;
+  filter?: string; // CSS filter (for preview)
+  lutFile?: string; // Filename of .cube LUT file (for FFmpeg)
+  type: 'css' | 'lut'; // Filter type
+}
+
+export const FILTERS: FilterConfig[] = [
+  // { id: 'none', name: 'Original', filter: '', type: 'css' },
+  // { id: 'sepia', name: 'Sepia', filter: 'sepia(100%)', type: 'css' },
+  // { id: 'grayscale', name: 'B&W', filter: 'grayscale(100%)', type: 'css' },
+  // {
+  //   id: 'vintage',
+  //   name: 'Vintage',
+  //   filter: 'sepia(50%) contrast(1.2) brightness(1.1)',
+  //   type: 'css',
+  // },
+  // { id: 'cool', name: 'Cool', filter: 'hue-rotate(90deg) saturate(1.2)', type: 'css' },
+  // {
+  //   id: 'warm',
+  //   name: 'Warm',
+  //   filter: 'hue-rotate(-30deg) saturate(1.1) brightness(1.1)',
+  //   type: 'css',
+  // },
+  // LUT-based filters (for high-quality color grading)
+  { id: 'timelab1', name: 'Timelab-1', lutFile: 'Timelab-1.cube', type: 'lut' },
+  { id: 'timelab2', name: 'Timelab-2', lutFile: 'Timelab-2.cube', type: 'lut' },
+  { id: 'timelab3', name: 'Timelab-3', lutFile: 'Timelab-3.cube', type: 'lut' },
+  { id: 'timelab4', name: 'Timelab-4', lutFile: 'Timelab-4.cube', type: 'lut' },
+  { id: 'timelab5', name: 'Timelab-5', lutFile: 'Timelab-5.cube', type: 'lut' },
 ];
