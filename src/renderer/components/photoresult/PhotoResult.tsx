@@ -2,11 +2,14 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 import { FrameConfig } from '../../utils/frameConfig';
+import { generateBoomerangAssets } from '../../utils/boomerang';
 import './PhotoResult.css';
 
 interface Capture {
   video: string;
   photo: string;
+  boomerangGif?: string;
+  boomerangFrames?: string[];
 }
 
 interface LocationState {
@@ -19,58 +22,70 @@ interface LocationState {
   selectedCaptures: Capture[];
 }
 
-export default function PhotoResult() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const state = location.state as LocationState;
-  const [printStatus, setPrintStatus] = useState<
-    'idle' | 'printing' | 'success' | 'error'
-  >('idle');
-  const [compiledVideoUrl, setCompiledVideoUrl] = useState<string | null>(null);
-  const [isCreatingVideo, setIsCreatingVideo] = useState(false);
-  const hasGeneratedVideo = useRef(false);
+const ensureBoomerangAssets = async (
+  captures: Capture[],
+): Promise<Capture[]> => {
+  return Promise.all(
+    captures.map(async (capture) => {
+      if (capture.boomerangFrames?.length && capture.boomerangGif) {
+        return capture;
+      }
 
-  const generateFramedVideo = async (
-    captures: Capture[],
-    frame: FrameConfig,
+      try {
+        const assets = await generateBoomerangAssets(capture.video);
+        return {
+          ...capture,
+          ...assets,
+        };
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to create boomerang assets', error);
+        return capture;
+      }
+    }),
+  );
+};
+
+const generateFramedVideo = async (
+  captures: Capture[],
+  frame: FrameConfig,
+): Promise<string> => {
+  const loadFrameImage = () =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('ไม่สามารถโหลดภาพกรอบได้'));
+      img.src = frame.image;
+    });
+
+  const loadVideoElement = (capture: Capture, index: number) =>
+    new Promise<HTMLVideoElement>((resolve, reject) => {
+      const videoElement = document.createElement('video');
+      videoElement.src = capture.video;
+      videoElement.muted = true;
+      videoElement.preload = 'auto';
+      videoElement.loop = true;
+      videoElement.playsInline = true;
+
+      const timeout = setTimeout(() => {
+        reject(new Error(`วิดีโอที่ ${index + 1} ใช้เวลานานเกินไปในการโหลด`));
+      }, 10000);
+
+      videoElement.onloadedmetadata = () => {
+        clearTimeout(timeout);
+        resolve(videoElement);
+      };
+
+      videoElement.onerror = () => {
+        clearTimeout(timeout);
+        reject(new Error(`ไม่สามารถโหลดวิดีโอที่ ${index + 1}`));
+      };
+    });
+
+  const composeBoomerangVideo = async (
+    frameImg: HTMLImageElement,
+    enrichedCaptures: Capture[],
   ): Promise<string> => {
-    const loadFrameImage = () =>
-      new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('ไม่สามารถโหลดภาพกรอบได้'));
-        img.src = frame.image;
-      });
-
-    const loadVideoElement = (capture: Capture, index: number) =>
-      new Promise<HTMLVideoElement>((resolve, reject) => {
-        const videoElement = document.createElement('video');
-        videoElement.src = capture.video;
-        videoElement.muted = true;
-        videoElement.preload = 'auto';
-        videoElement.loop = true;
-        videoElement.playsInline = true;
-
-        const timeout = setTimeout(() => {
-          reject(new Error(`วิดีโอที่ ${index + 1} ใช้เวลานานเกินไปในการโหลด`));
-        }, 10000);
-
-        videoElement.onloadedmetadata = () => {
-          clearTimeout(timeout);
-          resolve(videoElement);
-        };
-
-        videoElement.onerror = () => {
-          clearTimeout(timeout);
-          reject(new Error(`ไม่สามารถโหลดวิดีโอที่ ${index + 1}`));
-        };
-      });
-
-    const [frameImg, videoElements] = await Promise.all([
-      loadFrameImage(),
-      Promise.all(captures.map(loadVideoElement)),
-    ]);
-
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
@@ -87,15 +102,45 @@ export default function PhotoResult() {
     const scaleX = frameWidth / frame.width;
     const scaleY = frameHeight / frame.height;
 
-    videoElements.forEach((video) => {
-      // eslint-disable-next-line no-param-reassign
-      video.currentTime = 0;
-    });
+    const loadBoomerangFrames = (capture: Capture, captureIndex: number) => {
+      if (!capture.boomerangFrames || capture.boomerangFrames.length === 0) {
+        return Promise.reject(
+          new Error(
+            `เอฟเฟ็กต์ Boomerang ของวิดีโอที่ ${captureIndex + 1} ยังไม่พร้อม`,
+          ),
+        );
+      }
 
-    await Promise.all(videoElements.map((video) => video.play().catch(() => undefined)));
+      return Promise.all(
+        capture.boomerangFrames.map(
+          (frameSrc, frameIndex) =>
+            new Promise<HTMLImageElement>((resolve, reject) => {
+              const img = new Image();
+              img.onload = () => resolve(img);
+              img.onerror = () =>
+                reject(
+                  new Error(
+                    `ไม่สามารถโหลดภาพเอฟเฟ็กต์ที่ ${frameIndex + 1} ของวิดีโอที่ ${captureIndex + 1}`,
+                  ),
+                );
+              img.src = frameSrc;
+            }),
+        ),
+      );
+    };
+
+    const boomerangImages = await Promise.all(
+      enrichedCaptures.map((capture, index) =>
+        loadBoomerangFrames(capture, index),
+      ),
+    );
+
+    const fps = 12;
+    const totalDurationSeconds = 4;
+    const totalFrames = fps * totalDurationSeconds;
 
     return new Promise<string>((resolve, reject) => {
-      const stream = canvas.captureStream(30);
+      const stream = canvas.captureStream(fps);
 
       const mimeTypes = [
         'video/webm;codecs=vp9',
@@ -104,7 +149,7 @@ export default function PhotoResult() {
       ];
 
       const selectedMimeType =
-        mimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ||
+        mimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ??
         mimeTypes[0];
 
       const mediaRecorder = new MediaRecorder(stream, {
@@ -113,22 +158,16 @@ export default function PhotoResult() {
       });
 
       const chunks: Blob[] = [];
-      let animationFrameId: number | null = null;
-      const maxDuration = 4;
-      const startTime = performance.now();
       let recording = true;
+      let timeoutId: number | null = null;
+      let frameCursor = 0;
 
       const cleanup = () => {
         recording = false;
-        if (animationFrameId !== null) {
-          cancelAnimationFrame(animationFrameId);
+        if (timeoutId !== null) {
+          clearTimeout(timeoutId);
         }
         stream.getTracks().forEach((track) => track.stop());
-        videoElements.forEach((video) => {
-          video.pause();
-          // eslint-disable-next-line no-param-reassign
-          video.src = '';
-        });
       };
 
       mediaRecorder.ondataavailable = (event) => {
@@ -140,14 +179,14 @@ export default function PhotoResult() {
       mediaRecorder.onstop = () => {
         cleanup();
         const blob = new Blob(chunks, { type: selectedMimeType });
-        const url = URL.createObjectURL(blob);
-        resolve(url);
+        resolve(URL.createObjectURL(blob));
       };
 
       mediaRecorder.onerror = (event) => {
         cleanup();
         reject(
-          event.error || new Error('MediaRecorder เกิดปัญหาในระหว่างสร้างวิดีโอ'),
+          event.error ||
+            new Error('MediaRecorder เกิดปัญหาในระหว่างสร้างวิดีโอ'),
         );
       };
 
@@ -156,36 +195,32 @@ export default function PhotoResult() {
           return;
         }
 
-        const elapsed = (performance.now() - startTime) / 1000;
-        if (elapsed >= maxDuration) {
-          recording = false;
-          mediaRecorder.stop();
-          return;
-        }
-
         ctx.clearRect(0, 0, frameWidth, frameHeight);
         ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
 
-        frame.slots.forEach((slot, index) => {
-          const video = videoElements[index];
-          if (!video) {
+        frame.slots.forEach((slot, slotIndex) => {
+          const slotFrames = boomerangImages[slotIndex];
+          if (!slotFrames || slotFrames.length === 0) {
             return;
           }
 
+          const image = slotFrames[frameCursor % slotFrames.length];
+          const imageWidth = image.naturalWidth || image.width;
+          const imageHeight = image.naturalHeight || image.height;
           const slotAspect = slot.width / slot.height;
-          const videoAspect = video.videoWidth / video.videoHeight || 1;
+          const imageAspect = imageWidth / imageHeight || 1;
 
-          let sourceWidth = video.videoWidth;
-          let sourceHeight = video.videoHeight;
+          let sourceWidth = imageWidth;
+          let sourceHeight = imageHeight;
           let sourceX = 0;
           let sourceY = 0;
 
-          if (videoAspect > slotAspect) {
-            sourceWidth = video.videoHeight * slotAspect;
-            sourceX = (video.videoWidth - sourceWidth) / 2;
+          if (imageAspect > slotAspect) {
+            sourceWidth = imageHeight * slotAspect;
+            sourceX = (imageWidth - sourceWidth) / 2;
           } else {
-            sourceHeight = video.videoWidth / slotAspect;
-            sourceY = (video.videoHeight - sourceHeight) / 2;
+            sourceHeight = imageWidth / slotAspect;
+            sourceY = (imageHeight - sourceHeight) / 2;
           }
 
           const targetX = slot.x * scaleX;
@@ -194,7 +229,7 @@ export default function PhotoResult() {
           const targetHeight = slot.height * scaleY;
 
           ctx.drawImage(
-            video,
+            image,
             sourceX,
             sourceY,
             sourceWidth,
@@ -206,13 +241,193 @@ export default function PhotoResult() {
           );
         });
 
-        animationFrameId = requestAnimationFrame(drawFrame);
+        frameCursor += 1;
+        if (frameCursor >= totalFrames) {
+          recording = false;
+          mediaRecorder.stop();
+          return;
+        }
+
+        timeoutId = window.setTimeout(() => {
+          drawFrame();
+        }, 1000 / fps);
       };
 
       mediaRecorder.start();
       drawFrame();
     });
   };
+
+  const frameImg = await loadFrameImage();
+  const enrichedCaptures = await ensureBoomerangAssets(captures);
+
+  const hasBoomerangFrames = enrichedCaptures.every(
+    (capture) => capture.boomerangFrames && capture.boomerangFrames.length > 0,
+  );
+
+  if (hasBoomerangFrames) {
+    return composeBoomerangVideo(frameImg, enrichedCaptures);
+  }
+
+  const videoElements = await Promise.all(
+    enrichedCaptures.map((capture, index) => loadVideoElement(capture, index)),
+  );
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  if (!ctx) {
+    throw new Error('ไม่สามารถสร้าง canvas context ได้');
+  }
+
+  const frameWidth = frameImg.naturalWidth || frame.width;
+  const frameHeight = frameImg.naturalHeight || frame.height;
+
+  canvas.width = frameWidth;
+  canvas.height = frameHeight;
+
+  const scaleX = frameWidth / frame.width;
+  const scaleY = frameHeight / frame.height;
+
+  videoElements.forEach((video) => {
+    // eslint-disable-next-line no-param-reassign
+    video.currentTime = 0;
+  });
+
+  await Promise.all(
+    videoElements.map((video) => video.play().catch(() => undefined)),
+  );
+
+  return new Promise<string>((resolve, reject) => {
+    const stream = canvas.captureStream(30);
+
+    const mimeTypes = [
+      'video/webm;codecs=vp9',
+      'video/webm',
+      'video/webm;codecs=vp8',
+    ];
+
+    const selectedMimeType =
+      mimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ||
+      mimeTypes[0];
+
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: selectedMimeType,
+      videoBitsPerSecond: 2500000,
+    });
+
+    const chunks: Blob[] = [];
+    let animationFrameId: number | null = null;
+    const maxDuration = 4;
+    const startTime = performance.now();
+    let recording = true;
+
+    const cleanup = () => {
+      recording = false;
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      stream.getTracks().forEach((track) => track.stop());
+      videoElements.forEach((video) => {
+        video.pause();
+        // eslint-disable-next-line no-param-reassign
+        video.src = '';
+      });
+    };
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        chunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      cleanup();
+      const blob = new Blob(chunks, { type: selectedMimeType });
+      const url = URL.createObjectURL(blob);
+      resolve(url);
+    };
+
+    mediaRecorder.onerror = (event) => {
+      cleanup();
+      reject(
+        event.error || new Error('MediaRecorder เกิดปัญหาในระหว่างสร้างวิดีโอ'),
+      );
+    };
+
+    const drawFrame = () => {
+      if (!recording) {
+        return;
+      }
+
+      const elapsed = (performance.now() - startTime) / 1000;
+      if (elapsed >= maxDuration) {
+        recording = false;
+        mediaRecorder.stop();
+        return;
+      }
+
+      ctx.clearRect(0, 0, frameWidth, frameHeight);
+      ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+
+      frame.slots.forEach((slot, index) => {
+        const video = videoElements[index];
+        if (!video) {
+          return;
+        }
+
+        const slotAspect = slot.width / slot.height;
+        const videoAspect = video.videoWidth / video.videoHeight || 1;
+
+        let sourceWidth = video.videoWidth;
+        let sourceHeight = video.videoHeight;
+        let sourceX = 0;
+        let sourceY = 0;
+
+        if (videoAspect > slotAspect) {
+          sourceWidth = video.videoHeight * slotAspect;
+          sourceX = (video.videoWidth - sourceWidth) / 2;
+        } else {
+          sourceHeight = video.videoWidth / slotAspect;
+          sourceY = (video.videoHeight - sourceHeight) / 2;
+        }
+
+        const targetX = slot.x * scaleX;
+        const targetY = slot.y * scaleY;
+        const targetWidth = slot.width * scaleX;
+        const targetHeight = slot.height * scaleY;
+
+        ctx.drawImage(
+          video,
+          sourceX,
+          sourceY,
+          sourceWidth,
+          sourceHeight,
+          targetX,
+          targetY,
+          targetWidth,
+          targetHeight,
+        );
+      });
+
+      animationFrameId = requestAnimationFrame(drawFrame);
+    };
+
+    mediaRecorder.start();
+    drawFrame();
+  });
+};
+
+export default function PhotoResult() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const state = location.state as LocationState;
+  const [printStatus, setPrintStatus] = useState<
+    'idle' | 'printing' | 'success' | 'error'
+  >('idle');
+  const [compiledVideoUrl, setCompiledVideoUrl] = useState<string | null>(null);
+  const [isCreatingVideo, setIsCreatingVideo] = useState(false);
+  const hasGeneratedVideo = useRef(false);
 
   // Create compiled video from selected captures
   useEffect(() => {

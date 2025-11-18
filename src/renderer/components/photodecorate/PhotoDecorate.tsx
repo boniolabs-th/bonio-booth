@@ -1,13 +1,15 @@
 /* eslint-disable jsx-a11y/img-redundant-alt */
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { FRAME_CONFIGS, FrameConfig } from '../../utils/frameConfig';
 import './PhotoDecorate.css';
 
 interface Capture {
   video: string;
   photo: string;
+  boomerangGif?: string;
+  boomerangFrames?: string[];
 }
 
 interface LocationState {
@@ -34,7 +36,7 @@ export default function PhotoDecorate() {
     ? selectedFrame.width / selectedFrame.height
     : 1;
 
-  const calculateScaleFactor = () => {
+  const calculateScaleFactor = useCallback(() => {
     const frameImg = frameImgRef.current;
     if (frameImg) {
       const actualWidth = frameImg.offsetWidth || frameImg.clientWidth;
@@ -43,7 +45,7 @@ export default function PhotoDecorate() {
       const scaleY = actualHeight / selectedFrame.height;
       setScaleFactor({ x: scaleX, y: scaleY });
     }
-  };
+  }, [selectedFrame.height, selectedFrame.width]);
 
   // Calculate scale factor when frame image loads
   useEffect(() => {
@@ -51,7 +53,7 @@ export default function PhotoDecorate() {
     if (frameImg && frameImg.complete) {
       calculateScaleFactor();
     }
-  }, [selectedFrame.width, selectedFrame.height]);
+  }, [calculateScaleFactor, selectedFrame.height, selectedFrame.width]);
 
   // Recalculate scale factor on window resize
   useEffect(() => {
@@ -63,7 +65,7 @@ export default function PhotoDecorate() {
     return () => {
       window.removeEventListener('resize', handleResize);
     };
-  }, [selectedFrame.width, selectedFrame.height]);
+  }, [calculateScaleFactor, selectedFrame.height, selectedFrame.width]);
 
   const handleFrameImageLoad = () => {
     calculateScaleFactor();
@@ -123,10 +125,48 @@ export default function PhotoDecorate() {
         const targetY = slot.y * scaleY;
         const targetWidth = slot.width * scaleX;
         const targetHeight = slot.height * scaleY;
+        const targetRadius = slot.radius * scaleX; // Scale radius with scaleX
         const photoImg = new Image();
 
         photoImg.onload = () => {
           ctx.save();
+
+          // Create rounded rectangle clipping path
+          ctx.beginPath();
+          ctx.moveTo(targetX + targetRadius, targetY);
+          ctx.lineTo(targetX + targetWidth - targetRadius, targetY);
+          ctx.quadraticCurveTo(
+            targetX + targetWidth,
+            targetY,
+            targetX + targetWidth,
+            targetY + targetRadius,
+          );
+          ctx.lineTo(
+            targetX + targetWidth,
+            targetY + targetHeight - targetRadius,
+          );
+          ctx.quadraticCurveTo(
+            targetX + targetWidth,
+            targetY + targetHeight,
+            targetX + targetWidth - targetRadius,
+            targetY + targetHeight,
+          );
+          ctx.lineTo(targetX + targetRadius, targetY + targetHeight);
+          ctx.quadraticCurveTo(
+            targetX,
+            targetY + targetHeight,
+            targetX,
+            targetY + targetHeight - targetRadius,
+          );
+          ctx.lineTo(targetX, targetY + targetRadius);
+          ctx.quadraticCurveTo(
+            targetX,
+            targetY,
+            targetX + targetRadius,
+            targetY,
+          );
+          ctx.closePath();
+          ctx.clip();
 
           // Calculate crop dimensions (cover behavior - crop to fit slot)
           const photoAspect = photoImg.width / photoImg.height;
@@ -262,12 +302,13 @@ export default function PhotoDecorate() {
                     width: `${slotWidth}px`,
                     height: `${slotHeight}px`,
                     aspectRatio: slotAspectRatio,
+                    borderRadius: `${slot.radius}px`,
                   }}
                 >
                   {photoAssignments[slotIndex] !== undefined && (
                     <img
                       src={state.captures[photoAssignments[slotIndex]].photo}
-                      alt={`Photo ${slotIndex + 1}`}
+                      alt={`Capture ${slotIndex + 1}`}
                       className="slot-photo"
                     />
                   )}
@@ -291,7 +332,7 @@ export default function PhotoDecorate() {
                   className={`photo-card ${isSelected ? 'selected' : ''}`}
                   onClick={() => handlePhotoClick(index)}
                 >
-                  <img src={capture.photo} alt={`Photo ${index + 1}`} />
+                  <img src={capture.photo} alt={`Capture ${index + 1}`} />
                   {isSelected && (
                     <div className="sequence-badge">{sequenceNumber + 1}</div>
                   )}

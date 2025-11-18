@@ -14,6 +14,7 @@ export interface FrameConfig {
     y: number;
     width: number;
     height: number;
+    radius: number;
   }[];
   previewSlots?: {
     id: string;
@@ -21,6 +22,7 @@ export interface FrameConfig {
     y: number;
     width: number;
     height: number;
+    radius: number;
   }[];
 }
 
@@ -33,20 +35,20 @@ export const FRAME_CONFIGS: FrameConfig[] = [
     height: 3600,
     orientation: 'landscape' as const,
     slots: [
-      { id: 'classic_slot_1', x: 35, y: 54, width: 1130, height: 1083 }, // Top left photo slot
-      { id: 'classic_slot_2', x: 1237, y: 55, width: 1130, height: 1083 }, // Top right photo slot
-      { id: 'classic_slot_3', x: 35, y: 1163, width: 1130, height: 1083 }, // Middle left photo slot
-      { id: 'classic_slot_4', x: 1233, y: 1162, width: 1130, height: 1083 },
-      { id: 'classic_slot_5', x: 37, y: 2275, width: 1130, height: 1083 },
-      { id: 'classic_slot_6', x: 1238, y: 2272, width: 1130, height: 1083 },
+      { id: 'classic_slot_1', x: 35, y: 54, width: 1130, height: 1083, radius: 100 }, // Top left photo slot
+      { id: 'classic_slot_2', x: 1237, y: 55, width: 1130, height: 1083, radius: 100 }, // Top right photo slot
+      { id: 'classic_slot_3', x: 35, y: 1163, width: 1130, height: 1083, radius: 100 }, // Middle left photo slot
+      { id: 'classic_slot_4', x: 1233, y: 1162, width: 1130, height: 1083, radius: 100 },
+      { id: 'classic_slot_5', x: 37, y: 2275, width: 1130, height: 1083, radius: 100 },
+      { id: 'classic_slot_6', x: 1238, y: 2272, width: 1130, height: 1083, radius: 100 },
     ],
     previewSlots: [
-      { id: 'classic_slot_1', x: 151, y: 54, width: 1018, height: 1083 },
-      { id: 'classic_slot_2', x: 1237, y: 55, width: 1018, height: 1083 },
-      { id: 'classic_slot_3', x: 151, y: 1163, width: 1018, height: 1083 },
-      { id: 'classic_slot_4', x: 1237, y: 1162, width: 1018, height: 1083 },
-      { id: 'classic_slot_5', x: 151, y: 2275, width: 1018, height: 1083 },
-      { id: 'classic_slot_6', x: 1237, y: 2272, width: 1018, height: 1083 },
+      { id: 'classic_slot_1', x: 35, y: 54, width: 1130, height: 1083, radius: 15 },
+      { id: 'classic_slot_2', x: 1237, y: 55, width: 1130, height: 1083, radius: 15 },
+      { id: 'classic_slot_3', x: 35, y: 1163, width: 1130, height: 1083, radius: 15 },
+      { id: 'classic_slot_4', x: 1237, y: 1162, width: 1130, height: 1083, radius: 15 },
+      { id: 'classic_slot_5', x: 35, y: 2275, width: 1130, height: 1083, radius: 15 },
+      { id: 'classic_slot_6', x: 1237, y: 2272, width: 1130, height: 1083, radius: 15 },
     ],
   },
   {
@@ -57,12 +59,12 @@ export const FRAME_CONFIGS: FrameConfig[] = [
     height: 1800, // 8 inches × 300 DPI
     orientation: 'landscape' as const,
     slots: [
-      { id: 'modern_slot_1', x: 150, y: 150, width: 450, height: 300 }, // Top left
-      { id: 'modern_slot_2', x: 675, y: 150, width: 450, height: 300 }, // Top middle
-      { id: 'modern_slot_3', x: 1200, y: 150, width: 450, height: 300 }, // Top right
-      { id: 'modern_slot_4', x: 150, y: 600, width: 450, height: 300 }, // Bottom left
-      { id: 'modern_slot_5', x: 675, y: 600, width: 450, height: 300 }, // Bottom middle
-      { id: 'modern_slot_6', x: 1200, y: 600, width: 450, height: 300 }, // Bottom right
+      { id: 'modern_slot_1', x: 150, y: 150, width: 450, height: 300, radius: 15 }, // Top left
+      { id: 'modern_slot_2', x: 675, y: 150, width: 450, height: 300, radius: 15 }, // Top middle
+      { id: 'modern_slot_3', x: 1200, y: 150, width: 450, height: 300, radius: 15 }, // Top right
+      { id: 'modern_slot_4', x: 150, y: 600, width: 450, height: 300, radius: 15 }, // Bottom left
+      { id: 'modern_slot_5', x: 675, y: 600, width: 450, height: 300, radius: 15 }, // Bottom middle
+      { id: 'modern_slot_6', x: 1200, y: 600, width: 450, height: 300, radius: 15 }, // Bottom right
     ],
   },
   // Mock additional frames
@@ -74,9 +76,9 @@ export const FRAME_CONFIGS: FrameConfig[] = [
     height: 3600,
     orientation: 'portrait' as const,
     slots: [
-      { id: 'slot_1', x: 100, y: 100, width: 1000, height: 800 },
-      { id: 'slot_2', x: 100, y: 1000, width: 1000, height: 800 },
-      { id: 'slot_3', x: 100, y: 1900, width: 1000, height: 800 },
+      { id: 'slot_1', x: 100, y: 100, width: 1000, height: 800, radius: 15 },
+      { id: 'slot_2', x: 100, y: 1000, width: 1000, height: 800, radius: 15 },
+      { id: 'slot_3', x: 100, y: 1900, width: 1000, height: 800, radius: 15 },
     ],
   },
   {
@@ -87,10 +89,10 @@ export const FRAME_CONFIGS: FrameConfig[] = [
     height: 3600,
     orientation: 'portrait' as const,
     slots: [
-      { id: 'slot_1', x: 100, y: 50, width: 1000, height: 700 },
-      { id: 'slot_2', x: 100, y: 800, width: 1000, height: 700 },
-      { id: 'slot_3', x: 100, y: 1550, width: 1000, height: 700 },
-      { id: 'slot_4', x: 100, y: 2300, width: 1000, height: 700 },
+      { id: 'slot_1', x: 100, y: 50, width: 1000, height: 700, radius: 15 },
+      { id: 'slot_2', x: 100, y: 800, width: 1000, height: 700, radius: 15 },
+      { id: 'slot_3', x: 100, y: 1550, width: 1000, height: 700, radius: 15 },
+      { id: 'slot_4', x: 100, y: 2300, width: 1000, height: 700, radius: 15 },
     ],
   },
   {
@@ -101,7 +103,7 @@ export const FRAME_CONFIGS: FrameConfig[] = [
     height: 1800,
     orientation: 'portrait' as const,
     slots: [
-      { id: 'slot_1', x: 100, y: 100, width: 1000, height: 1600 },
+      { id: 'slot_1', x: 100, y: 100, width: 1000, height: 1600, radius: 15 },
     ],
   },
   {
@@ -112,8 +114,8 @@ export const FRAME_CONFIGS: FrameConfig[] = [
     height: 1800,
     orientation: 'landscape' as const,
     slots: [
-      { id: 'slot_1', x: 50, y: 200, width: 500, height: 1400 },
-      { id: 'slot_2', x: 650, y: 200, width: 500, height: 1400 },
+      { id: 'slot_1', x: 50, y: 200, width: 500, height: 1400, radius: 15 },
+      { id: 'slot_2', x: 650, y: 200, width: 500, height: 1400, radius: 15 },
     ],
   },
   {
@@ -124,10 +126,10 @@ export const FRAME_CONFIGS: FrameConfig[] = [
     height: 1800,
     orientation: 'landscape' as const,
     slots: [
-      { id: 'slot_1', x: 50, y: 50, width: 500, height: 800 },
-      { id: 'slot_2', x: 650, y: 50, width: 500, height: 800 },
-      { id: 'slot_3', x: 50, y: 950, width: 500, height: 800 },
-      { id: 'slot_4', x: 650, y: 950, width: 500, height: 800 },
+      { id: 'slot_1', x: 50, y: 50, width: 500, height: 800, radius: 15 },
+      { id: 'slot_2', x: 650, y: 50, width: 500, height: 800, radius: 15 },
+      { id: 'slot_3', x: 50, y: 950, width: 500, height: 800, radius: 15 },
+      { id: 'slot_4', x: 650, y: 950, width: 500, height: 800, radius: 15 },
     ],
   },
 ];

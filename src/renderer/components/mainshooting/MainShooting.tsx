@@ -12,8 +12,10 @@ interface LocationState {
 }
 
 interface Capture {
-  video: string; // Blob URL
+  video: string; // Blob URL of the raw recording
   photo: string; // Base64 data URL
+  boomerangGif?: string; // Base64 GIF with boomerang effect
+  boomerangFrames?: string[]; // Captured frames used for boomerang playback
 }
 
 export default function MainShooting() {
@@ -22,7 +24,6 @@ export default function MainShooting() {
   const state = location.state as LocationState;
 
   const [countdown, setCountdown] = useState(3);
-  const [currentCapture, setCurrentCapture] = useState(0);
   const [captures, setCaptures] = useState<Capture[]>([]);
   const [showCountdown, setShowCountdown] = useState(false);
   const [showFlash, setShowFlash] = useState(false);
@@ -147,7 +148,7 @@ export default function MainShooting() {
 
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
 
     if (context) {
       canvas.width = video.videoWidth;
@@ -202,8 +203,6 @@ export default function MainShooting() {
 
           // eslint-disable-next-line no-plusplus
           for (let i = 0; i < 6; i += 1) {
-            setCurrentCapture(i);
-
             // Start recording video
             startRecording();
 
@@ -222,7 +221,10 @@ export default function MainShooting() {
 
             // Add capture to array
             if (videoUrl && photoData) {
-              newCaptures.push({ video: videoUrl, photo: photoData });
+              newCaptures.push({
+                video: videoUrl,
+                photo: photoData,
+              });
               // Update state to show progress
               setCaptures([...newCaptures]);
             }
@@ -279,7 +281,7 @@ export default function MainShooting() {
       {/* Title Section */}
       <div className="title-section">
         <h1 className="title-thai">มองกล้อง!</h1>
-        <p className="title-english">LET'S TAKE A PHOTO</p>
+        <p className="title-english">LET&apos;S TAKE A PHOTO</p>
       </div>
 
       {/* Main Content */}
@@ -336,7 +338,7 @@ export default function MainShooting() {
               {captures[index] ? (
                 <img
                   src={captures[index].photo}
-                  alt={`Photo ${index + 1}`}
+                  alt={`Capture ${index + 1}`}
                   className="thumbnail-image"
                 />
               ) : (

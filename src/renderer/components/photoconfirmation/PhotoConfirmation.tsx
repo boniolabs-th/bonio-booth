@@ -6,6 +6,8 @@ import './PhotoConfirmation.css';
 interface Capture {
   video: string;
   photo: string;
+  boomerangGif?: string;
+  boomerangFrames?: string[];
 }
 
 interface LocationState {
@@ -44,10 +46,13 @@ export default function PhotoConfirmation() {
           <div className="photos-grid">
             {state.captures &&
               state.captures.map((capture, index) => (
-                <div key={index} className="photo-frame">
+                <div
+                  key={capture.video || capture.photo || index}
+                  className="photo-frame"
+                >
                   <img
                     src={capture.photo}
-                    alt={`Photo ${index + 1}`}
+                    alt={`Capture ${index + 1}`}
                     className="photo-image"
                   />
                   <div className="photo-number">{index + 1}</div>
