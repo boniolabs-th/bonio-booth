@@ -8,6 +8,8 @@ import './PhotoPrepare.css';
 interface LocationState {
   quantity: number;
   totalPrice: number;
+  selectedFrame?: FrameConfig;
+  useBoomerang?: boolean;
 }
 
 export default function PhotoPrepare() {
@@ -15,7 +17,7 @@ export default function PhotoPrepare() {
   const location = useLocation();
   const state = location.state as LocationState;
   const [selectedFrame, setSelectedFrame] = useState<FrameConfig>(
-    FRAME_CONFIGS[0],
+    state.selectedFrame || FRAME_CONFIGS[0],
   );
 
   const handleBack = () => {
@@ -23,7 +25,13 @@ export default function PhotoPrepare() {
   };
 
   const handleConfirm = () => {
-    navigate('/main-shooting', { state: { ...state, selectedFrame } });
+    navigate('/main-shooting', {
+      state: {
+        ...state,
+        selectedFrame,
+        useBoomerang: state.useBoomerang || false,
+      },
+    });
   };
 
   return (

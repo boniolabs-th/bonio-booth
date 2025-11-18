@@ -9,6 +9,7 @@ interface LocationState {
   quantity: number;
   totalPrice: number;
   selectedFrame: FrameConfig;
+  useBoomerang?: boolean;
 }
 
 interface Capture {
@@ -267,6 +268,7 @@ export default function MainShooting() {
           state: {
             ...state,
             captures,
+            useBoomerang: state.useBoomerang || false,
           },
         });
       }, 1000);

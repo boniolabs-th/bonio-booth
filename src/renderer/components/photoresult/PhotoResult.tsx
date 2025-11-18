@@ -21,11 +21,18 @@ interface LocationState {
   selectedFrame: FrameConfig;
   selectedFilter: string;
   selectedCaptures: Capture[];
+  useBoomerang?: boolean;
 }
 
 const ensureBoomerangAssets = async (
   captures: Capture[],
+  useBoomerang?: boolean,
 ): Promise<Capture[]> => {
+  // If boomerang is not selected, return captures as-is
+  if (!useBoomerang) {
+    return captures;
+  }
+
   return Promise.all(
     captures.map(async (capture) => {
       if (capture.boomerangFrames?.length && capture.boomerangGif) {
@@ -50,6 +57,8 @@ const ensureBoomerangAssets = async (
 const generateFramedVideo = async (
   captures: Capture[],
   frame: FrameConfig,
+  selectedFilterId?: string,
+  useBoomerang?: boolean,
 ): Promise<string> => {
   const loadFrameImage = () =>
     new Promise<HTMLImageElement>((resolve, reject) => {
@@ -86,7 +95,7 @@ const generateFramedVideo = async (
   const composeBoomerangVideo = async (
     frameImg: HTMLImageElement,
     enrichedCaptures: Capture[],
-
+    selectedFilterId?: string,
   ): Promise<string> => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -230,12 +239,12 @@ const generateFramedVideo = async (
           const targetWidth = slot.width * scaleX;
           const targetHeight = slot.height * scaleY;
 
-          // Apply filter to video before drawing
+          // Apply filter to boomerang frame before drawing
           ctx.save();
-          // const filter = FILTERS.find((f) => f.id === frame.selectedFilterId);
-          // if (filter && filter.filter) {
-          //   ctx.filter = filter.filter;
-          // }
+          const filter = FILTERS.find((f) => f.id === selectedFilterId);
+          if (filter && filter.filter) {
+            ctx.filter = filter.filter;
+          }
 
           ctx.drawImage(
             image,
@@ -270,14 +279,15 @@ const generateFramedVideo = async (
   };
 
   const frameImg = await loadFrameImage();
-  const enrichedCaptures = await ensureBoomerangAssets(captures);
+  const enrichedCaptures = await ensureBoomerangAssets(captures, useBoomerang);
 
   const hasBoomerangFrames = enrichedCaptures.every(
     (capture) => capture.boomerangFrames && capture.boomerangFrames.length > 0,
   );
 
-  if (hasBoomerangFrames) {
-    return composeBoomerangVideo(frameImg, enrichedCaptures);
+  // Only use boomerang if user selected it and frames are available
+  if (useBoomerang && hasBoomerangFrames) {
+    return composeBoomerangVideo(frameImg, enrichedCaptures, selectedFilterId);
   }
 
   const videoElements = await Promise.all(
@@ -408,6 +418,13 @@ const generateFramedVideo = async (
         const targetWidth = slot.width * scaleX;
         const targetHeight = slot.height * scaleY;
 
+        // Apply filter to video before drawing
+        ctx.save();
+        const filter = FILTERS.find((f) => f.id === selectedFilterId);
+        if (filter && filter.filter) {
+          ctx.filter = filter.filter;
+        }
+
         ctx.drawImage(
           video,
           sourceX,
@@ -419,6 +436,8 @@ const generateFramedVideo = async (
           targetWidth,
           targetHeight,
         );
+
+        ctx.restore();
       });
 
       animationFrameId = requestAnimationFrame(drawFrame);
@@ -439,6 +458,45 @@ export default function PhotoResult() {
   const [compiledVideoUrl, setCompiledVideoUrl] = useState<string | null>(null);
   const [isCreatingVideo, setIsCreatingVideo] = useState(false);
   const hasGeneratedVideo = useRef(false);
+  const [previewBoomerangGif, setPreviewBoomerangGif] = useState<string | null>(
+    null,
+  );
+
+  // Setup preview (boomerang or video based on user choice)
+  useEffect(() => {
+    const setupPreview = async () => {
+      if (!state?.selectedCaptures?.[0]) {
+        return;
+      }
+
+      const firstCapture = state.selectedCaptures[0];
+      const shouldUseBoomerang = state.useBoomerang || false;
+
+      if (shouldUseBoomerang) {
+        // Check if boomerang assets already exist
+        if (firstCapture.boomerangGif) {
+          setPreviewBoomerangGif(firstCapture.boomerangGif);
+          return;
+        }
+
+        // Generate boomerang assets if not exists
+        try {
+          const assets = await generateBoomerangAssets(firstCapture.video);
+          setPreviewBoomerangGif(assets.boomerangGif);
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to create boomerang preview:', error);
+          // Fallback to video if boomerang generation fails
+          setPreviewBoomerangGif(null);
+        }
+      } else {
+        // Use regular video, no boomerang
+        setPreviewBoomerangGif(null);
+      }
+    };
+
+    setupPreview();
+  }, [state?.selectedCaptures, state?.useBoomerang]);
 
   // Create compiled video from selected captures
   useEffect(() => {
@@ -462,6 +520,8 @@ export default function PhotoResult() {
         const url = await generateFramedVideo(
           state.selectedCaptures,
           state.selectedFrame,
+          state.selectedFilter,
+          state.useBoomerang,
         );
         setCompiledVideoUrl(url);
       } catch (error) {
@@ -583,17 +643,71 @@ export default function PhotoResult() {
         {/* Left - Video Preview */}
         <div className="video-preview-section">
           {state?.selectedCaptures?.[0] && (
-            <div className="video-preview-container">
-              <video
-                className="video-preview"
-                style={{
-                  filter: getFilterStyle(),
-                }}
-                loop
-                muted
-                playsInline
-              />
-            </div>
+            <>
+              <div className="video-preview-container">
+                {previewBoomerangGif ? (
+                  <img
+                    src={previewBoomerangGif}
+                    alt="Boomerang preview"
+                    className="video-preview"
+                    style={{
+                      filter: getFilterStyle(),
+                    }}
+                  />
+                ) : state?.selectedCaptures?.[0]?.video ? (
+                  <video
+                    src={state.selectedCaptures[0].video}
+                    className="video-preview"
+                    style={{
+                      filter: getFilterStyle(),
+                    }}
+                    loop
+                    muted
+                    playsInline
+                    autoPlay
+                  />
+                ) : (
+                  <div className="video-preview-loading">
+                    <div className="loading-spinner" />
+                    <p>กำลังโหลดวิดีโอ...</p>
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                className="download-video-button"
+                onClick={handleDownloadGif}
+                disabled={!compiledVideoUrl}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <polyline
+                    points="7 10 12 15 17 10"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <line
+                    x1="12"
+                    y1="15"
+                    x2="12"
+                    y2="3"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                ดาวน์โหลดวิดีโอ
+              </button>
+            </>
           )}
         </div>
 

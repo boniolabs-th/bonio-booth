@@ -193,6 +193,95 @@
 } */
 
 
+/* Boomerang Option Section */
+.boomerang-option-section {
+  width: 100%;
+  max-width: 600px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 16px;
+  margin: 20px 0;
+}
+
+.boomerang-option-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c2c2c;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.boomerang-options {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.boomerang-option-button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: white;
+  border: 2px solid #e8e8e8;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+}
+
+.boomerang-option-button:hover {
+  border-color: #ffa500;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 165, 0, 0.2);
+}
+
+.boomerang-option-button.active {
+  border-color: #ffa500;
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, rgba(255, 140, 0, 0.1) 100%);
+  box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
+}
+
+.boomerang-option-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  transition: color 0.3s ease;
+}
+
+.boomerang-option-button.active .boomerang-option-icon {
+  color: #ffa500;
+}
+
+.boomerang-option-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.boomerang-option-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c2c2c;
+  transition: color 0.3s ease;
+}
+
+.boomerang-option-button.active .boomerang-option-name {
+  color: #ffa500;
+}
+
+.boomerang-option-desc {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.4;
+}
+
 .next-button-frame {
   padding: 16px 40px;
   font-size: 24px;

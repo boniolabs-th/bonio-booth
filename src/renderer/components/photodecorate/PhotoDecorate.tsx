@@ -16,6 +16,8 @@ interface LocationState {
   quantity: number;
   totalPrice: number;
   captures: Capture[];
+  selectedFrame?: FrameConfig;
+  useBoomerang?: boolean;
 }
 
 export default function PhotoDecorate() {
@@ -81,6 +83,7 @@ export default function PhotoDecorate() {
         finalImage: finalImageData,
         selectedFrame,
         selectedCaptures,
+        useBoomerang: state.useBoomerang || false,
       },
     });
   };

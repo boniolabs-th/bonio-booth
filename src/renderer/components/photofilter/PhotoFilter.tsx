@@ -16,6 +16,7 @@ interface LocationState {
   finalImage: string;
   selectedFrame: FrameConfig;
   selectedCaptures: Capture[];
+  useBoomerang?: boolean;
 }
 
 export default function PhotoFilter() {
@@ -201,6 +202,7 @@ export default function PhotoFilter() {
           ...state,
           finalImage: filteredFinalImage,
           selectedFilter,
+          useBoomerang: state.useBoomerang || false,
         },
       });
     } catch (error) {
