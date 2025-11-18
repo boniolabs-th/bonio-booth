@@ -35,7 +35,7 @@ export default function FrameSelection() {
       <Header showBackButton onBackClick={handleBack} />
 
       {/* Main Content */}
-      <div className="main-content">
+      <div className="main-content-frame">
         {/* Title Section */}
         <div className="title-section">
           <h1 className="title-frame">เลือกกรอบรูป</h1>
@@ -57,7 +57,6 @@ export default function FrameSelection() {
                 tabIndex={0}
                 className={`frame-thumbnail ${selectedFrame.id === frame.id ? 'selected' : ''}`}
                 style={{
-                  width: thumbnailWidth,
                   height: thumbnailHeight,
                 }}
                 onClick={() => setSelectedFrame(frame)}

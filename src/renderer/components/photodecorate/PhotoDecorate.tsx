@@ -24,7 +24,7 @@ export default function PhotoDecorate() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
-  const [selectedFrame] = useState<FrameConfig>(FRAME_CONFIGS[0]);
+  const selectedFrame = state.selectedFrame || FRAME_CONFIGS[0];
   const [photoAssignments, setPhotoAssignments] = useState<{
     [slotIndex: number]: number;
   }>({});
