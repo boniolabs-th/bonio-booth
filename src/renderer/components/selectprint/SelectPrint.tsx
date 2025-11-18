@@ -1,14 +1,25 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Header } from '..';
 import './SelectPrint.css';
 import couponIcon from '../../../../assets/icons/svg/coupon.svg';
 import qrIcon from '../../../../assets/icons/svg/qrcode.svg';
+
+interface LocationState {
+  quantity?: number;
+  totalPrice?: number;
+  discountCode?: string;
+}
+
 export default function SelectPrint() {
-  const [quantity, setQuantity] = useState(1);
-  const [price] = useState(125); // Base price per print
   const navigate = useNavigate();
+  const location = useLocation();
+  const state = location.state as LocationState;
+  
+  const [quantity, setQuantity] = useState(state?.quantity || 1);
+  const [price] = useState(125); // Base price per print
+  const [discountCode] = useState(state?.discountCode || undefined);
 
   const handleDecrease = () => {
     if (quantity > 1) {
@@ -21,15 +32,23 @@ export default function SelectPrint() {
   };
 
   const handleDiscountCoupon = () => {
-    // TODO: Implement discount coupon functionality
+    navigate('/discount-coupon', {
+      state: {
+        quantity,
+        totalPrice: price * quantity,
+      },
+    });
   };
 
   const handleConfirm = () => {
     // Navigate to payment page with quantity and total price
+    const originalPrice = price * quantity;
     navigate('/payment-qr', {
       state: {
         quantity,
-        totalPrice: price * quantity,
+        totalPrice: originalPrice,
+        originalPrice,
+        discountCode: discountCode || undefined,
       },
     });
   };

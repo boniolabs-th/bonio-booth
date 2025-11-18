@@ -154,12 +154,37 @@
   background: #000;
 }
 
+.price-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 40px;
+}
+
+.discount-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e74c3c;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.discount-label {
+  color: #e74c3c;
+}
+
+.discount-amount {
+  color: #e74c3c;
+  font-weight: 700;
+}
+
 .price-container {
   /* background: #2563eb; */
   color: #333;
   padding: 8px 24px;
   border-radius: 12px;
-  margin-bottom: 40px;
   display: flex;
   align-items: center;
   gap: 8px;

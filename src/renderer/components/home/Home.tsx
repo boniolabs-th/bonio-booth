@@ -3,10 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import icon from '../../../../assets/icons/default_full.svg';
 import './Home.css';
 
-const EXTERNAL_LINKS = {
-  TERMS_AND_SERVICES: 'https://boniolabs.com',
-} as const;
-
 function Home(): React.JSX.Element {
   const navigate = useNavigate();
 
@@ -15,12 +11,12 @@ function Home(): React.JSX.Element {
   }, [navigate]);
 
   const handleTermsClick = React.useCallback(() => {
-    window.open(
-      EXTERNAL_LINKS.TERMS_AND_SERVICES,
-      '_blank',
-      'noopener,noreferrer',
-    );
-  }, []);
+    navigate('/terms-and-services');
+  }, [navigate]);
+
+  const handleHelpClick = React.useCallback(() => {
+    navigate('/get-help');
+  }, [navigate]);
 
   return (
     <main className="home-container">
@@ -53,6 +49,14 @@ function Home(): React.JSX.Element {
           aria-label="Open Terms and Services"
         >
           Terms & Services
+        </button>
+        <button
+          type="button"
+          onClick={handleHelpClick}
+          className="terms-link"
+          aria-label="Open Help"
+        >
+          ช่วยเหลือ
         </button>
       </footer>
     </main>

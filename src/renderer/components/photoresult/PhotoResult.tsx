@@ -1,8 +1,9 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
-import { FrameConfig } from '../../utils/frameConfig';
+import { FrameConfig , FILTERS } from '../../utils/frameConfig';
 import { generateBoomerangAssets } from '../../utils/boomerang';
+
 import './PhotoResult.css';
 
 interface Capture {
@@ -85,6 +86,7 @@ const generateFramedVideo = async (
   const composeBoomerangVideo = async (
     frameImg: HTMLImageElement,
     enrichedCaptures: Capture[],
+
   ): Promise<string> => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -228,6 +230,13 @@ const generateFramedVideo = async (
           const targetWidth = slot.width * scaleX;
           const targetHeight = slot.height * scaleY;
 
+          // Apply filter to video before drawing
+          ctx.save();
+          // const filter = FILTERS.find((f) => f.id === frame.selectedFilterId);
+          // if (filter && filter.filter) {
+          //   ctx.filter = filter.filter;
+          // }
+
           ctx.drawImage(
             image,
             sourceX,
@@ -239,6 +248,8 @@ const generateFramedVideo = async (
             targetWidth,
             targetHeight,
           );
+
+          ctx.restore();
         });
 
         frameCursor += 1;
@@ -541,34 +552,55 @@ export default function PhotoResult() {
     }
   };
 
+  const getFilterStyle = () => {
+    const filter = FILTERS.find((f) => f.id === state.selectedFilter);
+    return filter?.filter || '';
+  };
+
   return (
     <div className="photo-result-container">
       {/* Header */}
       <div className="result-header">
-        <h1 className="result-title">รูปถ่ายของคุณ</h1>
-        <p className="result-subtitle">YOUR PHOTO</p>
+        <h1 className="result-title">กำลังพิมพ์รูปภาพ...</h1>
+        <p className="result-subtitle">Printing your memory...</p>
       </div>
 
-      {/* Main Layout */}
+      {/* Main Layout - Photo Strip Center */}
       <div className="result-main">
-        {/* Left - Frame with Photos */}
-        <div className="frame-display-section">
-          <div className="frame-display-container">
-            {state.finalImage && (
-              <img
-                src={state.finalImage}
-                alt="Final result"
-                className="final-result-image"
+        <div className="photo-strip-center">
+          {state.finalImage && (
+            <img
+              src={state.finalImage}
+              alt="Final result"
+              className="final-result-image"
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Bottom Section - Video Preview & QR Code */}
+      <div className="result-bottom">
+        {/* Left - Video Preview */}
+        <div className="video-preview-section">
+          {state?.selectedCaptures?.[0] && (
+            <div className="video-preview-container">
+              <video
+                className="video-preview"
+                style={{
+                  filter: getFilterStyle(),
+                }}
+                loop
+                muted
+                playsInline
               />
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Right - QR Code & Download */}
         <div className="download-section">
           <div className="download-content">
-            <h2 className="download-title">ดาวน์โหลดวิดีโอ</h2>
-            <p className="download-subtitle">DOWNLOAD YOUR VIDEO</p>
+            <h2 className="download-title">Download GIF File</h2>
 
             {isCreatingVideo ? (
               <div className="creating-video-message">
@@ -576,53 +608,13 @@ export default function PhotoResult() {
                 <p>กำลังสร้างวิดีโอของคุณ...</p>
               </div>
             ) : (
-              <>
-                <div className="qr-display">
-                  <img
-                    src={generateQRCode()}
-                    alt="QR Code"
-                    className="qr-code"
-                  />
-                  <p className="qr-instruction">สแกน QR Code เพื่อดาวน์โหลด</p>
-                </div>
-
-                <div className="download-actions">
-                  <button
-                    type="button"
-                    className="download-button"
-                    onClick={handleDownloadGif}
-                    disabled={!compiledVideoUrl}
-                  >
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <polyline
-                        points="7 10 12 15 17 10"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <line
-                        x1="12"
-                        y1="15"
-                        x2="12"
-                        y2="3"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    ดาวน์โหลดวิดีโอ
-                  </button>
-                </div>
-              </>
+              <div className="qr-display">
+                <img
+                  src={generateQRCode()}
+                  alt="QR Code"
+                  className="qr-code"
+                />
+              </div>
             )}
           </div>
         </div>

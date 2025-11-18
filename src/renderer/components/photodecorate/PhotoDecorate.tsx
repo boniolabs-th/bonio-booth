@@ -75,7 +75,7 @@ export default function PhotoDecorate() {
     finalImageData: string,
     selectedCaptures: Capture[],
   ) => {
-    navigate('/photo-result', {
+    navigate('/photo-filter', {
       state: {
         ...state,
         finalImage: finalImageData,
