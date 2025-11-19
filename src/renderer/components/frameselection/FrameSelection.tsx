@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
-import { Header } from '..';
+import { BackButton } from '..';
 import { FRAME_CONFIGS, FrameConfig } from '../../utils/frameConfig';
 import './FrameSelection.css';
 
@@ -31,8 +31,8 @@ export default function FrameSelection() {
 
   return (
     <div className="frame-selection-container">
-      {/* Header */}
-      <Header showBackButton onBackClick={handleBack} />
+      {/* Back Button */}
+      <BackButton onBackClick={handleBack} />
 
       {/* Main Content */}
       <div className="main-content-frame">
@@ -91,7 +91,7 @@ export default function FrameSelection() {
         </div>
 
         {/* Boomerang Option */}
-        <div className="boomerang-option-section">
+        {/* <div className="boomerang-option-section">
           <div className="boomerang-option-title">เลือกรูปแบบวิดีโอ</div>
           <div className="boomerang-options">
             <button
@@ -153,7 +153,7 @@ export default function FrameSelection() {
               </div>
             </button>
           </div>
-        </div>
+        </div> */}
 
         {/* Confirm Button */}
         <button

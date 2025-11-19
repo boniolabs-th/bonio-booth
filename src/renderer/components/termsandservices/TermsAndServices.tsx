@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Header } from '..';
+import { BackButton } from '..';
 import './TermsAndServices.css';
 
 export default function TermsAndServices() {
@@ -11,7 +11,7 @@ export default function TermsAndServices() {
 
   return (
     <div className="terms-container">
-      <Header showBackButton onBackClick={handleBack} />
+      <BackButton onBackClick={handleBack} />
 
       <div className="terms-content">
         <h1 className="terms-title">

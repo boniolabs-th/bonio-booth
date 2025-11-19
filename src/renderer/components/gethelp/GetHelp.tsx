@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Header } from '..';
+import { BackButton } from '..';
 import './GetHelp.css';
 
 export default function GetHelp() {
@@ -51,7 +51,7 @@ export default function GetHelp() {
 
   return (
     <div className="get-help-container">
-      <Header showBackButton onBackClick={handleBack} />
+      <BackButton onBackClick={handleBack} />
 
       <div className="help-content">
         <div className="help-illustration">

@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Header } from '..';
+import { BackButton } from '..';
 import './PhotoConfirmation.css';
 
 interface Capture {
@@ -35,8 +35,8 @@ export default function PhotoConfirmation() {
 
   return (
     <div className="photo-confirmation-container">
-      {/* Header */}
-      <Header showBackButton onBackClick={handleBack} />
+      {/* Back Button */}
+      <BackButton onBackClick={handleBack} />
 
       {/* Main Content */}
       <div className="main-content">

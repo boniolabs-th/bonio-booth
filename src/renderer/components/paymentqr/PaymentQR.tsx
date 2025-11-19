@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Header } from '..';
+import { BackButton } from '..';
 import paymentService from '../../services/paymentService';
 import checkCircleIcon from '../../../../assets/icons/svg/check-circle.svg';
 import './PaymentQR.css';
@@ -208,8 +208,8 @@ export default function PaymentQR() {
 
   return (
     <div className="payment-qr-container">
-      {/* Header */}
-      <Header showBackButton backButtonPath="/select-print" />
+      {/* Back Button */}
+      <BackButton backButtonPath="/select-print" />
 
       {/* Main Content */}
       <div className="main-content">

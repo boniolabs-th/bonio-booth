@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Header } from '..';
+import { BackButton } from '..';
 import './SelectPrint.css';
 import couponIcon from '../../../../assets/icons/svg/coupon.svg';
 import qrIcon from '../../../../assets/icons/svg/qrcode.svg';
@@ -55,8 +55,8 @@ export default function SelectPrint() {
 
   return (
     <div className="select-print-container">
-      {/* Header */}
-      <Header showBackButton backButtonPath="/" />
+      {/* Back Button */}
+      <BackButton backButtonPath="/" />
 
       {/* Main Content */}
       <div className="main-content">

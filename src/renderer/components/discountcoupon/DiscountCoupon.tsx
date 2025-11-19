@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Header } from '..';
+import { BackButton } from '..';
 import './DiscountCoupon.css';
 
 interface LocationState {
@@ -55,7 +55,7 @@ export default function DiscountCoupon() {
 
   return (
     <div className="discount-coupon-container">
-      <Header showBackButton onBackClick={handleBack} />
+      <BackButton onBackClick={handleBack} />
 
       <div className="discount-content">
         {/* Title Section */}

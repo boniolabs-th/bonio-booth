@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
-import { Header } from '..';
+import { BackButton } from '..';
 import { FRAME_CONFIGS, FrameConfig } from '../../utils/frameConfig';
 import './PhotoPrepare.css';
 
@@ -36,8 +36,8 @@ export default function PhotoPrepare() {
 
   return (
     <div className="photo-prepare-container">
-      {/* Header */}
-      <Header showBackButton onBackClick={handleBack} />
+      {/* Back Button */}
+      <BackButton onBackClick={handleBack} />
 
       {/* Main Content */}
       <div className="main-content">

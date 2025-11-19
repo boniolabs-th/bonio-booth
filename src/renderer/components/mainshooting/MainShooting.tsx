@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Header } from '..';
+import { BackButton } from '..';
 import { FrameConfig } from '../../utils/frameConfig';
 import './MainShooting.css';
 
@@ -277,8 +277,8 @@ export default function MainShooting() {
 
   return (
     <div className="main-shooting-container">
-      {/* Header */}
-      <Header showBackButton onBackClick={handleBack} />
+      {/* Back Button */}
+      <BackButton onBackClick={handleBack} />
 
       {/* Title Section */}
       <div className="title-section">
