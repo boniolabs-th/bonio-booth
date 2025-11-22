@@ -223,52 +223,89 @@ export default function PhotoFilter() {
   const handlePrint = async () => {
     setIsProcessing(true);
     try {
+      console.log('=== START GENERATING FINAL IMAGE ===');
       // Filter รูปภาพแต่ละรูป แล้วสร้าง finalImage ใหม่ (รูปที่ filter + frame)
+      // รอให้ generate เสร็จก่อน
       const filteredFinalImage = await generateFinalImageWithFilteredPhotos();
+      console.log('=== FINAL IMAGE GENERATED SUCCESSFULLY ===');
 
-      // พิมพ์รูปภาพทันที
+      // Log image for debugging
+      console.log('=== GENERATED FINAL IMAGE ===');
+      console.log('Image from generateFinalImageWithFilteredPhotos');
+      console.log('Image size:', filteredFinalImage.length, 'characters');
+      console.log('Image type:', filteredFinalImage.substring(0, 20)); // Show data:image/...
+      console.log(
+        'Image preview (first 200 chars):',
+        filteredFinalImage.substring(0, 200),
+      );
+      console.log(
+        'Image preview (last 200 chars):',
+        filteredFinalImage.substring(filteredFinalImage.length - 200),
+      );
+
+      // พิมพ์รูปภาพทันที และรอให้พิมพ์เสร็จก่อนค่อย navigate
       if (window.electron?.print) {
         try {
           setPrintStatus('printing');
           console.log('=== SENDING PRINT REQUEST ===');
           console.log('Frame ID:', state.selectedFrame?.id || 'classic_2x6');
-          console.log('Frame Name:', state.selectedFrame?.name || '2x6 Classic');
-          console.log('Image size:', filteredFinalImage.length, 'characters');
+          console.log(
+            'Frame Name:',
+            state.selectedFrame?.name || '2x6 Classic',
+          );
+          console.log(
+            'Using filteredFinalImage from generateFinalImageWithFilteredPhotos',
+          );
 
-          // Set up listener for print response
-          window.electron.print.onPrintResponse((response) => {
-            console.log('=== PRINT RESPONSE RECEIVED ===', response);
-            if (response.success) {
-              setPrintStatus('success');
-              console.log('พิมพ์สำเร็จ');
-            } else {
-              setPrintStatus('error');
-              console.error('พิมพ์ไม่สำเร็จ:', response.error);
-              // Show alert for debugging
-              alert(`พิมพ์ไม่สำเร็จ: ${response.error || 'Unknown error'}`);
+          // รอ print response ก่อน navigate
+          await new Promise<void>((resolve, reject) => {
+            // Set up listener for print response
+            window.electron.print.onPrintResponse((response) => {
+              console.log('=== PRINT RESPONSE RECEIVED ===', response);
+              if (response.success) {
+                setPrintStatus('success');
+                console.log('พิมพ์สำเร็จ - จะ navigate ไปหน้าต่อไป');
+                // Clean up listener
+                window.electron?.print?.removePrintResponseListener();
+                resolve();
+              } else {
+                setPrintStatus('error');
+                console.error('พิมพ์ไม่สำเร็จ:', response.error);
+                // Clean up listener
+                window.electron?.print?.removePrintResponseListener();
+                // แม้พิมพ์ไม่สำเร็จก็ยัง navigate ไปหน้า result
+                resolve();
+              }
+            });
+
+            // Send print request with frame configuration
+            try {
+              window.electron.print.printPhoto({
+                imageDataUrl: filteredFinalImage,
+                frameId: state.selectedFrame?.id || 'classic_2x6',
+                frameName: state.selectedFrame?.name || '2x6 Classic',
+              });
+              console.log('Print request sent - waiting for response...');
+            } catch (printError) {
+              console.error('Error sending print request:', printError);
+              window.electron?.print?.removePrintResponseListener();
+              reject(printError);
             }
-            // Clean up listener
-            window.electron?.print?.removePrintResponseListener();
           });
 
-          // Send print request with frame configuration
-          window.electron.print.printPhoto({
-            imageDataUrl: filteredFinalImage,
-            frameId: state.selectedFrame?.id || 'classic_2x6',
-            frameName: state.selectedFrame?.name || '2x6 Classic',
-          });
-          console.log('Print request sent');
+          console.log('=== PRINT PROCESS COMPLETED - NAVIGATING ===');
         } catch (printError) {
           setPrintStatus('error');
-          console.error('Error sending print request:', printError);
-          alert(`Error sending print request: ${printError}`);
+          console.error('Error in print process:', printError);
+          // แม้เกิด error ก็ยัง navigate ไปหน้า result
         }
       } else {
         console.error('window.electron.print is not available');
-        alert('Print function is not available. Please check console for details.');
+        // แม้ไม่มี print function ก็ยัง navigate ไปหน้า result
       }
 
-      // Navigate to photo-result page
+      // Navigate to photo-result page หลังจาก finalImage generate เสร็จและ print เสร็จแล้ว
+      console.log('=== NAVIGATING TO PHOTO RESULT ===');
       navigate('/photo-result', {
         state: {
           ...state,

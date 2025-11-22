@@ -11,6 +11,10 @@
 import path from 'path';
 import { app, BrowserWindow, shell, ipcMain } from 'electron';
 import { promises as fs } from 'fs';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
@@ -50,8 +54,10 @@ interface PrintConfig {
 
 // Function to determine paper size and print settings based on frame
 function getPrintSettings(frameId: string, frameName: string) {
-  // Default settings
-  let pageSize: any = 'A4';
+  // Default settings for photo booth - 4x6 inches
+  // 4 inches = 101.6mm = 101600 microns
+  // 6 inches = 152.4mm = 152400 microns
+  let pageSize: any = { width: 152400, height: 101600 }; // 4x6 inches in microns (width x height)
   let scaleFactor = 1;
   let cutInstruction = '';
 
@@ -61,9 +67,19 @@ function getPrintSettings(frameId: string, frameName: string) {
     pageSize = { width: 152400, height: 101600 }; // 4x6 inches in microns
     cutInstruction = '2x6_cut';
   } else if (frameId === 'modern_4x6' || frameName.includes('4x6')) {
-    // For 4x6 frame, use appropriate paper size
-    pageSize = { width: 152400, height: 203200 }; // 6x8 inches in microns
+    // For 4x6 frame, use 4x6 paper size
+    pageSize = { width: 152400, height: 101600 }; // 4x6 inches in microns
+  } else {
+    // Default: 4x6 inches for photo booth
+    pageSize = { width: 152400, height: 101600 }; // 4x6 inches in microns
   }
+
+  console.log('Print settings:', {
+    frameId,
+    frameName,
+    pageSize,
+    pageSizeInches: '4x6',
+  });
 
   return {
     pageSize,
@@ -100,9 +116,16 @@ ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
 
     console.log('Print window created');
 
+    // Log received image data
+    console.log('=== RECEIVED IMAGE DATA ===');
+    console.log('Image Data URL length:', printConfig.imageDataUrl?.length || 0);
+    console.log('Image Data URL type:', printConfig.imageDataUrl?.substring(0, 30) || 'N/A');
+
     // Create HTML content with the image
     // Escape the image data URL to prevent issues with special characters
     const escapedImageUrl = printConfig.imageDataUrl.replace(/"/g, '&quot;');
+
+    console.log('Creating HTML content with image...');
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -196,6 +219,10 @@ ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
       clearTimeout(loadTimeout);
       console.log('Print window loaded, starting print process...');
 
+      // Wait a bit more to ensure image is fully rendered
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log('Image should be fully loaded now');
+
       // Get print settings based on frame configuration
       const printSettings = getPrintSettings(printConfig.frameId, printConfig.frameName);
       console.log('Print settings:', printSettings);
@@ -253,12 +280,23 @@ ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
         // Print configuration for different frame types
         // Try multiple approaches for better compatibility
         const printOptions: any = {
-          silent: true, // Print without showing dialog
+          silent: true, // Show print dialog to debug - change back to true after testing
           printBackground: true,
+          copies: 1, // Always print 1 copy only
+          collate: false,
           margins: {
             marginType: 'none', // Use no margins for photo printing
           },
         };
+
+        // Force copies to 1 - some printers ignore the copies option
+        // So we'll print only once by ensuring the option is explicitly set
+        printOptions.copies = 1;
+        printOptions.numberOfCopies = 1;
+
+        // Remove any duplicate copy settings that might cause issues
+        // Some printer drivers may have default copies set to 4
+        console.log('⚠️ Setting copies explicitly to 1');
 
         // Set printer - try deviceName first, fallback to not specifying
         if (selectedPrinter.name) {
@@ -277,13 +315,21 @@ ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
         if (printSettings.cutInstruction === '2x6_cut' || dnpPrinter) {
           // Add printer-specific options for DNP printer
           printOptions.dpi = { horizontal: 300, vertical: 300 };
-          printOptions.copies = 1;
           // DNP printers typically support high-quality photo printing
           printOptions.color = true;
           printOptions.duplex = false;
         }
 
+        // Log image information for debugging
+        console.log('=== PRINT IMAGE INFO ===');
+        console.log('Image Data URL length:', printConfig.imageDataUrl.length);
+        console.log('Image Data URL preview (first 100 chars):', printConfig.imageDataUrl.substring(0, 100));
+        console.log('Image Data URL preview (last 100 chars):', printConfig.imageDataUrl.substring(printConfig.imageDataUrl.length - 100));
+        console.log('Frame ID:', printConfig.frameId);
+        console.log('Frame Name:', printConfig.frameName);
         console.log('Print options:', JSON.stringify(printOptions, null, 2));
+        console.log('⚠️ IMPORTANT: copies =', printOptions.copies, ', numberOfCopies =', printOptions.numberOfCopies);
+        console.log('⚠️ If printer still prints 4 copies, check printer driver settings');
 
         // Wait a bit to ensure image is fully loaded
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -316,15 +362,74 @@ ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
           return;
         }
 
+        console.log('=== CALLING PRINT FUNCTION ===');
+        console.log('Print options before print:', JSON.stringify(printOptions, null, 2));
+        console.log('Selected printer:', selectedPrinter.name);
+        console.log('Printer status:', selectedPrinter.status);
+        console.log('Printer is default:', selectedPrinter.isDefault);
+
+        // Check printer status before printing
+        if (selectedPrinter.status === 0) {
+          console.log('✅ Printer status is 0 (idle/ready) - Good!');
+        } else if (selectedPrinter.status === 1) {
+          console.log('⚠️ WARNING: Printer status is 1 (paused) - Printer is paused!');
+        } else if (selectedPrinter.status === 2) {
+          console.log('⚠️ WARNING: Printer status is 2 (error) - Printer has error!');
+        } else {
+          console.log('⚠️ WARNING: Printer status is unknown:', selectedPrinter.status);
+        }
+
+        // Try printing with printToPDF first, then print the PDF
+        // This is more reliable for some printers
+        console.log('Attempting to print using webContents.print()...');
+
+        // Add a small delay to ensure everything is ready
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
         printWindow.webContents.print(
           printOptions,
           (success, failureReason) => {
+            console.log('=== PRINT CALLBACK RECEIVED ===');
+            console.log('Success:', success);
+            console.log('Failure reason:', failureReason);
+            console.log('Callback received at:', new Date().toISOString());
+
             if (success) {
-              console.log('Print job sent successfully');
-              event.reply('print-response', { success: true });
-              cleanupAndClose();
+              console.log('✅ Print job sent successfully to printer:', selectedPrinter.name);
+              console.log('📋 Printer Status shows "Waiting" - this means printer is ready but waiting for print job');
+              console.log('⚠️ IMPORTANT: If printer still not working, try these steps:');
+              console.log('   1. Open Windows Settings > Printers & scanners');
+              console.log('   2. Click on "DP-QW410" > "Manage"');
+              console.log('   3. Click "See what\'s printing" to check if print job is in queue');
+              console.log('   4. If print job is in queue but not printing:');
+              console.log('      - Check if printer queue is paused (unpause if needed)');
+              console.log('      - Check if printer has paper (61/150 sheets remaining)');
+              console.log('      - Try canceling and resending the print job');
+              console.log('   5. If no print job in queue:');
+              console.log('      - The print job may not have been sent correctly');
+              console.log('      - Try restarting print spooler service');
+              console.log('      - Check printer driver settings');
+              console.log('   6. Try printing a test page from printer properties to verify printer works');
+
+              // Wait longer before closing to ensure print job is queued
+              console.log('Waiting 3 seconds before closing window to ensure print job is queued...');
+              setTimeout(() => {
+                // Try to verify print job was queued by checking printer status again
+                printWindow.webContents.getPrintersAsync().then((printers) => {
+                  const currentPrinter = printers.find(p => p.name === selectedPrinter.name);
+                  if (currentPrinter) {
+                    console.log('Printer status after print:', currentPrinter.status);
+                    console.log('Printer name:', currentPrinter.name);
+                  }
+                }).catch((err) => {
+                  console.error('Error checking printer status:', err);
+                });
+
+                event.reply('print-response', { success: true });
+                cleanupAndClose();
+              }, 3000);
             } else {
-              console.error('Print failed:', failureReason);
+              console.error('❌ Print failed:', failureReason);
 
               // Try fallback: print without deviceName (use default)
               if (printOptions.deviceName && !printWindow.isDestroyed()) {
