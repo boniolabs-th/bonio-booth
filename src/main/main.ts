@@ -10,6 +10,7 @@
  */
 import path from 'path';
 import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { promises as fs } from 'fs';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
@@ -72,8 +73,14 @@ function getPrintSettings(frameId: string, frameName: string) {
 }
 
 ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
+  console.log('=== PRINT REQUEST RECEIVED ===');
+  console.log('Frame ID:', printConfig.frameId);
+  console.log('Frame Name:', printConfig.frameName);
+  console.log('Image data URL length:', printConfig.imageDataUrl?.length || 0);
+
   try {
     if (!mainWindow) {
+      console.error('Main window not found');
       event.reply('print-response', {
         success: false,
         error: 'Main window not found',
@@ -81,6 +88,7 @@ ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
       return;
     }
 
+    console.log('Creating print window...');
     // Create a new hidden window for printing
     const printWindow = new BrowserWindow({
       show: false,
@@ -90,7 +98,11 @@ ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
       },
     });
 
+    console.log('Print window created');
+
     // Create HTML content with the image
+    // Escape the image data URL to prevent issues with special characters
+    const escapedImageUrl = printConfig.imageDataUrl.replace(/"/g, '&quot;');
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -124,87 +136,251 @@ ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
           </style>
         </head>
         <body>
-          <img src="${printConfig.imageDataUrl}" alt="Photo to print" />
+          <img src="${escapedImageUrl}" alt="Photo to print" />
         </body>
       </html>
     `;
 
-    // Load the HTML content
-    printWindow.loadURL(
-      `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`,
-    );
+    // Write HTML to temporary file to avoid URL length issues
+    const tempDir = app.getPath('temp');
+    const tempHtmlPath = path.join(tempDir, `print-${Date.now()}.html`);
+
+    try {
+      console.log('Writing HTML to temp file:', tempHtmlPath);
+      await fs.writeFile(tempHtmlPath, htmlContent, 'utf-8');
+      console.log('HTML file written successfully');
+    } catch (writeError) {
+      console.error('Error writing HTML file:', writeError);
+      event.reply('print-response', {
+        success: false,
+        error: `Failed to create print file: ${writeError instanceof Error ? writeError.message : 'Unknown error'}`,
+      });
+      printWindow.close();
+      return;
+    }
+
+    // Add error handlers
+    printWindow.webContents.on('did-fail-load', (_webEvent, errorCode, errorDescription) => {
+      console.error('Print window failed to load:', errorCode, errorDescription);
+      // Clean up temp file
+      fs.unlink(tempHtmlPath).catch(() => {});
+      event.reply('print-response', {
+        success: false,
+        error: `Failed to load print window: ${errorDescription}`,
+      });
+      if (!printWindow.isDestroyed()) {
+        printWindow.close();
+      }
+    });
+
+    // Load the HTML file
+    console.log('Loading HTML file into print window...');
+    printWindow.loadFile(tempHtmlPath);
+
+    // Set timeout for print window loading
+    const loadTimeout = setTimeout(() => {
+      console.error('Print window load timeout');
+      // Clean up temp file
+      fs.unlink(tempHtmlPath).catch(() => {});
+      event.reply('print-response', {
+        success: false,
+        error: 'Print window load timeout',
+      });
+      if (!printWindow.isDestroyed()) {
+        printWindow.close();
+      }
+    }, 10000); // 10 seconds timeout
 
     // Wait for the content to load
-    printWindow.webContents.once('did-finish-load', () => {
+    printWindow.webContents.once('did-finish-load', async () => {
+      clearTimeout(loadTimeout);
+      console.log('Print window loaded, starting print process...');
+
       // Get print settings based on frame configuration
       const printSettings = getPrintSettings(printConfig.frameId, printConfig.frameName);
+      console.log('Print settings:', printSettings);
 
-      // Get the default printer
-      printWindow.webContents
-        .getPrintersAsync()
-        .then((printers) => {
-          if (printers.length === 0) {
-            event.reply('print-response', {
-              success: false,
-              error: 'No printers found',
-            });
-            printWindow.close();
-            return;
-          }
+      try {
+        // Get available printers and find DNP printer
+        const printers = await printWindow.webContents.getPrintersAsync();
 
-          // Use the default printer (first in the list)
-          const defaultPrinter = printers[0];
+        console.log(`Found ${printers.length} printer(s):`);
+        printers.forEach((printer, index) => {
+          console.log(`  ${index + 1}. ${printer.name} (default: ${printer.isDefault}, status: ${printer.status})`);
+        });
 
-
-          // Print configuration for different frame types
-          const printOptions: any = {
-            silent: true, // Print without showing dialog
-            printBackground: true,
-            deviceName: defaultPrinter.name,
-            pageSize: printSettings.pageSize,
-            margins: {
-              marginType: 'none', // Use no margins for photo printing
-            },
-          };
-
-          // Add special handling for RX1HS printer with 2x6 frames
-          if (printSettings.cutInstruction === '2x6_cut') {
-            // Add printer-specific options for cutting instruction
-            printOptions.dpi = { horizontal: 300, vertical: 300 };
-            printOptions.copies = 1;
-            // Note: Actual cutting instruction depends on RX1HS printer driver
-            // This may need to be implemented through printer-specific commands
-          }
-
-          // Print without showing dialog
-          printWindow.webContents.print(
-            printOptions,
-            (success, failureReason) => {
-              if (success) {
-                event.reply('print-response', { success: true });
-              } else {
-                console.error('Print failed:', failureReason);
-                event.reply('print-response', {
-                  success: false,
-                  error: failureReason,
-                });
-              }
-
-              // Close the print window after printing
-              setTimeout(() => {
-                printWindow.close();
-              }, 1000);
-            },
-          );
-        })
-        .catch((error) => {
-          console.error('Error getting printers:', error);
+        if (printers.length === 0) {
+          // Clean up temp file
+          fs.unlink(tempHtmlPath).catch(() => {});
           event.reply('print-response', {
             success: false,
-            error: 'Failed to get printers',
+            error: 'No printers found',
           });
-          printWindow.close();
+          if (!printWindow.isDestroyed()) {
+            printWindow.close();
+          }
+          return;
+        }
+
+        // Find specific printer by name (priority order)
+        // 1. dp-qw410 (user's preferred printer)
+        // 2. DNP printers
+        // 3. Default printer
+        const targetPrinterName = 'dp-qw410';
+        const targetPrinter = printers.find(
+          (printer) => printer.name.toLowerCase() === targetPrinterName.toLowerCase(),
+        );
+
+        const dnpPrinter = printers.find(
+          (printer) =>
+            printer.name.toLowerCase().includes('dnp') ||
+            printer.name.toLowerCase().includes('rx1hs') ||
+            printer.name.toLowerCase().includes('ds'),
+        );
+
+        // Use target printer if found, otherwise use DNP printer, then default printer
+        const selectedPrinter = targetPrinter || dnpPrinter || printers.find(p => p.isDefault) || printers[0];
+
+        if (targetPrinter) {
+          console.log(`✓ Found target printer: ${selectedPrinter.name}`);
+        } else if (dnpPrinter) {
+          console.log(`⚠ Target printer (${targetPrinterName}) not found, using DNP printer: ${selectedPrinter.name}`);
+        } else {
+          console.log(`⚠ Target printer (${targetPrinterName}) not found, using default printer: ${selectedPrinter.name}`);
+        }
+        console.log(`Selected printer: ${selectedPrinter.name} (default: ${selectedPrinter.isDefault}, status: ${selectedPrinter.status})`);
+
+        // Print configuration for different frame types
+        // Try multiple approaches for better compatibility
+        const printOptions: any = {
+          silent: true, // Print without showing dialog
+          printBackground: true,
+          margins: {
+            marginType: 'none', // Use no margins for photo printing
+          },
+        };
+
+        // Set printer - try deviceName first, fallback to not specifying
+        if (selectedPrinter.name) {
+          printOptions.deviceName = selectedPrinter.name;
+        }
+
+        // Set page size - use string format for better compatibility
+        if (typeof printSettings.pageSize === 'object') {
+          // For custom sizes, try to use the object format
+          printOptions.pageSize = printSettings.pageSize;
+        } else {
+          printOptions.pageSize = printSettings.pageSize;
+        }
+
+        // Add special handling for DNP printers with 2x6 frames
+        if (printSettings.cutInstruction === '2x6_cut' || dnpPrinter) {
+          // Add printer-specific options for DNP printer
+          printOptions.dpi = { horizontal: 300, vertical: 300 };
+          printOptions.copies = 1;
+          // DNP printers typically support high-quality photo printing
+          printOptions.color = true;
+          printOptions.duplex = false;
+        }
+
+        console.log('Print options:', JSON.stringify(printOptions, null, 2));
+
+        // Wait a bit to ensure image is fully loaded
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Helper function to cleanup and close
+        const cleanupAndClose = () => {
+          // Clean up temp file
+          fs.unlink(tempHtmlPath).catch((err) => {
+            console.error('Error deleting temp file:', err);
+          });
+
+          // Close window if not destroyed
+          if (!printWindow.isDestroyed()) {
+            setTimeout(() => {
+              if (!printWindow.isDestroyed()) {
+                printWindow.close();
+              }
+            }, 1000);
+          }
+        };
+
+        // Print without showing dialog
+        if (printWindow.isDestroyed()) {
+          console.error('Print window was destroyed before printing');
+          event.reply('print-response', {
+            success: false,
+            error: 'Print window was destroyed',
+          });
+          cleanupAndClose();
+          return;
+        }
+
+        printWindow.webContents.print(
+          printOptions,
+          (success, failureReason) => {
+            if (success) {
+              console.log('Print job sent successfully');
+              event.reply('print-response', { success: true });
+              cleanupAndClose();
+            } else {
+              console.error('Print failed:', failureReason);
+
+              // Try fallback: print without deviceName (use default)
+              if (printOptions.deviceName && !printWindow.isDestroyed()) {
+                console.log('Retrying print without deviceName...');
+                const fallbackOptions = { ...printOptions };
+                delete fallbackOptions.deviceName;
+
+                if (printWindow.isDestroyed()) {
+                  event.reply('print-response', {
+                    success: false,
+                    error: failureReason || 'Unknown print error',
+                  });
+                  cleanupAndClose();
+                  return;
+                }
+
+                printWindow.webContents.print(
+                  fallbackOptions,
+                  (retrySuccess, retryFailureReason) => {
+                    if (retrySuccess) {
+                      console.log('Print job sent successfully (fallback)');
+                      event.reply('print-response', { success: true });
+                    } else {
+                      console.error('Print failed (fallback):', retryFailureReason);
+                      event.reply('print-response', {
+                        success: false,
+                        error: retryFailureReason || 'Unknown print error',
+                      });
+                    }
+                    cleanupAndClose();
+                  },
+                );
+              } else {
+                event.reply('print-response', {
+                  success: false,
+                  error: failureReason || 'Unknown print error',
+                });
+                cleanupAndClose();
+              }
+            }
+          },
+        );
+      } catch (error) {
+        console.error('Error in print process:', error);
+        // Clean up temp file
+        fs.unlink(tempHtmlPath).catch(() => {});
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        event.reply('print-response', {
+          success: false,
+          error: `Print process error: ${errorMessage}`,
         });
+        if (!printWindow.isDestroyed()) {
+          printWindow.close();
+        }
+      }
     });
   } catch (error) {
     console.error('Print error:', error);

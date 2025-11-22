@@ -30,6 +30,9 @@ export default function PhotoFilter() {
   const [previewImage, setPreviewImage] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState<boolean>(false);
+  const [printStatus, setPrintStatus] = useState<
+    'idle' | 'printing' | 'success' | 'error'
+  >('idle');
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Filter รูปภาพแต่ละรูป (รองรับทั้ง CSS และ LUT)
@@ -223,6 +226,49 @@ export default function PhotoFilter() {
       // Filter รูปภาพแต่ละรูป แล้วสร้าง finalImage ใหม่ (รูปที่ filter + frame)
       const filteredFinalImage = await generateFinalImageWithFilteredPhotos();
 
+      // พิมพ์รูปภาพทันที
+      if (window.electron?.print) {
+        try {
+          setPrintStatus('printing');
+          console.log('=== SENDING PRINT REQUEST ===');
+          console.log('Frame ID:', state.selectedFrame?.id || 'classic_2x6');
+          console.log('Frame Name:', state.selectedFrame?.name || '2x6 Classic');
+          console.log('Image size:', filteredFinalImage.length, 'characters');
+
+          // Set up listener for print response
+          window.electron.print.onPrintResponse((response) => {
+            console.log('=== PRINT RESPONSE RECEIVED ===', response);
+            if (response.success) {
+              setPrintStatus('success');
+              console.log('พิมพ์สำเร็จ');
+            } else {
+              setPrintStatus('error');
+              console.error('พิมพ์ไม่สำเร็จ:', response.error);
+              // Show alert for debugging
+              alert(`พิมพ์ไม่สำเร็จ: ${response.error || 'Unknown error'}`);
+            }
+            // Clean up listener
+            window.electron?.print?.removePrintResponseListener();
+          });
+
+          // Send print request with frame configuration
+          window.electron.print.printPhoto({
+            imageDataUrl: filteredFinalImage,
+            frameId: state.selectedFrame?.id || 'classic_2x6',
+            frameName: state.selectedFrame?.name || '2x6 Classic',
+          });
+          console.log('Print request sent');
+        } catch (printError) {
+          setPrintStatus('error');
+          console.error('Error sending print request:', printError);
+          alert(`Error sending print request: ${printError}`);
+        }
+      } else {
+        console.error('window.electron.print is not available');
+        alert('Print function is not available. Please check console for details.');
+      }
+
+      // Navigate to photo-result page
       navigate('/photo-result', {
         state: {
           ...state,
@@ -413,7 +459,15 @@ export default function PhotoFilter() {
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
             <rect x="6" y="14" width="12" height="8" />
           </svg>
-          {isProcessing ? 'กำลังประมวลผล...' : 'พิมพ์รูปภาพ'}
+          {isProcessing
+            ? 'กำลังประมวลผล...'
+            : printStatus === 'printing'
+              ? 'กำลังพิมพ์...'
+              : printStatus === 'success'
+                ? 'พิมพ์สำเร็จ ✓'
+                : printStatus === 'error'
+                  ? 'พิมพ์ไม่สำเร็จ ✗'
+                  : 'พิมพ์รูปภาพ'}
         </button>
       </div>
 
