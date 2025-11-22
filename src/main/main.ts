@@ -192,43 +192,25 @@ ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
 
     console.log("Using printer:", printerName);
 
-    // ตัวเลือก 1 (ดีที่สุด): ใช้ mspaint.exe
-    const mspaintCmd = `mspaint.exe /pt "${jpgPath}" "${printerName}"`;
-    console.log("Executing:", mspaintCmd);
+    // ใช้ rundll32 โดยตรง (mspaint อาจพิมพ์ 2 ครั้ง)
+    // rundll32 จะพิมพ์ 1 ครั้งเท่านั้น
+    const printCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${jpgPath}" "${printerName}"`;
+    console.log("Executing print command:", printCmd);
 
-    exec(mspaintCmd, (err) => {
+    exec(printCmd, (err) => {
+      // ลบไฟล์ temp หลังพิมพ์เสร็จ (รอสักครู่)
+      setTimeout(() => {
+        fs.unlink(jpgPath).catch(() => {});
+      }, 3000);
+
       if (err) {
-        console.error("MSPaint print error:", err);
-
-        // fallback ตัวเลือก 2: ใช้ rundll32
-        const fallbackCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${jpgPath}" "${printerName}"`;
-        console.log("Fallback print:", fallbackCmd);
-
-        exec(fallbackCmd, (err2) => {
-          // ลบไฟล์ temp หลังพิมพ์เสร็จ (รอสักครู่)
-          setTimeout(() => {
-            fs.unlink(jpgPath).catch(() => {});
-          }, 3000);
-
-          if (err2) {
-            console.error("Fallback print error:", err2);
-            event.reply("print-response", {
-              success: false,
-              error: err2.message || "Print failed"
-            });
-          } else {
-            console.log("Fallback print success");
-            event.reply("print-response", { success: true });
-          }
+        console.error("Print error:", err);
+        event.reply("print-response", {
+          success: false,
+          error: err.message || "Print failed"
         });
       } else {
-        console.log("MSPaint print success");
-
-        // ลบไฟล์ temp หลังพิมพ์เสร็จ (รอสักครู่)
-        setTimeout(() => {
-          fs.unlink(jpgPath).catch(() => {});
-        }, 3000);
-
+        console.log("Print success");
         event.reply("print-response", { success: true });
       }
     });
