@@ -38,6 +38,151 @@ class AppUpdater {
   }
 }
 
+/**
+ * สร้างรูปภาพที่มี padding รอบๆ เพื่อป้องกันการล้นและขาดขอบ
+ * ใช้ BrowserWindow เพื่อ render รูปภาพให้เหมาะสมกับเครื่องปริ้น
+ */
+async function generateImageWithPadding(base64: string, paddingPercent = 0): Promise<Buffer> {
+  return new Promise(async (resolve, reject) => {
+    let htmlPath: string | null = null;
+    let resolved = false;
+
+    const cleanup = async () => {
+      if (htmlPath) {
+        try {
+          await fs.unlink(htmlPath).catch(() => {});
+        } catch {
+          // ignore cleanup errors
+        }
+      }
+    };
+
+    const timeout = setTimeout(async () => {
+      if (!resolved) {
+        resolved = true;
+        await cleanup();
+        reject(new Error('Timeout: Failed to generate image with padding'));
+      }
+    }, 15000); // 15 seconds timeout
+
+    try {
+      // สร้างไฟล์ HTML ชั่วคราว
+      const tempDir = app.getPath("temp");
+      htmlPath = path.join(tempDir, `padded-image-${Date.now()}.html`);
+
+      const html = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html, body {
+        width: 100%;
+        height: 100%;
+        background: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+      }
+      .container {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      img {
+        max-width: calc(100% + ${10}%);
+        max-height: calc(100% + ${10}%);
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        display: block;
+        transform: rotate(90deg);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <img src="${base64.replace(/"/g, '&quot;')}"
+           onload="console.log('Image loaded successfully')"
+           onerror="console.error('Image load error', this.src.substring(0, 50))"/>
+    </div>
+  </body>
+</html>
+      `.trim();
+
+      await fs.writeFile(htmlPath, html, 'utf-8');
+      console.log("HTML file created:", htmlPath);
+
+      const win = new BrowserWindow({
+        show: false,
+        width: 1200,
+        height: 1800,
+        webPreferences: {
+          offscreen: true,
+        }
+      });
+
+      win.webContents.once('did-finish-load', () => {
+        // รอให้รูปภาพ render เสร็จ
+        setTimeout(() => {
+          win.webContents.capturePage().then(async (image) => {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timeout);
+              const buffer = image.toPNG();
+              win.close();
+              await cleanup();
+              resolve(buffer);
+            }
+          }).catch(async (err) => {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timeout);
+              win.close();
+              await cleanup();
+              reject(err);
+            }
+          });
+        }, 1000); // รอ 1 วินาทีเพื่อให้รูปภาพ render เสร็จ
+      });
+
+      win.webContents.once('did-fail-load', async (event, errorCode, errorDescription) => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          win.close();
+          await cleanup();
+          reject(new Error(`Failed to load HTML: ${errorDescription} (code: ${errorCode})`));
+        }
+      });
+
+      win.on('closed', async () => {
+        await cleanup();
+      });
+
+      // ใช้ loadFile แทน loadURL เพื่อหลีกเลี่ยงปัญหา URL ยาวเกินไป
+      await win.loadFile(htmlPath);
+      console.log("HTML file loaded successfully");
+
+    } catch (err) {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+        await cleanup();
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    }
+  });
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 const installExtensions = async () => {
@@ -190,16 +335,19 @@ ipcMain.on("print-photo", async (event, printConfig) => {
   lastPrintImageHash = imageHash;
   lastPrintTime = now;
 
-  console.log("=== NATIVE PRINT METHOD ===");
+  console.log("=== NATIVE PRINT METHOD WITH PADDING ===");
   console.log("Image hash:", imageHash.substring(0, 20) + "...");
 
   try {
-    const tempDir = app.getPath("temp");
-    const jpgPath = path.join(tempDir, `photo-${Date.now()}.jpg`);
+    // ใช้ generateImageWithPadding เพื่อเพิ่ม padding รอบรูปภาพ (5% ทั้ง 4 ด้าน)
+    console.log("Generating image with padding...");
+    const paddedImageBuffer = await generateImageWithPadding(printConfig.imageDataUrl, 5);
+    console.log("Padded image generated, size:", paddedImageBuffer.length, "bytes");
 
-    const base64Data = printConfig.imageDataUrl.replace(/^data:image\/\w+;base64,/, "");
-    const buffer = Buffer.from(base64Data, "base64");
-    await fs.writeFile(jpgPath, buffer);
+    const tempDir = app.getPath("temp");
+    const pngPath = path.join(tempDir, `photo-${Date.now()}.png`);
+    await fs.writeFile(pngPath, paddedImageBuffer);
+    console.log("PNG file saved:", pngPath);
 
     let printerName = "DP-QW410";
 
@@ -209,11 +357,11 @@ ipcMain.on("print-photo", async (event, printConfig) => {
       if (target) printerName = target.name;
     }
 
-    const printCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${jpgPath}" "${printerName}"`;
+    const printCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${pngPath}" "${printerName}"`;
     console.log("Executing:", printCmd);
 
     exec(printCmd, err => {
-      setTimeout(() => fs.unlink(jpgPath).catch(() => {}), 2000);
+      setTimeout(() => fs.unlink(pngPath).catch(() => {}), 2000);
 
       if (err) {
         console.error("Print error:", err);
