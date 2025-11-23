@@ -98,13 +98,13 @@ async function generateImageWithPadding(base64: string, paddingPercent = 0): Pro
         align-items: center;
       }
       img {
-        max-width: calc(100% + ${14}%);
-        max-height: calc(100% + ${14}%);
+        max-width: calc(100% - ${1}%);
+        max-height: calc(100% - ${1}%);
         width: auto;
         height: auto;
         object-fit: contain;
         display: block;
-        transform: rotate(90deg);
+        // transform: rotate(90deg);
       }
     </style>
   </head>
