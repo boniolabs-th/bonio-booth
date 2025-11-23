@@ -144,87 +144,101 @@ interface PrintConfig {
   frameName: string;
 }
 
-ipcMain.on('print-photo', async (event, printConfig: PrintConfig) => {
-  console.log("=== NATIVE PRINT METHOD ===");
+let isPrinting = false;
+let lastPrintImageHash: string | null = null;
+let lastPrintTime = 0;
+const PRINT_DEBOUNCE_MS = 3000; // ป้องกันการพิมพ์ซ้ำภายใน 3 วินาที
 
-  if (!printConfig.imageDataUrl) {
-    event.reply("print-response", { success: false, error: "No image data" });
+// สร้าง hash จาก imageDataUrl เพื่อตรวจสอบว่าเป็นรูปเดียวกันหรือไม่
+const getImageHash = (imageDataUrl: string): string => {
+  // ใช้ส่วนแรกของ base64 data เป็น hash (ประมาณ 100 ตัวอักษร)
+  const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, "");
+  return base64Data.substring(0, 100);
+};
+
+ipcMain.on("print-photo", async (event, printConfig) => {
+  const now = Date.now();
+  const imageHash = getImageHash(printConfig.imageDataUrl);
+
+  // ตรวจสอบว่ากำลังพิมพ์อยู่หรือไม่
+  if (isPrinting) {
+    console.log("Print request ignored: already printing.");
+    event.reply("print-response", {
+      success: false,
+      error: "กำลังพิมพ์อยู่ กรุณารอสักครู่"
+    });
     return;
   }
+
+  // ตรวจสอบว่าเป็นรูปเดียวกันและเพิ่งพิมพ์ไปเมื่อไม่นานนี้
+  if (
+    lastPrintImageHash === imageHash &&
+    now - lastPrintTime < PRINT_DEBOUNCE_MS
+  ) {
+    console.log(
+      `Print request ignored: same image printed ${Math.round((now - lastPrintTime) / 1000)}s ago`
+    );
+    event.reply("print-response", {
+      success: false,
+      error: "รูปภาพนี้เพิ่งพิมพ์ไปเมื่อสักครู่"
+    });
+    return;
+  }
+
+  // ตั้งค่า flag และ hash
+  isPrinting = true;
+  lastPrintImageHash = imageHash;
+  lastPrintTime = now;
+
+  console.log("=== NATIVE PRINT METHOD ===");
+  console.log("Image hash:", imageHash.substring(0, 20) + "...");
 
   try {
     const tempDir = app.getPath("temp");
     const jpgPath = path.join(tempDir, `photo-${Date.now()}.jpg`);
 
-    // ตัด prefix base64
     const base64Data = printConfig.imageDataUrl.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
-
-    // สร้างไฟล์ JPG
     await fs.writeFile(jpgPath, buffer);
 
-    console.log("JPG created:", jpgPath);
+    let printerName = "DP-QW410";
 
-    // หา printer name จาก list
-    let printerName = "DP-QW410"; // default
     if (mainWindow) {
-      try {
-        const printers = await mainWindow.webContents.getPrintersAsync();
-        console.log("Available printers:", JSON.stringify(printers, null, 2));
-
-        const targetPrinter = printers.find(
-          (p) => p.name.toLowerCase().includes('dp-qw410') ||
-                 p.name.toLowerCase().includes('qw410')
-        );
-        if (targetPrinter) {
-          printerName = targetPrinter.name;
-          console.log("Found printer:", printerName);
-        } else if (printers.length > 0) {
-          // ใช้ default printer ถ้าไม่เจอ DP-QW410
-          const defaultPrinter = printers.find(p => p.isDefault) || printers[0];
-          printerName = defaultPrinter.name;
-          console.log("Using default printer:", printerName);
-        }
-      } catch (err) {
-        console.error("Error getting printers:", err);
-      }
+      const printers = await mainWindow.webContents.getPrintersAsync();
+      const target = printers.find(p => p.name.toLowerCase().includes("qw410"));
+      if (target) printerName = target.name;
     }
 
-    console.log("Using printer:", printerName);
-
-    // ใช้ rundll32 โดยตรง (mspaint อาจพิมพ์ 2 ครั้ง)
-    // rundll32 จะพิมพ์ 1 ครั้งเท่านั้น
     const printCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${jpgPath}" "${printerName}"`;
-    console.log("Executing print command:", printCmd);
+    console.log("Executing:", printCmd);
 
-    exec(printCmd, (err) => {
-      // ลบไฟล์ temp หลังพิมพ์เสร็จ (รอสักครู่)
-      setTimeout(() => {
-        fs.unlink(jpgPath).catch(() => {});
-      }, 3000);
+    exec(printCmd, err => {
+      setTimeout(() => fs.unlink(jpgPath).catch(() => {}), 2000);
 
       if (err) {
         console.error("Print error:", err);
-        event.reply("print-response", {
-          success: false,
-          error: err.message || "Print failed"
-        });
+        event.reply("print-response", { success: false, error: err.message });
       } else {
         console.log("Print success");
         event.reply("print-response", { success: true });
       }
+
+      // ปลดล็อคหลังพิมพ์เสร็จ (รอสักครู่เพื่อป้องกันการพิมพ์ซ้ำ)
+      setTimeout(() => {
+        isPrinting = false;
+      }, 1000);
     });
 
+  } catch (err) {
+    console.error(err);
+    event.reply("print-response", {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error"
+    });
+    isPrinting = false;
+  }
+});
 
-
-   } catch (err) {
-     console.error("PDF Print Error:", err);
-     event.reply("print-response", {
-       success: false,
-       error: err instanceof Error ? err.message : "Unknown error",
-     });
-   }
- });
 
 // KSher Payment IPC handlers
 ipcMain.handle(

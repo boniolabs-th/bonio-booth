@@ -645,9 +645,16 @@ export default function PhotoResult() {
     };
   }, [compiledVideoUrl]);
 
-  // Auto-print when component mounts
+  // Auto-print when component mounts (เฉพาะเมื่อยังไม่ได้พิมพ์จาก PhotoFilter)
   useEffect(() => {
     const handleAutoPrint = async () => {
+      // ถ้าเพิ่งพิมพ์จาก PhotoFilter แล้ว ไม่ต้อง auto-print อีก
+      if ((state as any)?.alreadyPrinted) {
+        console.log('Skip auto-print: already printed from PhotoFilter');
+        setPrintStatus('success');
+        return;
+      }
+
       if (!state?.finalImage) {
         setPrintStatus('error');
         return;

@@ -312,6 +312,7 @@ export default function PhotoFilter() {
           finalImage: filteredFinalImage,
           selectedFilter,
           useBoomerang: state.useBoomerang || false,
+          alreadyPrinted: true, // บอกว่าเพิ่งพิมพ์แล้ว ไม่ต้อง auto-print อีก
         },
       });
     } catch (error) {
