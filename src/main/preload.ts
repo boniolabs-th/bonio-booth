@@ -26,7 +26,7 @@ const electronHandler = {
     },
   },
   print: {
-    printPhoto: (printConfig: { imageDataUrl: string; frameId: string; frameName: string }) => {
+    printPhoto: (printConfig: { imageDataUrl: string; frameId: string; frameName: string; copies?: number }) => {
       ipcRenderer.send('print-photo', printConfig);
     },
     onPrintResponse: (

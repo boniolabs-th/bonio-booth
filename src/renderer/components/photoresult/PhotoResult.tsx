@@ -680,6 +680,7 @@ export default function PhotoResult() {
           imageDataUrl: state.finalImage,
           frameId: state.selectedFrame?.id || 'classic_2x6',
           frameName: state.selectedFrame?.name || '2x6 Classic',
+          copies: state.quantity || 1,
         });
       } catch {
         setPrintStatus('error');

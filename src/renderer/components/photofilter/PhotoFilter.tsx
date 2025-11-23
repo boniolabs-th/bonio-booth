@@ -284,6 +284,7 @@ export default function PhotoFilter() {
                 imageDataUrl: filteredFinalImage,
                 frameId: state.selectedFrame?.id || 'classic_2x6',
                 frameName: state.selectedFrame?.name || '2x6 Classic',
+                copies: state.quantity || 1,
               });
               console.log('Print request sent - waiting for response...');
             } catch (printError) {

@@ -287,6 +287,7 @@ interface PrintConfig {
   imageDataUrl: string;
   frameId: string;
   frameName: string;
+  copies?: number;
 }
 
 let isPrinting = false;
@@ -338,6 +339,9 @@ ipcMain.on("print-photo", async (event, printConfig) => {
   console.log("=== NATIVE PRINT METHOD WITH PADDING ===");
   console.log("Image hash:", imageHash.substring(0, 20) + "...");
 
+  const copies = printConfig.copies || 1;
+  console.log(`Printing ${copies} copy/copies`);
+
   try {
     // ใช้ generateImageWithPadding เพื่อเพิ่ม padding รอบรูปภาพ (5% ทั้ง 4 ด้าน)
     console.log("Generating image with padding...");
@@ -357,25 +361,52 @@ ipcMain.on("print-photo", async (event, printConfig) => {
       if (target) printerName = target.name;
     }
 
-    const printCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${pngPath}" "${printerName}"`;
-    console.log("Executing:", printCmd);
+    // พิมพ์หลายครั้งตาม copies
+    let completedPrints = 0;
+    let hasError = false;
+    let errorMessage = "";
 
-    exec(printCmd, err => {
-      setTimeout(() => fs.unlink(pngPath).catch(() => {}), 2000);
+    const printNext = (copyNumber: number) => {
+      if (copyNumber > copies) {
+        // พิมพ์เสร็จทั้งหมดแล้ว
+        setTimeout(() => fs.unlink(pngPath).catch(() => {}), 2000);
 
-      if (err) {
-        console.error("Print error:", err);
-        event.reply("print-response", { success: false, error: err.message });
-      } else {
-        console.log("Print success");
-        event.reply("print-response", { success: true });
+        if (hasError) {
+          event.reply("print-response", { success: false, error: errorMessage });
+        } else {
+          console.log(`Print success: ${completedPrints} copy/copies printed`);
+          event.reply("print-response", { success: true });
+        }
+
+        // ปลดล็อคหลังพิมพ์เสร็จ (รอสักครู่เพื่อป้องกันการพิมพ์ซ้ำ)
+        setTimeout(() => {
+          isPrinting = false;
+        }, 1000);
+        return;
       }
 
-      // ปลดล็อคหลังพิมพ์เสร็จ (รอสักครู่เพื่อป้องกันการพิมพ์ซ้ำ)
-      setTimeout(() => {
-        isPrinting = false;
-      }, 1000);
-    });
+      const printCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${pngPath}" "${printerName}"`;
+      console.log(`Executing print ${copyNumber}/${copies}:`, printCmd);
+
+      exec(printCmd, (err) => {
+        if (err) {
+          console.error(`Print error (copy ${copyNumber}):`, err);
+          hasError = true;
+          errorMessage = err.message;
+        } else {
+          console.log(`Print success (copy ${copyNumber}/${copies})`);
+          completedPrints++;
+        }
+
+        // พิมพ์ copy ถัดไป (รอสักครู่เพื่อให้เครื่องพิมพ์พร้อม)
+        setTimeout(() => {
+          printNext(copyNumber + 1);
+        }, 1000);
+      });
+    };
+
+    // เริ่มพิมพ์ copy แรก
+    printNext(1);
 
   } catch (err) {
     console.error(err);
