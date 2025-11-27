@@ -1,7 +1,7 @@
 .main-shooting-container {
   width: 100vw;
   height: 100vh;
-  background: white;
+  /* background: white; */
   display: flex;
   flex-direction: column;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -43,7 +43,8 @@
 .title-section {
   text-align: center;
   padding: 20px 40px 10px;
-  background: white;
+  /* background: white; */
+  background:  rgba(0, 0, 0, 0.2);
   z-index: 5;
 }
 

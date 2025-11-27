@@ -247,7 +247,6 @@ const createWindow = async () => {
     process.env.DEBUG_PROD === 'true'
   ) {
     await installExtensions();
-    await initializeApp();
   }
 
   const RESOURCES_PATH = app.isPackaged
@@ -274,7 +273,7 @@ const createWindow = async () => {
 
   mainWindow.loadURL(resolveHtmlPath('index.html'));
 
-  mainWindow.on('ready-to-show', () => {
+  mainWindow.on('ready-to-show', async () => {
     if (!mainWindow) {
       throw new Error('"mainWindow" is not defined');
     }
@@ -282,6 +281,13 @@ const createWindow = async () => {
       mainWindow.minimize();
     } else {
       mainWindow.show();
+    }
+    
+    // เรียก initializeApp หลังจาก window พร้อมแล้ว
+    try {
+      await initializeApp();
+    } catch (error) {
+      console.error('Failed to initialize app:', error);
     }
   });
 

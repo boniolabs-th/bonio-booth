@@ -9,6 +9,10 @@ body {
   /* height: 1080px;
   width: 1920px; */
   background: white;
+  /* background จะถูก override ด้วย inline style จาก theme */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   font-family: sans-serif;
   overflow-y: hidden;
   display: flex;

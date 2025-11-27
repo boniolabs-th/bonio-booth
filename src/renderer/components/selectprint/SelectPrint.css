@@ -1,7 +1,7 @@
 .select-print-container {
   width: 100vw;
   height: 100vh;
-  background: white;
+  /* background: white; */
   display: flex;
   flex-direction: column;
   color: #333;

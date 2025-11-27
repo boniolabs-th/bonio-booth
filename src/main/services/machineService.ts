@@ -154,7 +154,7 @@ export class MachineService {
   private timeout: number;
 
   constructor(options: MachineServiceOptions = {}) {
-    this.apiBaseUrl = options.apiBaseUrl || process.env.API_URL || 'http://localhost:3000';
+    this.apiBaseUrl = 'https://api-booth.boniolabs.com';
     this.machinePort = options.machinePort || Number(process.env.PORT) || 33333;
     this.machineId = options.machineId || process.env.MACHINE_ID;
     this.timeout = options.timeout || 10000;
@@ -255,7 +255,7 @@ export class MachineService {
 
   /**
    * 1. GET /api/machines-public/verify
-   * ตรวจสอบว่า machine สามารถเข้าถึง API ได้หรือไม่
+   * ตรวจสอบว่า machine สามารถเข้าถึง API ได้หรือไม่1
    */
   async verify(machineId?: string): Promise<VerifyResponse> {
     console.log('🔍 [MachineService] Verifying machine...');
@@ -274,7 +274,7 @@ export class MachineService {
     }
   }
 
-  /**
+  /**xxxzvvvvss
    * 2. GET /api/machines-public/theme
    * ดึง theme ที่ตู้ถูก assign ปัจจุบัน
    */
