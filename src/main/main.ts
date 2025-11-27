@@ -19,7 +19,6 @@ import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
-import ksherService from './services/ksherService';
 import {
   createBoomerangVideo,
   createBoomerangGif,
@@ -471,61 +470,61 @@ ipcMain.on("print-photo", async (event, printConfig) => {
 });
 
 
-// KSher Payment IPC handlers
-ipcMain.handle(
-  'create-payment',
-  async (event, amount: number, orderNo: string) => {
-    try {
-      const result = await ksherService.createPayment(amount, orderNo);
-      return result;
-    } catch (error) {
-      console.error('Error in create-payment handler:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
-    }
-  },
-);
+// // KSher Payment IPC handlers
+// ipcMain.handle(
+//   'create-payment',
+//   async (event, amount: number, orderNo: string) => {
+//     try {
+//       const result = await ksherService.createPayment(amount, orderNo);
+//       return result;
+//     } catch (error) {
+//       console.error('Error in create-payment handler:', error);
+//       const errorMessage =
+//         error instanceof Error ? error.message : 'Unknown error';
+//       return { success: false, error: errorMessage };
+//     }
+//   },
+// );
 
-ipcMain.handle('check-payment-status', async (event, referenceId: string) => {
-  try {
-    const result = await ksherService.checkPaymentStatus(referenceId);
-    return result;
-  } catch (error) {
-    console.error('Error in check-payment-status handler:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMessage };
-  }
-});
+// ipcMain.handle('check-payment-status', async (event, referenceId: string) => {
+//   try {
+//     const result = await ksherService.checkPaymentStatus(referenceId);
+//     return result;
+//   } catch (error) {
+//     console.error('Error in check-payment-status handler:', error);
+//     const errorMessage =
+//       error instanceof Error ? error.message : 'Unknown error';
+//     return { success: false, error: errorMessage };
+//   }
+// });
 
 // Machine Payment API handler
-ipcMain.handle(
-  'create-machine-payment',
-  async (event, amount: number, numberPhoto: number, channel: string = 'promptpay') => {
-    try {
-      const result = await machineService.createPayment(amount, numberPhoto, channel);
-      return result;
-    } catch (error) {
-      console.error('Error in create-machine-payment handler:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
-    }
-  },
-);
+// ipcMain.handle(
+//   'create-machine-payment',
+//   async (event, amount: number, numberPhoto: number, channel: string = 'promptpay') => {
+//     try {
+//       const result = await machineService.createPayment(amount, numberPhoto, channel);
+//       return result;
+//     } catch (error) {
+//       console.error('Error in create-machine-payment handler:', error);
+//       const errorMessage =
+//         error instanceof Error ? error.message : 'Unknown error';
+//       return { success: false, error: errorMessage };
+//     }
+//   },
+// );
 
-ipcMain.handle(
-  'check-machine-payment-status',
-  async (event, mchOrderNo: string) => {
-    try {
-      const result = await machineService.checkPaymentStatus(mchOrderNo);
-      return result;
-    } catch (error) {
-      console.error('Error in check-machine-payment-status handler:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
-    }
-  },
-);
+// ipcMain.handle(
+//   'check-machine-payment-status',
+//   async (event, mchOrderNo: string) => {
+//     try {
+//       const result = await machineService.checkPaymentStatus(mchOrderNo);
+//       return result;
+//     } catch (error) {
+//       console.error('Error in check-machine-payment-status handler:', error);
+//       const errorMessage =
+//         error instanceof Error ? error.message : 'Unknown error';
+//       return { success: false, error: errorMessage };
+//     }
+//   },
+// );

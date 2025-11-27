@@ -181,11 +181,19 @@ export class MachineService {
   private timeout: number;
 
   constructor(options: MachineServiceOptions = {}) {
-    // this.apiBaseUrl = 'https://api-booth.boniolabs.com';
+    // อ่าน API URL จาก environment variable หรือ options หรือ default
+    // this.apiBaseUrl =  'https://api-booth.boniolabs.com';
     this.apiBaseUrl = 'http://localhost:3000';
     this.machinePort = options.machinePort || Number(process.env.PORT) || 33333;
     this.machineId = options.machineId || process.env.MACHINE_ID;
-    this.timeout = options.timeout || 10000;
+    this.timeout = options.timeout || Number(process.env.API_TIMEOUT) || 10000;
+
+    console.log('🔧 [MachineService] Configuration:', {
+      apiBaseUrl: this.apiBaseUrl,
+      machinePort: this.machinePort,
+      machineId: this.machineId || 'not set',
+      timeout: this.timeout,
+    });
   }
 
   /**
@@ -201,7 +209,7 @@ export class MachineService {
       try {
         // Build URL with query parameters
         const url = new URL(path, this.apiBaseUrl);
-        
+
         // Add query parameters
         if (queryParams) {
           Object.entries(queryParams).forEach(([key, value]) => {
@@ -241,14 +249,19 @@ export class MachineService {
 
           res.on('end', () => {
             try {
-              if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+              if (
+                res.statusCode &&
+                res.statusCode >= 200 &&
+                res.statusCode < 300
+              ) {
                 const jsonData = data ? JSON.parse(data) : {};
                 resolve(jsonData as T);
               } else {
                 let errorMessage = `HTTP ${res.statusCode}`;
                 try {
                   const errorData = JSON.parse(data);
-                  errorMessage = errorData.message || errorData.error || errorMessage;
+                  errorMessage =
+                    errorData.message || errorData.error || errorMessage;
                 } catch {
                   errorMessage = data || errorMessage;
                 }
@@ -294,7 +307,10 @@ export class MachineService {
         undefined,
         machineId ? { machineId } : undefined,
       );
-      console.log('✅ [MachineService] Machine verified:', response.machine.machineName);
+      console.log(
+        '✅ [MachineService] Machine verified:',
+        response.machine.machineName,
+      );
       return response;
     } catch (error) {
       console.error('❌ [MachineService] Verify failed:', error);
@@ -315,7 +331,10 @@ export class MachineService {
         undefined,
         machineId ? { machineId } : undefined,
       );
-      console.log('✅ [MachineService] Theme loaded:', JSON.stringify(response, null, 2));
+      console.log(
+        '✅ [MachineService] Theme loaded:',
+        JSON.stringify(response, null, 2),
+      );
       return response;
     } catch (error) {
       console.error('❌ [MachineService] Get theme failed:', error);
@@ -336,7 +355,9 @@ export class MachineService {
         undefined,
         machineId ? { machineId } : undefined,
       );
-      console.log(`✅ [MachineService] Frames loaded: ${response.frames.length} frames`);
+      console.log(
+        `✅ [MachineService] Frames loaded: ${response.frames.length} frames`,
+      );
       return response;
     } catch (error) {
       console.error('❌ [MachineService] Get frames failed:', error);
@@ -414,7 +435,10 @@ export class MachineService {
         undefined,
         machineId ? { machineId } : undefined,
       );
-      console.log('✅ [MachineService] Status loaded:', response.machine.machineName);
+      console.log(
+        '✅ [MachineService] Status loaded:',
+        response.machine.machineName,
+      );
       return response;
     } catch (error) {
       console.error('❌ [MachineService] Get status failed:', error);
@@ -456,7 +480,11 @@ export class MachineService {
     channel: string = 'promptpay',
     machineId?: string,
   ): Promise<PaymentCreateResponse> {
-    console.log('💳 [MachineService] Creating payment:', { amount, numberPhoto, channel });
+    console.log('💳 [MachineService] Creating payment:', {
+      amount,
+      numberPhoto,
+      channel,
+    });
     try {
       const response = await this.makeRequest<PaymentCreateResponse>(
         '/api/machines-public/payment/create',
@@ -508,4 +536,3 @@ export class MachineService {
 // ==================== Default Instance ====================
 
 export default new MachineService();
-

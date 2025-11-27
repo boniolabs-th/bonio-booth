@@ -107,9 +107,38 @@ console.log('Updated:', result.machine.paperLevel);
 
 ### Environment Variables
 
-- `API_URL` - Base URL ของ API (default: `https://api-booth.boniolabs.com`)
+สามารถตั้งค่าผ่าน environment variables หรือ `.env` file:
+
+- `API_URL` หรือ `API_BASE_URL` - Base URL ของ API (default: `https://api-booth.boniolabs.com`)
 - `PORT` - Port ที่แอปรันอยู่ (default: `33333`)
 - `MACHINE_ID` - Machine ID สำหรับ localhost testing (optional)
+- `API_TIMEOUT` - Request timeout ใน milliseconds (default: `10000`)
+
+#### ตัวอย่างการใช้งาน:
+
+**Development (localhost):**
+```bash
+API_URL=http://localhost:3000 PORT=33333 npm start
+```
+
+**Production:**
+```bash
+API_URL=https://api-booth.boniolabs.com npm start
+```
+
+**ใช้ .env file:**
+สร้างไฟล์ `.env` ใน root directory:
+```env
+API_URL=http://localhost:3000
+PORT=33333
+MACHINE_ID=6926008fb7f0df1d5093503b
+API_TIMEOUT=10000
+```
+
+**ลำดับความสำคัญ:**
+1. Constructor options (ถ้าส่งมา)
+2. Environment variables (`process.env.API_URL` หรือ `process.env.API_BASE_URL`)
+3. Default value (`https://api-booth.boniolabs.com`)
 
 ### Constructor Options
 
