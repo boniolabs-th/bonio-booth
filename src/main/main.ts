@@ -29,7 +29,7 @@ import {
   applyLutToVideo,
   createBoomerangWithLut,
 } from './services/videoService';
-
+import machineService from './services/machineService';
 class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
@@ -37,6 +37,48 @@ class AppUpdater {
     autoUpdater.checkForUpdatesAndNotify();
   }
 }
+
+
+async function initializeApp() {
+  try {
+    console.log('🚀 Initializing app...');
+    
+    // 1. Verify machine
+    const verifyResponse = await machineService.verify();
+    console.log('✅ Machine verified:', verifyResponse.machine.machineName);
+    
+    // 2. Get theme
+    const themeResponse = await machineService.getTheme();
+    console.log('✅ Theme loaded:', themeResponse);
+    
+    // 3. Send theme to renderer process
+    if (mainWindow && themeResponse.theme.background) {
+      mainWindow.webContents.send('theme-loaded', themeResponse.theme);
+      console.log('✅ Theme sent to renderer');
+    }
+    
+    // 4. Get frames (optional)
+    const framesResponse = await machineService.getFrames();
+    console.log(`✅ Frames loaded: ${framesResponse.frames.length} frames`);
+    
+    // 5. Get status (optional)
+    const status = await machineService.getStatus();
+    console.log('✅ Status loaded:', status.machine.status);
+    console.log('📄 Paper level:', status.machine.paperLevel, '%');
+    
+    return {
+      machine: verifyResponse.machine,
+      theme: themeResponse.theme,
+      frames: framesResponse.frames,
+      status: status.machine,
+    };
+  } catch (error) {
+    console.error('❌ Failed to initialize app:', error);
+    // ยังคงสร้าง window แม้ API จะล้มเหลว
+    throw error;
+  }
+}
+
 
 /**
  * สร้างรูปภาพที่มี padding รอบๆ เพื่อป้องกันการล้นและขาดขอบ
@@ -199,11 +241,13 @@ const installExtensions = async () => {
 };
 
 const createWindow = async () => {
+
   if (
     process.env.NODE_ENV === 'development' ||
     process.env.DEBUG_PROD === 'true'
   ) {
     await installExtensions();
+    await initializeApp();
   }
 
   const RESOURCES_PATH = app.isPackaged
@@ -279,6 +323,8 @@ app
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
       if (mainWindow === null) createWindow();
+
+
     });
   })
   .catch(console.log);
