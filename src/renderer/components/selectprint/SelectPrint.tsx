@@ -21,6 +21,8 @@ export default function SelectPrint() {
   const [price] = useState(125); // Base price per print
   const [discountCode] = useState(state?.discountCode || undefined);
 
+  const [amount, setAmount] = useState(price * quantity);
+
   const handleDecrease = () => {
     if (quantity > 1) {
       setQuantity(quantity - 1);
@@ -40,17 +42,44 @@ export default function SelectPrint() {
     });
   };
 
-  const handleConfirm = () => {
-    // Navigate to payment page with quantity and total price
-    const originalPrice = price * quantity;
-    navigate('/payment-qr', {
-      state: {
+  const handleConfirm = async () => {
+    try {
+      // คำนวณ amount ที่ลบส่วนลดแล้ว
+      const originalPrice = price * quantity;
+      // TODO: ควรดึง discount amount จาก coupon check ที่ทำไว้แล้ว
+      // ตอนนี้ใช้ mock discount 20 THB
+      const discountAmount = discountCode ? 20 : 0;
+      const finalAmount = originalPrice - discountAmount;
+
+      // เรียก API สร้าง payment
+      const result = await window.electron.payment.createMachinePayment(
+        finalAmount,
         quantity,
-        totalPrice: originalPrice,
-        originalPrice,
-        discountCode: discountCode || undefined,
-      },
-    });
+        'promptpay',
+      );
+
+      if (result.success && result.qr_code) {
+        // Navigate to payment page with QR code
+        navigate('/payment-qr', {
+          state: {
+            quantity,
+            totalPrice: finalAmount,
+            originalPrice,
+            discountCode: discountCode || undefined,
+            qrcode: result.qr_code,
+            referenceId: result.reference_id,
+            transactionId: result.transactionId,
+            paymentDetailsId: result.paymentDetailsId,
+          },
+        });
+      } else {
+        console.error('Failed to create payment:', result.error);
+        alert('ไม่สามารถสร้าง QR Code ได้ กรุณาลองใหม่อีกครั้ง');
+      }
+    } catch (error) {
+      console.error('Error creating payment:', error);
+      alert('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+    }
   };
 
   return (

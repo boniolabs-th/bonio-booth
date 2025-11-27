@@ -498,3 +498,19 @@ ipcMain.handle('check-payment-status', async (event, referenceId: string) => {
     return { success: false, error: errorMessage };
   }
 });
+
+// Machine Payment API handler
+ipcMain.handle(
+  'create-machine-payment',
+  async (event, amount: number, numberPhoto: number, channel: string = 'promptpay') => {
+    try {
+      const result = await machineService.createPayment(amount, numberPhoto, channel);
+      return result;
+    } catch (error) {
+      console.error('Error in create-machine-payment handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    }
+  },
+);

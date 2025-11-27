@@ -138,6 +138,24 @@ export interface PaperLevelResponse {
   };
 }
 
+export interface PaymentCreateRequest {
+  amount: number;
+  numberPhoto: number;
+  channel: string;
+}
+
+export interface PaymentCreateResponse {
+  success: boolean;
+  qr_code?: string;
+  reference_id?: string;
+  order_id?: string;
+  transactionId?: string;
+  paymentDetailsId?: string;
+  numberPhoto?: number;
+  message?: string;
+  error?: string;
+}
+
 export interface MachineServiceOptions {
   apiBaseUrl?: string;
   machinePort?: number;
@@ -154,7 +172,8 @@ export class MachineService {
   private timeout: number;
 
   constructor(options: MachineServiceOptions = {}) {
-    this.apiBaseUrl = 'https://api-booth.boniolabs.com';
+    // this.apiBaseUrl = 'https://api-booth.boniolabs.com';
+    this.apiBaseUrl = 'http://localhost:3000';
     this.machinePort = options.machinePort || Number(process.env.PORT) || 33333;
     this.machineId = options.machineId || process.env.MACHINE_ID;
     this.timeout = options.timeout || 10000;
@@ -414,6 +433,36 @@ export class MachineService {
       return response;
     } catch (error) {
       console.error('❌ [MachineService] Update paper level failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 8. POST /api/machines-public/payment/create
+   * สร้าง payment และรับ QR code สำหรับชำระเงิน
+   */
+  async createPayment(
+    amount: number,
+    numberPhoto: number,
+    channel: string = 'promptpay',
+    machineId?: string,
+  ): Promise<PaymentCreateResponse> {
+    console.log('💳 [MachineService] Creating payment:', { amount, numberPhoto, channel });
+    try {
+      const response = await this.makeRequest<PaymentCreateResponse>(
+        '/api/machines-public/payment/create',
+        'POST',
+        { amount, numberPhoto, channel },
+        machineId ? { machineId } : undefined,
+      );
+      console.log(
+        response.success
+          ? `✅ [MachineService] Payment created: ${response.reference_id}`
+          : `⚠️ [MachineService] Payment creation failed`,
+      );
+      return response;
+    } catch (error) {
+      console.error('❌ [MachineService] Create payment failed:', error);
       throw error;
     }
   }

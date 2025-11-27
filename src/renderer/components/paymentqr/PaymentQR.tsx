@@ -11,6 +11,10 @@ interface LocationState {
   totalPrice: number;
   discountCode?: string;
   originalPrice?: number;
+  qrcode?: string;
+  referenceId?: string;
+  transactionId?: string;
+  paymentDetailsId?: string;
 }
 
 // Function to calculate discount based on code
@@ -35,9 +39,9 @@ export default function PaymentQR() {
   const finalPrice = originalPrice - discountAmount;
 
   const [timeLeft, setTimeLeft] = useState(180); // 3 minutes in seconds
-  const [qrCode, setQrCode] = useState<string>('');
-  const [referenceId, setReferenceId] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [qrCode, setQrCode] = useState<string>(state?.qrcode || '');
+  const [referenceId, setReferenceId] = useState<string>(state?.referenceId || '');
+  const [isLoading, setIsLoading] = useState(!state?.qrcode);
   const [error, setError] = useState<string>('');
   const [successCountdown, setSuccessCountdown] = useState<number | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<
@@ -65,10 +69,11 @@ export default function PaymentQR() {
     setError('');
 
     try {
-      const orderNo = paymentService.generateOrderNo();
-      const result = await paymentService.createPayment(
+      // ใช้ API ใหม่จาก machine service
+      const result = await window.electron.payment.createMachinePayment(
         finalPrice,
-        orderNo,
+        state.quantity,
+        'promptpay',
       );
 
       if (result.success && result.qr_code) {
@@ -85,11 +90,11 @@ export default function PaymentQR() {
     } finally {
       setIsLoading(false);
     }
-  }, [finalPrice]);
+  }, [finalPrice, state.quantity]);
 
-  // Create payment when component mounts
+  // Create payment when component mounts (ถ้ายังไม่มี qrcode)
   useEffect(() => {
-    if (state) {
+    if (state && !state.qrcode) {
       createPayment();
     }
   }, [state, createPayment]);
