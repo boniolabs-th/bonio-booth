@@ -50,6 +50,9 @@ const electronHandler = {
     createMachinePayment: (amount: number, numberPhoto: number, channel?: string) => {
       return ipcRenderer.invoke('create-machine-payment', amount, numberPhoto, channel || 'promptpay');
     },
+    checkMachinePaymentStatus: (mchOrderNo: string) => {
+      return ipcRenderer.invoke('check-machine-payment-status', mchOrderNo);
+    },
   },
   video: {
     createBoomerang: (videoPath: string, format: 'video' | 'gif' = 'video') => {

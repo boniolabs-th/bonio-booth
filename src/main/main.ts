@@ -514,3 +514,18 @@ ipcMain.handle(
     }
   },
 );
+
+ipcMain.handle(
+  'check-machine-payment-status',
+  async (event, mchOrderNo: string) => {
+    try {
+      const result = await machineService.checkPaymentStatus(mchOrderNo);
+      return result;
+    } catch (error) {
+      console.error('Error in check-machine-payment-status handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    }
+  },
+);

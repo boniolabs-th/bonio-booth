@@ -156,6 +156,15 @@ export interface PaymentCreateResponse {
   error?: string;
 }
 
+export interface PaymentStatusResponse {
+  success: boolean;
+  status?: string;
+  amount?: number;
+  reference_id?: string;
+  transactionStatus?: string;
+  error?: string;
+}
+
 export interface MachineServiceOptions {
   apiBaseUrl?: string;
   machinePort?: number;
@@ -463,6 +472,34 @@ export class MachineService {
       return response;
     } catch (error) {
       console.error('❌ [MachineService] Create payment failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 9. GET /api/machines-public/payment/status/{mchOrderNo}
+   * ตรวจสอบสถานะการชำระเงิน
+   */
+  async checkPaymentStatus(
+    mchOrderNo: string,
+    machineId?: string,
+  ): Promise<PaymentStatusResponse> {
+    console.log('🔍 [MachineService] Checking payment status:', mchOrderNo);
+    try {
+      const response = await this.makeRequest<PaymentStatusResponse>(
+        `/api/machines-public/payment/status/${mchOrderNo}`,
+        'GET',
+        undefined,
+        machineId ? { machineId } : undefined,
+      );
+      console.log(
+        response.success
+          ? `✅ [MachineService] Payment status: ${response.status}`
+          : `⚠️ [MachineService] Failed to check payment status`,
+      );
+      return response;
+    } catch (error) {
+      console.error('❌ [MachineService] Check payment status failed:', error);
       throw error;
     }
   }

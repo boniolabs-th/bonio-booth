@@ -38,7 +38,7 @@ export default function PaymentQR() {
     : 0;
   const finalPrice = originalPrice - discountAmount;
 
-  const [timeLeft, setTimeLeft] = useState(180); // 3 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
   const [qrCode, setQrCode] = useState<string>(state?.qrcode || '');
   const [referenceId, setReferenceId] = useState<string>(state?.referenceId || '');
   const [isLoading, setIsLoading] = useState(!state?.qrcode);
@@ -114,30 +114,37 @@ export default function PaymentQR() {
     return () => clearInterval(timer);
   }, [timeLeft, navigate]);
 
-  // Check payment status periodically
+  // Check payment status periodically using Machine API
   useEffect(() => {
     if (!referenceId) return;
 
     const statusChecker = setInterval(async () => {
-      const status = await paymentService.checkPaymentStatus(referenceId);
-      if (status.success && status.status) {
-        setPaymentStatus(status.status as any); // Cast to any to handle all KSher statuses
-
-        if (status.status === 'NOTPAY') {
-          // Payment successful, start countdown
-          setSuccessCountdown(3);
-        } else if (
-          ['FAIL', 'PAYERROR', 'CLOSED'].includes(status.status as string)
-        ) {
-          setError('Payment failed. Please try again.');
-        } else if (status.status === 'REFUND') {
-          setError('Payment was refunded. Please try again.');
+      try {
+        const result = await window.electron.payment.checkMachinePaymentStatus(referenceId);
+        
+        if (result.success && result.status) {
+          setPaymentStatus(result.status as any);
+          
+          // เช็คว่า payment สำเร็จหรือไม่
+          if (result.status === 'SUCCESS' || result.transactionStatus === 'success') {
+            // Payment successful, start countdown
+            setSuccessCountdown(3);
+          } else if (
+            ['FAIL', 'PAYERROR', 'CLOSED', 'failed'].includes(result.status as string) ||
+            result.transactionStatus === 'failed'
+          ) {
+            setError('Payment failed. Please try again.');
+          }
+        } else if (result.error) {
+          console.error('Payment status check error:', result.error);
         }
+      } catch (error) {
+        console.error('Error checking payment status:', error);
       }
     }, 3000); // Check every 3 seconds
 
     return () => clearInterval(statusChecker);
-  }, [referenceId, paymentStatus, navigate]);
+  }, [referenceId]);
 
   // Success countdown timer
   useEffect(() => {
