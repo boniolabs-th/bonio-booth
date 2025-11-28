@@ -47,8 +47,11 @@ const electronHandler = {
     checkPaymentStatus: (referenceId: string) => {
       return ipcRenderer.invoke('check-payment-status', referenceId);
     },
-    createMachinePayment: (amount: number, numberPhoto: number, channel?: string) => {
-      return ipcRenderer.invoke('create-machine-payment', amount, numberPhoto, channel || 'promptpay');
+    createMachinePayment: (amount: number, numberPhoto: number, channel?: string, couponCodeId?: string) => {
+      return ipcRenderer.invoke('create-machine-payment', amount, numberPhoto, channel || 'promptpay', couponCodeId);
+    },
+    checkMachineCoupon: (code: string) => {
+      return ipcRenderer.invoke('check-machine-coupon', code);
     },
     checkMachinePaymentStatus: (mchOrderNo: string) => {
       return ipcRenderer.invoke('check-machine-payment-status', mchOrderNo);

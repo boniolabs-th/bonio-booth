@@ -509,15 +509,31 @@ ipcMain.on("print-photo", async (event, printConfig) => {
 // Machine Payment API handler
 ipcMain.handle(
   'create-machine-payment',
-  async (event, amount: number, numberPhoto: number, channel: string = 'promptpay') => {
+  async (event, amount: number, numberPhoto: number, channel: string = 'promptpay', couponCodeId?: string) => {
     try {
-      const result = await machineService.createPayment(amount, numberPhoto, channel);
+      const result = await machineService.createPayment(amount, numberPhoto, channel, couponCodeId);
       return result;
     } catch (error) {
       console.error('Error in create-machine-payment handler:', error);
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       return { success: false, error: errorMessage };
+    }
+  },
+);
+
+// Machine Coupon API handler
+ipcMain.handle(
+  'check-machine-coupon',
+  async (event, code: string) => {
+    try {
+      const result = await machineService.checkCoupon(code);
+      return result;
+    } catch (error) {
+      console.error('Error in check-machine-coupon handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { valid: false, message: errorMessage };
     }
   },
 );

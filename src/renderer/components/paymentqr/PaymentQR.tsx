@@ -15,6 +15,9 @@ interface LocationState {
   referenceId?: string;
   transactionId?: string;
   paymentDetailsId?: string;
+  discountAmount?: number;
+  netAmount?: number;
+  couponCodeId?: string;
 }
 
 // Function to calculate discount based on code
@@ -32,11 +35,17 @@ export default function PaymentQR() {
   const state = location.state as LocationState;
 
   // Calculate discount and final price
+  // ใช้ discountAmount และ netAmount จาก state (ที่ได้จาก API) ถ้ามี
+  // ถ้าไม่มีให้คำนวณเอง
   const originalPrice = state.originalPrice || state.totalPrice;
-  const discountAmount = state.discountCode
+  const discountAmount = state.discountAmount !== undefined
+    ? state.discountAmount
+    : state.discountCode
     ? calculateDiscount(state.discountCode, originalPrice)
     : 0;
-  const finalPrice = originalPrice - discountAmount;
+  const finalPrice = state.netAmount !== undefined
+    ? state.netAmount
+    : originalPrice - discountAmount;
 
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
   const [qrCode, setQrCode] = useState<string>(state?.qrcode || '');

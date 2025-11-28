@@ -84,6 +84,9 @@ export interface CouponCheckRequest {
 export interface CouponCheckResponse {
   valid: boolean;
   message: string;
+  couponCodeId?: string;
+  discountType?: 'percent' | 'fixed';
+  discountValue?: number;
   coupon?: Coupon;
   couponCode?: CouponCode;
 }
@@ -142,6 +145,7 @@ export interface PaymentCreateRequest {
   amount: number;
   numberPhoto: number;
   channel: string;
+  couponCodeId?: string;
 }
 
 export interface PaymentCreateResponse {
@@ -152,6 +156,10 @@ export interface PaymentCreateResponse {
   transactionId?: string;
   paymentDetailsId?: string;
   numberPhoto?: number;
+  discountAmount?: number;
+  totalAmount?: number;
+  netAmount?: number;
+  couponCodeId?: string;
   message?: string;
   error?: string;
 }
@@ -554,18 +562,27 @@ export class MachineService {
     amount: number,
     numberPhoto: number,
     channel: string = 'promptpay',
+    couponCodeId?: string,
     machineId?: string,
   ): Promise<PaymentCreateResponse> {
     console.log('💳 [MachineService] Creating payment:', {
       amount,
       numberPhoto,
       channel,
+      couponCodeId: couponCodeId || 'none',
     });
     try {
+      const requestBody: PaymentCreateRequest = {
+        amount,
+        numberPhoto,
+        channel,
+        ...(couponCodeId && { couponCodeId }),
+      };
+      
       const response = await this.makeRequest<PaymentCreateResponse>(
         '/api/machines-public/payment/create',
         'POST',
-        { amount, numberPhoto, channel },
+        requestBody,
         machineId ? { machineId } : undefined,
       );
       console.log(
