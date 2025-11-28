@@ -42,34 +42,26 @@ async function initializeApp() {
   try {
     console.log('🚀 Initializing app...');
     
-    // 1. Verify machine
-    const verifyResponse = await machineService.verify();
-    console.log('✅ Machine verified:', verifyResponse.machine.machineName);
+    // เรียก API init เพื่อดึงข้อมูลทั้งหมดในครั้งเดียว
+    const initResponse = await machineService.init();
     
-    // 2. Get theme
-    const themeResponse = await machineService.getTheme();
-    console.log('✅ Theme loaded:', themeResponse);
+    console.log('✅ App initialized:', {
+      machine: initResponse.machine.machineName,
+      theme: initResponse.theme.name,
+      frames: initResponse.frames.length,
+      paperLevel: initResponse.machine.paperLevel,
+    });
     
-    // 3. Send theme to renderer process
-    if (mainWindow && themeResponse.theme.background) {
-      mainWindow.webContents.send('theme-loaded', themeResponse.theme);
+    // Send theme to renderer process
+    if (mainWindow && initResponse.theme.background) {
+      mainWindow.webContents.send('theme-loaded', initResponse.theme);
       console.log('✅ Theme sent to renderer');
     }
     
-    // 4. Get frames (optional)
-    const framesResponse = await machineService.getFrames();
-    console.log(`✅ Frames loaded: ${framesResponse.frames.length} frames`);
-    
-    // 5. Get status (optional)
-    const status = await machineService.getStatus();
-    console.log('✅ Status loaded:', status.machine.status);
-    console.log('📄 Paper level:', status.machine.paperLevel, '%');
-    
     return {
-      machine: verifyResponse.machine,
-      theme: themeResponse.theme,
-      frames: framesResponse.frames,
-      status: status.machine,
+      machine: initResponse.machine,
+      theme: initResponse.theme,
+      frames: initResponse.frames,
     };
   } catch (error) {
     console.error('❌ Failed to initialize app:', error);
@@ -499,32 +491,32 @@ ipcMain.on("print-photo", async (event, printConfig) => {
 // });
 
 // Machine Payment API handler
-// ipcMain.handle(
-//   'create-machine-payment',
-//   async (event, amount: number, numberPhoto: number, channel: string = 'promptpay') => {
-//     try {
-//       const result = await machineService.createPayment(amount, numberPhoto, channel);
-//       return result;
-//     } catch (error) {
-//       console.error('Error in create-machine-payment handler:', error);
-//       const errorMessage =
-//         error instanceof Error ? error.message : 'Unknown error';
-//       return { success: false, error: errorMessage };
-//     }
-//   },
-// );
+ipcMain.handle(
+  'create-machine-payment',
+  async (event, amount: number, numberPhoto: number, channel: string = 'promptpay') => {
+    try {
+      const result = await machineService.createPayment(amount, numberPhoto, channel);
+      return result;
+    } catch (error) {
+      console.error('Error in create-machine-payment handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    }
+  },
+);
 
-// ipcMain.handle(
-//   'check-machine-payment-status',
-//   async (event, mchOrderNo: string) => {
-//     try {
-//       const result = await machineService.checkPaymentStatus(mchOrderNo);
-//       return result;
-//     } catch (error) {
-//       console.error('Error in check-machine-payment-status handler:', error);
-//       const errorMessage =
-//         error instanceof Error ? error.message : 'Unknown error';
-//       return { success: false, error: errorMessage };
-//     }
-//   },
-// );
+ipcMain.handle(
+  'check-machine-payment-status',
+  async (event, mchOrderNo: string) => {
+    try {
+      const result = await machineService.checkPaymentStatus(mchOrderNo);
+      return result;
+    } catch (error) {
+      console.error('Error in check-machine-payment-status handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    }
+  },
+);

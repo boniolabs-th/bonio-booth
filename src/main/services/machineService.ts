@@ -165,6 +165,57 @@ export interface PaymentStatusResponse {
   error?: string;
 }
 
+export interface Price {
+  quantity: number;
+  price: number;
+}
+
+export interface InitMachine {
+  _id: string;
+  machineName: string;
+  serialNumber?: string;
+  status: string;
+  paperLevel?: number;
+  softwareVersion?: number;
+  cameraCountdown?: number;
+  setTimer?: string;
+  timerSchedule?: unknown;
+  isMaintenanceMode?: boolean;
+  prices?: Price[];
+}
+
+export interface InitTheme {
+  _id: string;
+  name: string;
+  code: string;
+  logo?: string;
+  background?: string;
+  primaryColor?: string;
+  fontColor?: string;
+  frames?: string[];
+  isActive: boolean;
+}
+
+export interface InitFrame {
+  _id: string;
+  name: string;
+  code: string;
+  imageUrl?: string;
+  imageSize?: string;
+  grid?: {
+    rows: number;
+    columns: number;
+    slots: unknown[];
+  };
+  isActive: boolean;
+}
+
+export interface InitResponse {
+  machine: InitMachine;
+  theme: InitTheme;
+  frames: InitFrame[];
+}
+
 export interface MachineServiceOptions {
   apiBaseUrl?: string;
   machinePort?: number;
@@ -292,6 +343,31 @@ export class MachineService {
         reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
+  }
+
+  /**
+   * 0. GET /api/machines-public/init
+   * ดึงข้อมูลทั้งหมดสำหรับ initialize app (machine, theme, frames)
+   */
+  async init(machineId?: string): Promise<InitResponse> {
+    console.log('🚀 [MachineService] Initializing app...');
+    try {
+      const response = await this.makeRequest<InitResponse>(
+        '/api/machines-public/init',
+        'GET',
+        undefined,
+        machineId ? { machineId } : undefined,
+      );
+      console.log('✅ [MachineService] App initialized:', {
+        machine: response.machine.machineName,
+        theme: response.theme.name,
+        frames: response.frames.length,
+      });
+      return response;
+    } catch (error) {
+      console.error('❌ [MachineService] Init failed:', error);
+      throw error;
+    }
   }
 
   /**
