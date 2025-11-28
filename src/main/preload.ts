@@ -2,7 +2,7 @@
 /* eslint no-unused-vars: off */
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
-export type Channels = 'ipc-example' | 'print-photo' | 'print-response' | 'theme-loaded';
+export type Channels = 'ipc-example' | 'print-photo' | 'print-response' | 'theme-loaded' | 'machine-init';
 
 const electronHandler = {
   ipcRenderer: {
@@ -52,6 +52,9 @@ const electronHandler = {
     },
     checkMachinePaymentStatus: (mchOrderNo: string) => {
       return ipcRenderer.invoke('check-machine-payment-status', mchOrderNo);
+    },
+    getMachinePrices: () => {
+      return ipcRenderer.invoke('get-machine-prices');
     },
   },
   video: {

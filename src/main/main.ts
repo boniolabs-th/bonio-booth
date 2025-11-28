@@ -58,6 +58,21 @@ async function initializeApp() {
       console.log('✅ Theme sent to renderer');
     }
     
+    // เก็บข้อมูลไว้ใน cache
+    cachedInitData = {
+      machine: initResponse.machine,
+      prices: initResponse.machine.prices || [],
+    };
+    
+    // Send machine data (including prices) to renderer process
+    if (mainWindow && initResponse.machine) {
+      mainWindow.webContents.send('machine-init', {
+        machine: initResponse.machine,
+        prices: initResponse.machine.prices || [],
+      });
+      console.log('✅ Machine data sent to renderer', initResponse.machine.prices);
+    }
+    
     return {
       machine: initResponse.machine,
       theme: initResponse.theme,
@@ -217,6 +232,7 @@ async function generateImageWithPadding(base64: string, paddingPercent = 0): Pro
 }
 
 let mainWindow: BrowserWindow | null = null;
+let cachedInitData: { machine?: { prices?: unknown[] }; prices?: unknown[] } | null = null;
 
 const installExtensions = async () => {
   const installer = require('electron-devtools-installer');
@@ -520,3 +536,24 @@ ipcMain.handle(
     }
   },
 );
+
+// Handler สำหรับ request prices
+ipcMain.handle('get-machine-prices', async () => {
+  try {
+    if (cachedInitData?.prices) {
+      return { success: true, prices: cachedInitData.prices };
+    }
+    // ถ้ายังไม่มี cache ให้เรียก API ใหม่
+    const initResponse = await machineService.init();
+    cachedInitData = {
+      machine: initResponse.machine,
+      prices: initResponse.machine.prices || [],
+    };
+    return { success: true, prices: initResponse.machine.prices || [] };
+  } catch (error) {
+    console.error('Error in get-machine-prices handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage, prices: [] };
+  }
+});
