@@ -13,7 +13,7 @@ export default function DiscountCoupon() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
-  const [code, setCode] = useState('0000');
+  const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,11 +21,14 @@ export default function DiscountCoupon() {
     navigate('/select-print', { state });
   };
 
-  const handleNumberClick = (number: string) => {
+  const handleKeyClick = (key: string) => {
     setCode((prev) => {
-      // Shift left and add new number, keep 4 digits
-      const newCode = prev.slice(1) + number;
-      return newCode;
+      // เพิ่มตัวอักษรใหม่ (จำกัดความยาวตามต้องการ)
+      const maxLength = 20; // กำหนดความยาวสูงสุด
+      if (prev.length >= maxLength) {
+        return prev; // ไม่เพิ่มถ้าเกินความยาว
+      }
+      return prev + key;
     });
     // Clear error when user types
     if (error) {
@@ -35,9 +38,8 @@ export default function DiscountCoupon() {
 
   const handleBackspace = () => {
     setCode((prev) => {
-      // Shift right and add 0 at the beginning
-      const newCode = '0' + prev.slice(0, -1);
-      return newCode;
+      // ลบตัวอักษรตัวสุดท้าย
+      return prev.slice(0, -1);
     });
     // Clear error when user types
     if (error) {
@@ -46,9 +48,9 @@ export default function DiscountCoupon() {
   };
 
   const handleConfirm = async () => {
-    // Check if code is at least 4 digits
-    if (code.length < 4) {
-      return; // Don't proceed if code is not complete
+    // Check if code is not empty
+    if (code.length === 0) {
+      return; // Don't proceed if code is empty
     }
 
     setIsLoading(true);
@@ -56,8 +58,9 @@ export default function DiscountCoupon() {
 
     try {
       // 1. ตรวจสอบ coupon code
-      const checkResult = await window.electron.payment.checkMachineCoupon(code);
-      
+      const checkResult =
+        await window.electron.payment.checkMachineCoupon(code);
+
       if (!checkResult.valid) {
         setError(checkResult.message || 'โค้ดส่วนลดไม่ถูกต้อง');
         setIsLoading(false);
@@ -91,7 +94,10 @@ export default function DiscountCoupon() {
           },
         });
       } else {
-        setError(paymentResult.error || 'ไม่สามารถสร้าง QR Code ได้ กรุณาลองใหม่อีกครั้ง');
+        setError(
+          paymentResult.error ||
+            'ไม่สามารถสร้าง QR Code ได้ กรุณาลองใหม่อีกครั้ง',
+        );
       }
     } catch (err) {
       console.error('Error in coupon flow:', err);
@@ -115,85 +121,74 @@ export default function DiscountCoupon() {
         {/* Code Input Display */}
         <div className="code-input-container">
           <div className="code-display">
-            {code.padStart(4, '0').slice(0, 4)}
+            {code || (
+              <span style={{ color: '#999', fontWeight: 400 }}>
+                Enter coupon code
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Numeric Keypad */}
+        {/* QWERTY Keyboard */}
         <div className="keypad-container">
+          {/* Row 1: Numbers */}
           <div className="keypad-row">
-            <button
-              type="button"
-              className="keypad-button"
-              onClick={() => handleNumberClick('1')}
-            >
-              1
-            </button>
-            <button
-              type="button"
-              className="keypad-button"
-              onClick={() => handleNumberClick('2')}
-            >
-              2
-            </button>
-            <button
-              type="button"
-              className="keypad-button"
-              onClick={() => handleNumberClick('3')}
-            >
-              3
-            </button>
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].map((key) => (
+              <button
+                key={key}
+                type="button"
+                className="keypad-button"
+                onClick={() => handleKeyClick(key)}
+              >
+                {key}
+              </button>
+            ))}
           </div>
+          {/* Row 2: Q W E R T Y U I O P */}
           <div className="keypad-row">
-            <button
-              type="button"
-              className="keypad-button"
-              onClick={() => handleNumberClick('4')}
-            >
-              4
-            </button>
-            <button
-              type="button"
-              className="keypad-button"
-              onClick={() => handleNumberClick('5')}
-            >
-              5
-            </button>
-            <button
-              type="button"
-              className="keypad-button"
-              onClick={() => handleNumberClick('6')}
-            >
-              6
-            </button>
+            {['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map((key) => (
+              <button
+                key={key}
+                type="button"
+                className="keypad-button"
+                onClick={() => handleKeyClick(key.toLowerCase())}
+              >
+                {key}
+              </button>
+            ))}
           </div>
+          {/* Row 3: A S D F G H J K L */}
           <div className="keypad-row">
-            <button
-              type="button"
-              className="keypad-button"
-              onClick={() => handleNumberClick('7')}
-            >
-              7
-            </button>
-            <button
-              type="button"
-              className="keypad-button"
-              onClick={() => handleNumberClick('8')}
-            >
-              8
-            </button>
-            <button
-              type="button"
-              className="keypad-button"
-              onClick={() => handleNumberClick('9')}
-            >
-              9
-            </button>
+            {['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'].map((key) => (
+              <button
+                key={key}
+                type="button"
+                className="keypad-button"
+                onClick={() => handleKeyClick(key.toLowerCase())}
+              >
+                {key}
+              </button>
+            ))}
           </div>
+          {/* Row 4: Z X C V B N M */}
+          <div className="keypad-row">
+            {['', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', ''].map((key) => (
+              <button
+                key={key}
+                type="button"
+                className="keypad-button"
+                style={{ visibility: key !== '' ? 'visible' : 'hidden' }}
+                onClick={() => handleKeyClick(key.toLowerCase())}
+              >
+                {key}
+              </button>
+            ))}
+          </div>
+          {/* Row 5: Backspace and Space */}
           <div className="keypad-row">
             <button
               type="button"
-              className="keypad-button"
+              className="keypad-button keypad-button-wide"
               onClick={handleBackspace}
             >
               <svg
@@ -206,22 +201,26 @@ export default function DiscountCoupon() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <path d="M19 12H5M12 19l-7-7 7-7" />
+                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
               </svg>
             </button>
+
+            {/* <button
+              type="button"
+              className="keypad-button keypad-button-wide"
+              onClick={() => handleKeyClick(' ')}
+            >
+              Space
+            </button> */}
             <button
               type="button"
-              className="keypad-button"
-              onClick={() => handleNumberClick('0')}
+              className="keypad-button keypad-button-wide"
+              onClick={handleConfirm}
+              disabled={code.length === 0 || isLoading}
             >
-              0
-            </button>
-            <button
-              type="button"
-              className="keypad-button"
-              onClick={() => handleNumberClick('*')}
-            >
-              *
+              {isLoading ? 'กำลังตรวจสอบ...' : 'ยืนยัน'}
             </button>
           </div>
         </div>
@@ -247,17 +246,16 @@ export default function DiscountCoupon() {
       )}
 
       {/* Confirm Button */}
-      <div className="confirm-section">
+      {/* <div className="confirm-section">
         <button
           type="button"
           className="confirm-button"
           onClick={handleConfirm}
-          disabled={code.length < 4 || isLoading}
+          disabled={code.length === 0 || isLoading}
         >
           {isLoading ? 'กำลังตรวจสอบ...' : 'ยืนยัน'}
         </button>
-      </div>
+      </div> */}
     </div>
   );
 }
-
