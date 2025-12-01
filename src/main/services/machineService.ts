@@ -193,6 +193,7 @@ export interface UploadFilesResponse {
   message: string;
   photoSession: PhotoSession;
   files: UploadFile[];
+  qrcodeStorageUrl?: string; // URL สำหรับ QR code ที่เก็บไว้ใน storage
   error?: string;
 }
 

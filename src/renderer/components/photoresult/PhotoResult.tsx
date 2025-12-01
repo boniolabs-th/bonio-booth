@@ -482,6 +482,7 @@ export default function PhotoResult() {
     null,
   );
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+  const [qrcodeStorageUrl, setQrcodeStorageUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const hasUploaded = useRef(false); // ป้องกันการ upload ซ้ำ
 
@@ -841,6 +842,14 @@ export default function PhotoResult() {
             setUploadedFileUrl(photoFile.url);
           }
 
+          // เก็บ qrcodeStorageUrl จาก response
+          if (uploadResult.qrcodeStorageUrl) {
+            console.log('✅ [PhotoResult] QR Code Storage URL:', uploadResult.qrcodeStorageUrl);
+            setQrcodeStorageUrl(uploadResult.qrcodeStorageUrl);
+          } else {
+            console.warn('⚠️ [PhotoResult] No qrcodeStorageUrl in response');
+          }
+
           // แสดง URLs ทั้งหมด
           uploadResult.files.forEach((file: { type: string; url: string; order: number }) => {
             console.log(`📁 [PhotoResult] ${file.type} (order: ${file.order}): ${file.url}`);
@@ -973,10 +982,15 @@ export default function PhotoResult() {
   };
 
   const generateQRCode = () => {
-    // Generate QR code from uploaded file URL
+    // ใช้ qrcodeStorageUrl จาก API response ถ้ามี
+    if (qrcodeStorageUrl) {
+      console.log('📱 [PhotoResult] Using QR code from API:', qrcodeStorageUrl);
+      return qrcodeStorageUrl;
+    }
+    
+    // Fallback: Generate QR code from uploaded file URL (ถ้าไม่มี qrcodeStorageUrl)
     if (uploadedFileUrl) {
-      // สร้าง QR code จาก URL โดยใช้ QR code library หรือ API
-      // สำหรับตอนนี้ใช้ placeholder ที่มี URL
+      console.log('📱 [PhotoResult] Generating QR code from uploadedFileUrl (fallback)');
       const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(uploadedFileUrl)}`;
       return qrCodeUrl;
     }
