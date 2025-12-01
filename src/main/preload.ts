@@ -59,6 +59,20 @@ const electronHandler = {
     getMachinePrices: () => {
       return ipcRenderer.invoke('get-machine-prices');
     },
+    uploadMachineFiles: (
+      transactionCode: string,
+      photos: string[],
+      videos?: string[],
+      transactionId?: string,
+    ) => {
+      return ipcRenderer.invoke(
+        'upload-machine-files',
+        transactionCode,
+        photos,
+        videos || [],
+        transactionId,
+      );
+    },
   },
   video: {
     createBoomerang: (videoPath: string, format: 'video' | 'gif' = 'video') => {

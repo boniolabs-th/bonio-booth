@@ -10,6 +10,9 @@ interface LocationState {
   totalPrice: number;
   selectedFrame?: FrameConfig;
   useBoomerang?: boolean;
+  transactionId?: string;
+  referenceId?: string;
+  paymentDetailsId?: string;
 }
 
 export default function PhotoPrepare() {

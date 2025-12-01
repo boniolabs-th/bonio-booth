@@ -8,6 +8,9 @@ import './FrameSelection.css';
 interface LocationState {
   quantity: number;
   totalPrice: number;
+  transactionId?: string;
+  referenceId?: string;
+  paymentDetailsId?: string;
 }
 
 export default function FrameSelection() {
@@ -25,7 +28,14 @@ export default function FrameSelection() {
 
   const handleConfirm = () => {
     navigate('/photo-prepare', {
-      state: { ...state, selectedFrame, useBoomerang },
+      state: {
+        ...state,
+        selectedFrame,
+        useBoomerang,
+        transactionId: state.transactionId,
+        referenceId: state.referenceId,
+        paymentDetailsId: state.paymentDetailsId,
+      },
     });
   };
 

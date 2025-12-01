@@ -149,19 +149,34 @@ export default function SelectPrint() {
         'promptpay',
       );
 
+      console.log('💳 [SelectPrint] Payment response:', {
+        success: result.success,
+        qr_code: result.qr_code ? 'present' : 'missing',
+        reference_id: result.reference_id,
+        order_id: result.order_id,
+        transactionId: result.transactionId,
+        paymentDetailsId: result.paymentDetailsId,
+        fullResponse: result,
+      });
+
       if (result.success && result.qr_code) {
         // Navigate to payment page with QR code
+        const navigationState = {
+          quantity,
+          totalPrice: finalAmount,
+          originalPrice,
+          discountCode: discountCode || undefined,
+          qrcode: result.qr_code,
+          referenceId: result.reference_id,
+          transactionId: result.transactionId,
+          paymentDetailsId: result.paymentDetailsId,
+          orderId: result.order_id,
+        };
+        
+        console.log('💳 [SelectPrint] Navigating with state:', navigationState);
+        
         navigate('/payment-qr', {
-          state: {
-            quantity,
-            totalPrice: finalAmount,
-            originalPrice,
-            discountCode: discountCode || undefined,
-            qrcode: result.qr_code,
-            referenceId: result.reference_id,
-            transactionId: result.transactionId,
-            paymentDetailsId: result.paymentDetailsId,
-          },
+          state: navigationState,
         });
       } else {
         console.error('Failed to create payment:', result.error);

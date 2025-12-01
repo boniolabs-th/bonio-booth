@@ -15,6 +15,7 @@ interface LocationState {
   referenceId?: string;
   transactionId?: string;
   paymentDetailsId?: string;
+  orderId?: string;
   discountAmount?: number;
   netAmount?: number;
   couponCodeId?: string;
@@ -52,6 +53,18 @@ export default function PaymentQR() {
   const [referenceId, setReferenceId] = useState<string>(state?.referenceId || '');
   const [isLoading, setIsLoading] = useState(!state?.qrcode);
   const [error, setError] = useState<string>('');
+
+  // Log state when component mounts
+  useEffect(() => {
+    console.log('💳 [PaymentQR] Component mounted with state:', {
+      hasState: !!state,
+      orderId: state?.orderId,
+      referenceId: state?.referenceId,
+      transactionId: state?.transactionId,
+      paymentDetailsId: state?.paymentDetailsId,
+      qrcode: state?.qrcode ? 'present' : 'missing',
+    });
+  }, []);
   const [successCountdown, setSuccessCountdown] = useState<number | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<
     | 'pending'
@@ -86,6 +99,12 @@ export default function PaymentQR() {
       );
 
       if (result.success && result.qr_code) {
+        console.log('💳 [PaymentQR] Payment created successfully:', {
+          reference_id: result.reference_id,
+          order_id: result.order_id,
+          transactionId: result.transactionId,
+          paymentDetailsId: result.paymentDetailsId,
+        });
         setQrCode(result.qr_code);
         setReferenceId(result.reference_id || '');
         setPaymentStatus('pending');
@@ -165,6 +184,10 @@ export default function PaymentQR() {
         state: {
           quantity: state.quantity,
           totalPrice: finalPrice,
+          transactionId: state.transactionId,
+          referenceId: referenceId,
+          paymentDetailsId: state.paymentDetailsId,
+          orderId: state.orderId,
         },
       });
       return;
@@ -183,6 +206,10 @@ export default function PaymentQR() {
         state: {
           quantity: state.quantity,
           totalPrice: finalPrice,
+          transactionId: state.transactionId,
+          referenceId: referenceId,
+          paymentDetailsId: state.paymentDetailsId,
+          orderId: state.orderId,
         },
       });
     }

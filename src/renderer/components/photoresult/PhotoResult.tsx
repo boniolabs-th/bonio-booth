@@ -27,6 +27,10 @@ interface LocationState {
   selectedFilter: string;
   selectedCaptures: Capture[];
   useBoomerang?: boolean;
+  transactionId?: string; // transactionId จาก payment/create response
+  referenceId?: string; // mchOrderNo จาก payment/create response
+  paymentDetailsId?: string;
+  orderId?: string;
 }
 
 const ensureBoomerangAssets = async (
@@ -477,6 +481,9 @@ export default function PhotoResult() {
   const [previewBoomerangGif, setPreviewBoomerangGif] = useState<string | null>(
     null,
   );
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const hasUploaded = useRef(false); // ป้องกันการ upload ซ้ำ
 
   // Setup preview (boomerang or video based on user choice)
   useEffect(() => {
@@ -647,54 +654,237 @@ export default function PhotoResult() {
 
   // Auto-print when component mounts (เฉพาะเมื่อยังไม่ได้พิมพ์จาก PhotoFilter)
   useEffect(() => {
+    console.log('🔄 [PhotoResult] useEffect triggered', {
+      hasState: !!state,
+      hasFinalImage: !!state?.finalImage,
+      alreadyPrinted: (state as any)?.alreadyPrinted,
+      printStatus,
+    });
+    console.log('🔄 [PhotoResult] Full state object:', JSON.stringify(state, null, 2));
+
     const handleAutoPrint = async () => {
-      // ถ้าเพิ่งพิมพ์จาก PhotoFilter แล้ว ไม่ต้อง auto-print อีก
-      if ((state as any)?.alreadyPrinted) {
-        console.log('Skip auto-print: already printed from PhotoFilter');
-        setPrintStatus('success');
+      // ป้องกันการ upload ซ้ำ
+      if (hasUploaded.current) {
+        console.log('⚠️ [PhotoResult] Already uploaded, skipping...');
         return;
+      }
+
+      // ถ้าเพิ่งพิมพ์จาก PhotoFilter แล้ว ก็ยังต้อง upload files
+      if ((state as any)?.alreadyPrinted) {
+        console.log('⚠️ [PhotoResult] Already printed from PhotoFilter, but will still upload files');
+        // ไม่ return ต่อ ให้ upload files ต่อไป
       }
 
       if (!state?.finalImage) {
+        console.error('❌ [PhotoResult] No finalImage in state');
         setPrintStatus('error');
         return;
       }
 
+      // ตั้งค่า flag เพื่อป้องกันการ upload ซ้ำ
+      hasUploaded.current = true;
+
+      // ข้ามการพิมพ์ - สมมติว่ากำลังพิมพ์
       setPrintStatus('printing');
+      setIsUploading(true);
 
       try {
-        // Set up listener for print response
-        window.electron?.print?.onPrintResponse((response) => {
-          if (response.success) {
-            setPrintStatus('success');
-          } else {
-            setPrintStatus('error');
+        // Helper function: แปลง blob URL เป็น base64 data URL
+        const blobUrlToDataUrl = async (url: string): Promise<string> => {
+          // ถ้าเป็น data URL อยู่แล้ว ให้ return ตามเดิม
+          if (url.startsWith('data:')) {
+            return url;
           }
 
-          // Clean up listener
-          window.electron?.print?.removePrintResponseListener();
+          // ถ้าเป็น blob URL ให้แปลงเป็น base64
+          if (url.startsWith('blob:')) {
+            try {
+              const response = await fetch(url);
+              const blob = await response.blob();
+              return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  resolve(reader.result as string);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+              });
+            } catch (error) {
+              console.error('Error converting blob URL to data URL:', error);
+              throw error;
+            }
+          }
+
+          // ถ้าเป็น file path หรือ URL อื่นๆ ให้ return ตามเดิม
+          return url;
+        };
+
+        // 1. Upload files ก่อน
+        // ใช้ mchOrderNo (reference_id) จาก payment response เป็น transaction code
+        // Format เป็น TXN-{mchOrderNo} ตามที่ API ต้องการ
+        if (!state.referenceId) {
+          const errorMsg = '❌ [PhotoResult] No mchOrderNo (referenceId) found in state! Cannot upload files.';
+          console.error(errorMsg);
+          console.error('📤 [PhotoResult] Full state:', JSON.stringify(state, null, 2));
+          console.error('📤 [PhotoResult] Available IDs:', {
+            orderId: state.orderId,
+            referenceId: state.referenceId,
+            transactionId: state.transactionId,
+          });
+          throw new Error('mchOrderNo (referenceId) is required. Please ensure payment was created successfully.');
+        }
+
+        // Format transaction code เป็น TXN-{mchOrderNo}
+        const mchOrderNo = state.referenceId;
+        const transactionCode = mchOrderNo.startsWith('TXN-')
+          ? mchOrderNo
+          : `TXN-${mchOrderNo}`;
+
+        console.log('📤 [PhotoResult] Starting upload files...');
+        console.log('📤 [PhotoResult] mchOrderNo (referenceId):', mchOrderNo);
+        console.log('📤 [PhotoResult] Formatted Transaction Code:', transactionCode);
+        console.log('📤 [PhotoResult] Transaction ID from state:', state.transactionId);
+        console.log('📤 [PhotoResult] Transaction ID type:', typeof state.transactionId);
+        console.log('📤 [PhotoResult] Transaction ID length:', state.transactionId?.length);
+        console.log('📤 [PhotoResult] Available IDs:', {
+          orderId: state.orderId,
+          referenceId: state.referenceId,
+          transactionId: state.transactionId,
         });
 
-        // Send print request with frame configuration
-        window.electron?.print?.printPhoto({
-          imageDataUrl: state.finalImage,
-          frameId: state.selectedFrame?.id || 'classic_2x6',
-          frameName: state.selectedFrame?.name || '2x6 Classic',
-          copies: state.quantity || 1,
+        // เตรียม photos และ videos
+        // ส่งเฉพาะ: 1) finalImage (รูปที่ print) 2) วิดีโอจาก compiledVideoUrl
+        const photos: string[] = [];
+        const videos: string[] = [];
+
+        // เพิ่ม finalImage (รูปที่ print) - ต้องเป็นรูปเดียวกับที่ print
+        if (state.finalImage) {
+          const convertedImage = await blobUrlToDataUrl(state.finalImage);
+          photos.push(convertedImage);
+          console.log('📤 [PhotoResult] Added finalImage (same as print image) to photos');
+        } else {
+          console.warn('⚠️ [PhotoResult] No finalImage available, cannot upload photo');
+        }
+
+        // เพิ่มวิดีโอจาก compiledVideoUrl
+        if (compiledVideoUrl) {
+          const convertedVideo = await blobUrlToDataUrl(compiledVideoUrl);
+          videos.push(convertedVideo);
+          console.log('📤 [PhotoResult] Added compiledVideoUrl to videos');
+        } else {
+          console.warn('⚠️ [PhotoResult] No compiledVideoUrl available, skipping video upload');
+        }
+
+        console.log('📤 [PhotoResult] Upload summary:', {
+          photosCount: photos.length,
+          videosCount: videos.length,
+          formatId: state.selectedFrame?.id,
         });
-      } catch {
+
+        // Upload files
+        // ใช้ transactionId จาก payment/create response
+        if (!state.transactionId) {
+          const errorMsg = '❌ [PhotoResult] No transactionId found in state! Cannot upload files.';
+          console.error(errorMsg);
+          throw new Error('transactionId is required. Please ensure payment was created successfully.');
+        }
+
+        console.log('📤 [PhotoResult] Calling uploadMachineFiles API...');
+        console.log('📤 [PhotoResult] Upload parameters:', {
+          transactionCode,
+          transactionId: state.transactionId,
+          photosCount: photos.length,
+          videosCount: videos.length,
+        });
+
+        const uploadResult = await window.electron.payment.uploadMachineFiles(
+          transactionCode,
+          photos,
+          videos,
+          state.transactionId,
+        );
+
+        console.log('📤 [PhotoResult] Upload result:', uploadResult);
+
+        if (uploadResult.success && uploadResult.files?.length > 0) {
+          console.log('✅ [PhotoResult] Upload successful! Files:', uploadResult.files);
+          
+          // หา photo URL แรก
+          const photoFile = uploadResult.files.find(
+            (f: { type: string; url: string }) => f.type === 'photo',
+          );
+          if (photoFile?.url) {
+            console.log('✅ [PhotoResult] Photo URL:', photoFile.url);
+            setUploadedFileUrl(photoFile.url);
+          }
+
+          // แสดง URLs ทั้งหมด
+          uploadResult.files.forEach((file: { type: string; url: string; order: number }) => {
+            console.log(`📁 [PhotoResult] ${file.type} (order: ${file.order}): ${file.url}`);
+          });
+        } else {
+          console.error('❌ [PhotoResult] Upload failed:', uploadResult);
+        }
+
+        setIsUploading(false);
+
+        // 2. ข้ามการพิมพ์ - สมมติว่ากำลังพิมพ์
+        console.log('🖨️ [PhotoResult] Skipping print (simulated)');
+        setTimeout(() => {
+          setPrintStatus('success');
+          console.log('✅ [PhotoResult] Print status set to success (simulated)');
+        }, 2000); // สมมติว่าพิมพ์เสร็จใน 2 วินาที
+
+        // // Print หลังจาก upload เสร็จ (ถูก comment ออกเพื่อเทส API)
+        // // Set up listener for print response
+        // window.electron?.print?.onPrintResponse((response) => {
+        //   if (response.success) {
+        //     setPrintStatus('success');
+        //   } else {
+        //     setPrintStatus('error');
+        //   }
+
+        //   // Clean up listener
+        //   window.electron?.print?.removePrintResponseListener();
+        // });
+
+        // // Send print request with frame configuration
+        // window.electron?.print?.printPhoto({
+        //   imageDataUrl: state.finalImage,
+        //   frameId: state.selectedFrame?.id || 'classic_2x6',
+        //   frameName: state.selectedFrame?.name || '2x6 Classic',
+        //   copies: state.quantity || 1,
+        // });
+      } catch (error) {
+        console.error('❌ [PhotoResult] Error in handleAutoPrint:', error);
+        setIsUploading(false);
         setPrintStatus('error');
+        // Reset flag ถ้าเกิด error เพื่อให้ลองใหม่ได้
+        hasUploaded.current = false;
       }
     };
 
-    if (state?.finalImage && printStatus === 'idle') {
-      handleAutoPrint();
+    // เรียก upload files ทันทีเมื่อ component mount (ไม่ต้องรอ printStatus === 'idle')
+    // แต่ต้องตรวจสอบว่า state มีข้อมูลครบถ้วน
+    if (state?.finalImage && state?.referenceId && state?.transactionId) {
+      if (!hasUploaded.current) {
+        console.log('🔄 [PhotoResult] Triggering handleAutoPrint');
+        handleAutoPrint();
+      } else {
+        console.log('⚠️ [PhotoResult] Already uploaded, skipping handleAutoPrint');
+      }
+    } else {
+      console.warn('⚠️ [PhotoResult] Missing required data:', {
+        hasFinalImage: !!state?.finalImage,
+        hasReferenceId: !!state?.referenceId,
+        hasTransactionId: !!state?.transactionId,
+      });
     }
   }, [
     state?.finalImage,
-    state?.selectedFrame?.id,
-    state?.selectedFrame?.name,
-    printStatus,
+    state?.referenceId,
+    state?.transactionId,
+    // ไม่ต้องใส่ dependencies อื่นๆ เพื่อป้องกันการเรียกซ้ำ
   ]);
 
   const handleFinish = () => {
@@ -702,7 +892,15 @@ export default function PhotoResult() {
   };
 
   const generateQRCode = () => {
-    // Generate QR code for the final image or download link
+    // Generate QR code from uploaded file URL
+    if (uploadedFileUrl) {
+      // สร้าง QR code จาก URL โดยใช้ QR code library หรือ API
+      // สำหรับตอนนี้ใช้ placeholder ที่มี URL
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(uploadedFileUrl)}`;
+      return qrCodeUrl;
+    }
+
+    // Fallback: Generate QR code for the final image or download link
     // For demo purposes, this would be a placeholder
     return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMTAgMTBoODB2ODBIMTBWMTB6IiBmaWxsPSJibGFjayIvPgo8cGF0aCBkPSJNMjAgMjBoNjB2NjBIMjBWMjB6IiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMzAgMzBoNDB2NDBIMzBWMzB6IiBmaWxsPSJibGFjayIvPgo8L3N2Zz4K';
   };
@@ -830,6 +1028,11 @@ export default function PhotoResult() {
               <div className="creating-video-message">
                 <div className="loading-spinner" />
                 <p>กำลังประมวลผล Filter...</p>
+              </div>
+            ) : isUploading ? (
+              <div className="creating-video-message">
+                <div className="loading-spinner" />
+                <p>กำลังอัปโหลดไฟล์...</p>
               </div>
             ) : (
               <div className="qr-display">

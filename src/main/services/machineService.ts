@@ -1,6 +1,8 @@
 import https from 'https';
 import http from 'http';
 import { URL } from 'url';
+import fs from 'fs';
+import path from 'path';
 
 // ==================== Type Definitions ====================
 
@@ -170,6 +172,27 @@ export interface PaymentStatusResponse {
   amount?: number;
   reference_id?: string;
   transactionStatus?: string;
+  error?: string;
+}
+
+export interface UploadFile {
+  type: 'photo' | 'video';
+  url: string;
+  order: number;
+}
+
+export interface PhotoSession {
+  id: string;
+  transactionId: string;
+  formatId?: string;
+  numPhotosSelected: number;
+}
+
+export interface UploadFilesResponse {
+  success: boolean;
+  message: string;
+  photoSession: PhotoSession;
+  files: UploadFile[];
   error?: string;
 }
 
@@ -579,16 +602,36 @@ export class MachineService {
         ...(couponCodeId && { couponCodeId }),
       };
       
+      console.log('💳 [MachineService] Request body:', JSON.stringify(requestBody, null, 2));
+      
       const response = await this.makeRequest<PaymentCreateResponse>(
         '/api/machines-public/payment/create',
         'POST',
         requestBody,
         machineId ? { machineId } : undefined,
       );
+      
+      console.log('💳 [MachineService] Payment create response:', JSON.stringify(response, null, 2));
+      console.log('💳 [MachineService] Payment response fields:', {
+        success: response.success,
+        qr_code: response.qr_code ? 'present' : 'missing',
+        reference_id: response.reference_id,
+        order_id: response.order_id,
+        transactionId: response.transactionId,
+        paymentDetailsId: response.paymentDetailsId,
+        numberPhoto: response.numberPhoto,
+        discountAmount: response.discountAmount,
+        totalAmount: response.totalAmount,
+        netAmount: response.netAmount,
+        couponCodeId: response.couponCodeId,
+        message: response.message,
+        error: response.error,
+      });
+      
       console.log(
         response.success
-          ? `✅ [MachineService] Payment created: ${response.reference_id}`
-          : `⚠️ [MachineService] Payment creation failed`,
+          ? `✅ [MachineService] Payment created: ${response.reference_id || response.order_id || response.transactionId || 'unknown'}`
+          : `⚠️ [MachineService] Payment creation failed: ${response.error || response.message || 'Unknown error'}`,
       );
       return response;
     } catch (error) {
@@ -621,6 +664,264 @@ export class MachineService {
       return response;
     } catch (error) {
       console.error('❌ [MachineService] Check payment status failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 10. POST /api/machines-public/upload-files
+   * Upload รูปภาพและวิดีโอ (ใช้ form-data)
+   */
+  async uploadFiles(
+    transactionCode: string,
+    photos: string[], // Array of base64 data URLs
+    videos: string[] = [], // Array of base64 data URLs
+    transactionId?: string, // transactionId จาก payment/create response
+    machineId?: string,
+  ): Promise<UploadFilesResponse> {
+    console.log('📤 [MachineService] Uploading files (form-data):', {
+      transactionCode,
+      transactionId,
+      photoCount: photos.length,
+      videoCount: videos.length,
+    });
+
+    try {
+      // Create multipart form data
+      const boundary = `----WebKitFormBoundary${Date.now()}`;
+      const formData: Buffer[] = [];
+
+      // Add transactionCode
+      console.log('📤 [MachineService] Adding form field: transactionCode =', transactionCode);
+      formData.push(
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="transactionCode"\r\n\r\n${transactionCode}\r\n`,
+        ),
+      );
+
+      // Add transactionId (จาก payment/create response)
+      if (transactionId) {
+        console.log('📤 [MachineService] Adding form field: transactionId =', transactionId);
+        console.log('📤 [MachineService] transactionId type:', typeof transactionId);
+        console.log('📤 [MachineService] transactionId length:', transactionId.length);
+        formData.push(
+          Buffer.from(
+            `--${boundary}\r\nContent-Disposition: form-data; name="transactionId"\r\n\r\n${transactionId}\r\n`,
+          ),
+        );
+      } else {
+        console.warn('⚠️ [MachineService] transactionId is missing!');
+      }
+
+      // Helper function to convert base64 data URL to buffer
+      const dataUrlToBuffer = (
+        dataUrl: string,
+      ): { buffer: Buffer; filename: string; mimeType: string } => {
+        if (!dataUrl.startsWith('data:')) {
+          throw new Error(`Invalid data URL format: ${dataUrl.substring(0, 50)}...`);
+        }
+
+        const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!matches) {
+          throw new Error(`Invalid data URL format: ${dataUrl.substring(0, 50)}...`);
+        }
+
+        const mimeType = matches[1];
+        const base64Data = matches[2];
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        // Determine file extension from mime type
+        let extension = 'bin';
+        if (mimeType.includes('image/jpeg') || mimeType.includes('image/jpg')) {
+          extension = 'jpg';
+        } else if (mimeType.includes('image/png')) {
+          extension = 'png';
+        } else if (mimeType.includes('image/gif')) {
+          extension = 'gif';
+        } else if (mimeType.includes('video/mp4')) {
+          extension = 'mp4';
+        } else if (mimeType.includes('video/webm')) {
+          extension = 'webm';
+        }
+
+        const filename = `file.${extension}`;
+
+        return { buffer, filename, mimeType };
+      };
+
+      // Add photos
+      for (let i = 0; i < photos.length; i++) {
+        const { buffer, filename, mimeType } = dataUrlToBuffer(photos[i]);
+        formData.push(
+          Buffer.from(
+            `--${boundary}\r\nContent-Disposition: form-data; name="photos"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
+          ),
+        );
+        formData.push(buffer);
+        formData.push(Buffer.from('\r\n'));
+      }
+
+      // Add videos
+      for (let i = 0; i < videos.length; i++) {
+        const { buffer, filename, mimeType } = dataUrlToBuffer(videos[i]);
+        formData.push(
+          Buffer.from(
+            `--${boundary}\r\nContent-Disposition: form-data; name="videos"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
+          ),
+        );
+        formData.push(buffer);
+        formData.push(Buffer.from('\r\n'));
+      }
+
+      // Close boundary
+      formData.push(Buffer.from(`--${boundary}--\r\n`));
+
+      const formBuffer = Buffer.concat(formData);
+
+      // Log form data fields ที่จะส่งไป
+      console.log('📤 [MachineService] ========== FORM DATA BODY ==========');
+      console.log('📤 [MachineService] Form data fields:', {
+        transactionCode: transactionCode,
+        transactionId: transactionId || 'NOT PROVIDED',
+        transactionIdType: typeof transactionId,
+        transactionIdLength: transactionId?.length || 0,
+        photosCount: photos.length,
+        videosCount: videos.length,
+        formBufferSize: formBuffer.length,
+        boundary: boundary,
+      });
+
+      // Log form data structure (text fields only)
+      // แสดงส่วนที่เป็น text fields (ไม่รวม binary data)
+      const textParts: string[] = [];
+      let currentPos = 0;
+      const bufferStr = formBuffer.toString('utf8', 0, Math.min(5000, formBuffer.length));
+      
+      // Extract text fields from form data
+      const transactionCodeMatch = bufferStr.match(/name="transactionCode"[^\r\n]*\r\n\r\n([^\r\n]+)/);
+      const transactionIdMatch = bufferStr.match(/name="transactionId"[^\r\n]*\r\n\r\n([^\r\n]+)/);
+      
+      console.log('📤 [MachineService] Extracted form fields:');
+      if (transactionCodeMatch) {
+        console.log('📤 [MachineService]   transactionCode:', transactionCodeMatch[1]);
+      }
+      if (transactionIdMatch) {
+        console.log('📤 [MachineService]   transactionId:', transactionIdMatch[1]);
+        console.log('📤 [MachineService]   transactionId (raw):', JSON.stringify(transactionIdMatch[1]));
+        console.log('📤 [MachineService]   transactionId (hex):', Buffer.from(transactionIdMatch[1]).toString('hex'));
+      } else {
+        console.warn('⚠️ [MachineService]   transactionId: NOT FOUND IN FORM DATA');
+      }
+      
+      // Log first part of form data structure
+      const formDataPreview = bufferStr.substring(0, Math.min(2000, bufferStr.length));
+      console.log('📤 [MachineService] Form data structure preview (first 2000 chars):');
+      console.log(formDataPreview);
+      console.log('📤 [MachineService] ============================================');
+
+      // Make request
+      return new Promise((resolve, reject) => {
+        try {
+          const url = new URL('/api/machines-public/upload-files', this.apiBaseUrl);
+
+          // Add query parameters
+          if (machineId) {
+            url.searchParams.append('machineId', machineId);
+          }
+          if (this.machinePort) {
+            url.searchParams.append('port', String(this.machinePort));
+          }
+
+          const options = {
+            hostname: url.hostname,
+            port: url.port || (url.protocol === 'https:' ? 443 : 80),
+            path: url.pathname + url.search,
+            method: 'POST',
+            headers: {
+              'Content-Type': `multipart/form-data; boundary=${boundary}`,
+              'Content-Length': formBuffer.length.toString(),
+              'X-Machine-Port': String(this.machinePort),
+              ...(this.machineId && { 'X-Machine-Id': this.machineId }),
+            },
+          };
+
+          const protocol = url.protocol === 'https:' ? https : http;
+          console.log('📤 [MachineService] Making HTTP request:', {
+            method: options.method,
+            url: url.toString(),
+            hostname: options.hostname,
+            port: options.port,
+            path: options.path,
+            contentLength: formBuffer.length,
+          });
+
+          const req = protocol.request(options, (res) => {
+            let data = '';
+
+            console.log('📤 [MachineService] Response received:', {
+              statusCode: res.statusCode,
+              headers: res.headers,
+            });
+
+            res.on('data', (chunk) => {
+              data += chunk;
+            });
+
+            res.on('end', () => {
+              try {
+                console.log('📤 [MachineService] Response data length:', data.length);
+                if (
+                  res.statusCode &&
+                  res.statusCode >= 200 &&
+                  res.statusCode < 300
+                ) {
+                  const jsonData = data ? JSON.parse(data) : {};
+                  console.log(
+                    `✅ [MachineService] Files uploaded successfully: ${jsonData.files?.length || 0} files`,
+                  );
+                  console.log('✅ [MachineService] Full response:', JSON.stringify(jsonData, null, 2));
+                  resolve(jsonData as UploadFilesResponse);
+                } else {
+                  let errorMessage = `HTTP ${res.statusCode}`;
+                  try {
+                    const errorData = JSON.parse(data);
+                    errorMessage =
+                      errorData.message || errorData.error || errorMessage;
+                  } catch {
+                    errorMessage = data || errorMessage;
+                  }
+                  console.error('❌ [MachineService] Upload failed:', errorMessage);
+                  reject(new Error(errorMessage));
+                }
+              } catch (parseError) {
+                console.error('❌ [MachineService] Parse error:', parseError, 'Data:', data);
+                reject(new Error(`Failed to parse response: ${data}`));
+              }
+            });
+          });
+
+          req.on('error', (error) => {
+            console.error('❌ [MachineService] Request error:', error);
+            reject(error);
+          });
+
+          req.setTimeout(this.timeout * 3, () => {
+            // Longer timeout for file uploads
+            console.error('❌ [MachineService] Upload timeout');
+            req.destroy();
+            reject(new Error('Upload timeout'));
+          });
+
+          console.log('📤 [MachineService] Writing form buffer to request...');
+          req.write(formBuffer);
+          req.end();
+          console.log('📤 [MachineService] Request sent');
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
+    } catch (error) {
+      console.error('❌ [MachineService] Upload files failed:', error);
       throw error;
     }
   }

@@ -444,8 +444,23 @@ ipcMain.on("print-photo", async (event, printConfig) => {
         return;
       }
 
-      const printCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${pngPath}" "${printerName}"`;
+      // สร้าง print command ตาม OS
+      let printCmd: string;
+      const platform = process.platform;
+
+      if (platform === 'win32') {
+        // Windows
+        printCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${pngPath}" "${printerName}"`;
+      } else if (platform === 'darwin') {
+        // macOS
+        printCmd = `lpr -P "${printerName}" "${pngPath}"`;
+      } else {
+        // Linux และ OS อื่นๆ
+        printCmd = `lp -d "${printerName}" "${pngPath}"`;
+      }
+
       console.log(`Executing print ${copyNumber}/${copies}:`, printCmd);
+      console.log(`Platform: ${platform}`);
 
       exec(printCmd, (err) => {
         if (err) {
@@ -573,3 +588,82 @@ ipcMain.handle('get-machine-prices', async () => {
     return { success: false, error: errorMessage, prices: [] };
   }
 });
+
+// Handler สำหรับ save temp video file
+ipcMain.handle('save-temp-video', async (event, arrayBuffer: ArrayBuffer) => {
+  try {
+    const tempDir = app.getPath('temp');
+    const fileName = `temp-video-${Date.now()}.webm`;
+    const filePath = path.join(tempDir, fileName);
+
+    // Convert ArrayBuffer to Buffer
+    const buffer = Buffer.from(arrayBuffer);
+    
+    // Write file
+    await fs.writeFile(filePath, buffer);
+    
+    console.log('✅ [Main] Temp video saved:', filePath);
+    
+    return {
+      success: true,
+      path: filePath,
+    };
+  } catch (error) {
+    console.error('❌ [Main] Error saving temp video:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+});
+
+// Handler สำหรับ upload files
+ipcMain.handle(
+  'upload-machine-files',
+  async (
+    event,
+    transactionCode: string,
+    photos: string[],
+    videos: string[] = [],
+    transactionId?: string,
+  ) => {
+    console.log('📤 [Main] upload-machine-files handler called', {
+      transactionCode,
+      transactionId,
+      photosCount: photos.length,
+      videosCount: videos.length,
+    });
+    try {
+      console.log('📤 [Main] Calling machineService.uploadFiles...');
+      const result = await machineService.uploadFiles(
+        transactionCode,
+        photos,
+        videos,
+        transactionId,
+      );
+      console.log('📤 [Main] Upload result:', {
+        success: result.success,
+        filesCount: result.files?.length || 0,
+        message: result.message,
+      });
+      return result;
+    } catch (error) {
+      console.error('❌ [Main] Error in upload-machine-files handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        message: errorMessage,
+        error: errorMessage,
+        photoSession: {
+          id: '',
+          transactionId: transactionId || transactionCode,
+          numPhotosSelected: photos.length,
+        },
+        files: [],
+      };
+    }
+  },
+);

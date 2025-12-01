@@ -76,22 +76,37 @@ export default function DiscountCoupon() {
         checkResult.couponCodeId,
       );
 
+      console.log('💳 [DiscountCoupon] Payment response:', {
+        success: paymentResult.success,
+        qr_code: paymentResult.qr_code ? 'present' : 'missing',
+        reference_id: paymentResult.reference_id,
+        order_id: paymentResult.order_id,
+        transactionId: paymentResult.transactionId,
+        paymentDetailsId: paymentResult.paymentDetailsId,
+        fullResponse: paymentResult,
+      });
+
       if (paymentResult.success && paymentResult.qr_code) {
         // Navigate to payment page with QR code and discount info
+        const navigationState = {
+          quantity: state.quantity,
+          totalPrice: paymentResult.netAmount || originalPrice,
+          originalPrice,
+          discountCode: code,
+          discountAmount: paymentResult.discountAmount || 0,
+          netAmount: paymentResult.netAmount || originalPrice,
+          qrcode: paymentResult.qr_code,
+          referenceId: paymentResult.reference_id,
+          transactionId: paymentResult.transactionId,
+          paymentDetailsId: paymentResult.paymentDetailsId,
+          orderId: paymentResult.order_id,
+          couponCodeId: paymentResult.couponCodeId,
+        };
+        
+        console.log('💳 [DiscountCoupon] Navigating with state:', navigationState);
+        
         navigate('/payment-qr', {
-          state: {
-            quantity: state.quantity,
-            totalPrice: paymentResult.netAmount || originalPrice,
-            originalPrice,
-            discountCode: code,
-            discountAmount: paymentResult.discountAmount || 0,
-            netAmount: paymentResult.netAmount || originalPrice,
-            qrcode: paymentResult.qr_code,
-            referenceId: paymentResult.reference_id,
-            transactionId: paymentResult.transactionId,
-            paymentDetailsId: paymentResult.paymentDetailsId,
-            couponCodeId: paymentResult.couponCodeId,
-          },
+          state: navigationState,
         });
       } else {
         setError(
