@@ -264,9 +264,9 @@ export class MachineService {
 
   constructor(options: MachineServiceOptions = {}) {
     // อ่าน API URL จาก environment variable หรือ options หรือ default
-    // this.apiBaseUrl =  'https://api-booth.boniolabs.com';
-    this.apiBaseUrl = 'http://localhost:3000';
-    this.machinePort = options.machinePort || Number(process.env.PORT) || 33333;
+    this.apiBaseUrl =  'https://api-booth.boniolabs.com';
+    // this.apiBaseUrl = 'http://localhost:3000';
+    this.machinePort = options.machinePort || Number(process.env.PORT) || 44444;
     this.machineId = options.machineId || process.env.MACHINE_ID;
     this.timeout = options.timeout || Number(process.env.API_TIMEOUT) || 10000;
 
@@ -601,16 +601,16 @@ export class MachineService {
         channel,
         ...(couponCodeId && { couponCodeId }),
       };
-      
+
       console.log('💳 [MachineService] Request body:', JSON.stringify(requestBody, null, 2));
-      
+
       const response = await this.makeRequest<PaymentCreateResponse>(
         '/api/machines-public/payment/create',
         'POST',
         requestBody,
         machineId ? { machineId } : undefined,
       );
-      
+
       console.log('💳 [MachineService] Payment create response:', JSON.stringify(response, null, 2));
       console.log('💳 [MachineService] Payment response fields:', {
         success: response.success,
@@ -627,7 +627,7 @@ export class MachineService {
         message: response.message,
         error: response.error,
       });
-      
+
       console.log(
         response.success
           ? `✅ [MachineService] Payment created: ${response.reference_id || response.order_id || response.transactionId || 'unknown'}`
@@ -796,11 +796,11 @@ export class MachineService {
       const textParts: string[] = [];
       let currentPos = 0;
       const bufferStr = formBuffer.toString('utf8', 0, Math.min(5000, formBuffer.length));
-      
+
       // Extract text fields from form data
       const transactionCodeMatch = bufferStr.match(/name="transactionCode"[^\r\n]*\r\n\r\n([^\r\n]+)/);
       const transactionIdMatch = bufferStr.match(/name="transactionId"[^\r\n]*\r\n\r\n([^\r\n]+)/);
-      
+
       console.log('📤 [MachineService] Extracted form fields:');
       if (transactionCodeMatch) {
         console.log('📤 [MachineService]   transactionCode:', transactionCodeMatch[1]);
@@ -812,7 +812,7 @@ export class MachineService {
       } else {
         console.warn('⚠️ [MachineService]   transactionId: NOT FOUND IN FORM DATA');
       }
-      
+
       // Log first part of form data structure
       const formDataPreview = bufferStr.substring(0, Math.min(2000, bufferStr.length));
       console.log('📤 [MachineService] Form data structure preview (first 2000 chars):');

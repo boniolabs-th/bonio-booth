@@ -767,11 +767,22 @@ export default function PhotoResult() {
         }
 
         // เพิ่มวิดีโอจาก compiledVideoUrl (วิดีโอที่ผ่าน LUT แล้ว)
+        console.log('📤 [PhotoResult] Checking compiledVideoUrl:', {
+          hasCompiledVideoUrl: !!compiledVideoUrl,
+          compiledVideoUrlType: typeof compiledVideoUrl,
+          compiledVideoUrlPreview: compiledVideoUrl?.substring(0, 50),
+          hasSelectedCaptures: !!state?.selectedCaptures,
+          selectedCapturesLength: state?.selectedCaptures?.length || 0,
+        });
+        
         if (compiledVideoUrl) {
           try {
+            console.log('📤 [PhotoResult] Converting compiledVideoUrl to data URL...');
             const convertedVideo = await blobUrlToDataUrl(compiledVideoUrl);
             videos.push(convertedVideo);
-            console.log('📤 [PhotoResult] Added compiledVideoUrl (LUT processed video) to videos');
+            console.log('✅ [PhotoResult] Added compiledVideoUrl (LUT processed video) to videos');
+            console.log('📤 [PhotoResult] Converted video data URL length:', convertedVideo.length);
+            console.log('📤 [PhotoResult] Converted video data URL preview:', convertedVideo.substring(0, 100));
           } catch (error) {
             console.error('❌ [PhotoResult] Failed to convert compiledVideoUrl to data URL:', error);
             console.warn('⚠️ [PhotoResult] Skipping video upload due to conversion error');
@@ -779,6 +790,12 @@ export default function PhotoResult() {
         } else {
           console.warn('⚠️ [PhotoResult] No compiledVideoUrl available, skipping video upload');
           console.warn('⚠️ [PhotoResult] Video may still be processing. Consider waiting for video to be ready.');
+          console.warn('⚠️ [PhotoResult] Debug info:', {
+            isCreatingVideo,
+            isApplyingLUT,
+            hasSelectedCaptures: !!state?.selectedCaptures,
+            selectedCapturesLength: state?.selectedCaptures?.length || 0,
+          });
         }
 
         console.log('📤 [PhotoResult] Upload summary:', {
@@ -872,28 +889,67 @@ export default function PhotoResult() {
 
     // เรียก upload files ทันทีเมื่อ component mount (ไม่ต้องรอ printStatus === 'idle')
     // แต่ต้องตรวจสอบว่า state มีข้อมูลครบถ้วน
-    // รอให้วิดีโอพร้อมก่อน (compiledVideoUrl) หรือ timeout หลังจาก 10 วินาที
+    // รอให้วิดีโอพร้อมก่อน (compiledVideoUrl) หรือ timeout หลังจาก 15 วินาที
     if (state?.finalImage && state?.referenceId && state?.transactionId) {
       if (!hasUploaded.current) {
-        // รอให้วิดีโอพร้อมก่อน upload (ถ้ามีการสร้างวิดีโอ)
-        const waitForVideo = async () => {
-          const maxWaitTime = 10000; // 10 วินาที
-          const checkInterval = 500; // ตรวจสอบทุก 0.5 วินาที
-          const startTime = Date.now();
+        // ตรวจสอบว่ามีวิดีโอให้รอหรือไม่
+        const hasCaptures = state?.selectedCaptures && state.selectedCaptures.length > 0;
+        const shouldWaitForVideo = hasCaptures && !compiledVideoUrl;
+        
+        if (shouldWaitForVideo) {
+          // รอให้วิดีโอพร้อมก่อน upload (ถ้ามีการสร้างวิดีโอ)
+          const waitForVideo = async () => {
+            const maxWaitTime = 15000; // 15 วินาที (เพิ่มจาก 10)
+            const checkInterval = 500; // ตรวจสอบทุก 0.5 วินาที
+            const startTime = Date.now();
 
-          while (Date.now() - startTime < maxWaitTime) {
-            if (compiledVideoUrl || !state?.selectedCaptures || state.selectedCaptures.length === 0) {
-              // วิดีโอพร้อมแล้ว หรือไม่มีวิดีโอให้รอ
-              break;
+            console.log('⏳ [PhotoResult] Waiting for video to be ready...', {
+              hasCompiledVideoUrl: !!compiledVideoUrl,
+              hasCaptures,
+              maxWaitTime,
+            });
+
+            while (Date.now() - startTime < maxWaitTime) {
+              // ถ้ามี compiledVideoUrl แล้ว
+              if (compiledVideoUrl) {
+                const elapsed = Date.now() - startTime;
+                console.log(`✅ [PhotoResult] Video ready after ${elapsed}ms`);
+                break;
+              }
+              
+              // Log progress ทุก 2 วินาที
+              const elapsed = Date.now() - startTime;
+              if (elapsed % 2000 < checkInterval) {
+                console.log(`⏳ [PhotoResult] Still waiting for video... (${Math.round(elapsed / 1000)}s / ${maxWaitTime / 1000}s)`, {
+                  isCreatingVideo,
+                  isApplyingLUT,
+                });
+              }
+              
+              await new Promise((resolve) => setTimeout(resolve, checkInterval));
             }
-            await new Promise((resolve) => setTimeout(resolve, checkInterval));
-          }
 
-          console.log('🔄 [PhotoResult] Triggering handleAutoPrint');
+            const finalElapsed = Date.now() - startTime;
+            if (!compiledVideoUrl) {
+              console.warn(`⚠️ [PhotoResult] Video not ready after ${finalElapsed}ms timeout, proceeding without video`);
+            }
+
+            console.log('🔄 [PhotoResult] Triggering handleAutoPrint after waiting', {
+              hasCompiledVideoUrl: !!compiledVideoUrl,
+              elapsed: finalElapsed,
+            });
+            handleAutoPrint();
+          };
+
+          waitForVideo();
+        } else {
+          // วิดีโอพร้อมแล้ว หรือไม่มีวิดีโอให้รอ - upload ทันที
+          console.log('🔄 [PhotoResult] Video ready (or not needed), triggering handleAutoPrint immediately', {
+            hasCompiledVideoUrl: !!compiledVideoUrl,
+            hasCaptures,
+          });
           handleAutoPrint();
-        };
-
-        waitForVideo();
+        }
       } else {
         console.log('⚠️ [PhotoResult] Already uploaded, skipping handleAutoPrint');
       }

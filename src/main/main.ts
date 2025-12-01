@@ -41,29 +41,29 @@ class AppUpdater {
 async function initializeApp() {
   try {
     console.log('🚀 Initializing app...');
-    
+
     // เรียก API init เพื่อดึงข้อมูลทั้งหมดในครั้งเดียว
     const initResponse = await machineService.init();
-    
+
     console.log('✅ App initialized:', {
       machine: initResponse.machine.machineName,
       theme: initResponse.theme.name,
       frames: initResponse.frames.length,
       paperLevel: initResponse.machine.paperLevel,
     });
-    
+
     // Send theme to renderer process
     if (mainWindow && initResponse.theme.background) {
       mainWindow.webContents.send('theme-loaded', initResponse.theme);
       console.log('✅ Theme sent to renderer');
     }
-    
+
     // เก็บข้อมูลไว้ใน cache
     cachedInitData = {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
     };
-    
+
     // Send machine data (including prices) to renderer process
     if (mainWindow && initResponse.machine) {
       mainWindow.webContents.send('machine-init', {
@@ -72,7 +72,7 @@ async function initializeApp() {
       });
       console.log('✅ Machine data sent to renderer', initResponse.machine.prices);
     }
-    
+
     return {
       machine: initResponse.machine,
       theme: initResponse.theme,
@@ -146,13 +146,13 @@ async function generateImageWithPadding(base64: string, paddingPercent = 0): Pro
         align-items: center;
       }
       img {
-        max-width: calc(100% - ${1}%);
-        max-height: calc(100% - ${1}%);
+        max-width: calc(100% + ${14}%);
+        max-height: calc(100% + ${14}%);
         width: auto;
         height: auto;
         object-fit: contain;
         display: block;
-        // transform: rotate(90deg);
+        transform: rotate(90deg);
       }
     </style>
   </head>
@@ -289,7 +289,7 @@ const createWindow = async () => {
     } else {
       mainWindow.show();
     }
-    
+
     // เรียก initializeApp หลังจาก window พร้อมแล้ว
     try {
       await initializeApp();
@@ -598,12 +598,12 @@ ipcMain.handle('save-temp-video', async (event, arrayBuffer: ArrayBuffer) => {
 
     // Convert ArrayBuffer to Buffer
     const buffer = Buffer.from(arrayBuffer);
-    
+
     // Write file
     await fs.writeFile(filePath, buffer);
-    
+
     console.log('✅ [Main] Temp video saved:', filePath);
-    
+
     return {
       success: true,
       path: filePath,
