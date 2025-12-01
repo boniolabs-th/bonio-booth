@@ -775,7 +775,7 @@ export default function PhotoResult() {
           hasSelectedCaptures: !!state?.selectedCaptures,
           selectedCapturesLength: state?.selectedCaptures?.length || 0,
         });
-        
+
         if (compiledVideoUrl) {
           try {
             console.log('📤 [PhotoResult] Converting compiledVideoUrl to data URL...');
@@ -832,7 +832,7 @@ export default function PhotoResult() {
 
         if (uploadResult.success && uploadResult.files?.length > 0) {
           console.log('✅ [PhotoResult] Upload successful! Files:', uploadResult.files);
-          
+
           // หา photo URL แรก
           const photoFile = uploadResult.files.find(
             (f: { type: string; url: string }) => f.type === 'photo',
@@ -904,7 +904,7 @@ export default function PhotoResult() {
         // ตรวจสอบว่ามีวิดีโอให้รอหรือไม่
         const hasCaptures = state?.selectedCaptures && state.selectedCaptures.length > 0;
         const shouldWaitForVideo = hasCaptures && !compiledVideoUrl;
-        
+
         if (shouldWaitForVideo) {
           // รอให้วิดีโอพร้อมก่อน upload (ถ้ามีการสร้างวิดีโอ)
           const waitForVideo = async () => {
@@ -925,7 +925,7 @@ export default function PhotoResult() {
                 console.log(`✅ [PhotoResult] Video ready after ${elapsed}ms`);
                 break;
               }
-              
+
               // Log progress ทุก 2 วินาที
               const elapsed = Date.now() - startTime;
               if (elapsed % 2000 < checkInterval) {
@@ -934,7 +934,7 @@ export default function PhotoResult() {
                   isApplyingLUT,
                 });
               }
-              
+
               await new Promise((resolve) => setTimeout(resolve, checkInterval));
             }
 
@@ -982,12 +982,14 @@ export default function PhotoResult() {
   };
 
   const generateQRCode = () => {
-    // ใช้ qrcodeStorageUrl จาก API response ถ้ามี
+    // ใช้ qrcodeStorageUrl จาก API response เป็น data สำหรับสร้าง QR code
     if (qrcodeStorageUrl) {
-      console.log('📱 [PhotoResult] Using QR code from API:', qrcodeStorageUrl);
-      return qrcodeStorageUrl;
+      console.log('📱 [PhotoResult] Generating QR code from qrcodeStorageUrl:', qrcodeStorageUrl);
+      // แปลง URL link เป็น QR code image โดยใช้ QR code generator API
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrcodeStorageUrl)}`;
+      return qrCodeUrl;
     }
-    
+
     // Fallback: Generate QR code from uploaded file URL (ถ้าไม่มี qrcodeStorageUrl)
     if (uploadedFileUrl) {
       console.log('📱 [PhotoResult] Generating QR code from uploadedFileUrl (fallback)');
@@ -997,6 +999,7 @@ export default function PhotoResult() {
 
     // Fallback: Generate QR code for the final image or download link
     // For demo purposes, this would be a placeholder
+    console.warn('⚠️ [PhotoResult] No QR code URL available, using placeholder');
     return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMTAgMTBoODB2ODBIMTBWMTB6IiBmaWxsPSJibGFjayIvPgo8cGF0aCBkPSJNMjAgMjBoNjB2NjBIMjBWMjB6IiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMzAgMzBoNDB2NDBIMzBWMzB6IiBmaWxsPSJibGFjayIvPgo8L3N2Zz4K';
   };
 
