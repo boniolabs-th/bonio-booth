@@ -606,18 +606,78 @@ ipcMain.handle('save-temp-video', async (event, arrayBuffer: ArrayBuffer) => {
 
     // Convert ArrayBuffer to Buffer
     const buffer = Buffer.from(arrayBuffer);
-
+    
     // Write file
     await fs.writeFile(filePath, buffer);
-
+    
     console.log('✅ [Main] Temp video saved:', filePath);
-
+    
     return {
       success: true,
       path: filePath,
     };
   } catch (error) {
     console.error('❌ [Main] Error saving temp video:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+});
+
+// Handler สำหรับ apply LUT to video
+ipcMain.handle('apply-lut-to-video', async (event, videoPath: string, lutFileName: string) => {
+  try {
+    console.log('🎨 [Main] Applying LUT to video:', { videoPath, lutFileName });
+    const outputPath = await applyLutToVideo(videoPath, lutFileName);
+    return {
+      success: true,
+      path: outputPath,
+    };
+  } catch (error) {
+    console.error('❌ [Main] Error applying LUT to video:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+});
+
+// Handler สำหรับ create boomerang with LUT
+ipcMain.handle('create-boomerang-with-lut', async (event, videoPath: string, lutFileName: string) => {
+  try {
+    console.log('🎨 [Main] Creating boomerang with LUT:', { videoPath, lutFileName });
+    const outputPath = await createBoomerangWithLut(videoPath, lutFileName);
+    return {
+      success: true,
+      path: outputPath,
+    };
+  } catch (error) {
+    console.error('❌ [Main] Error creating boomerang with LUT:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+});
+
+// Handler สำหรับ read video file
+ipcMain.handle('read-video-file', async (event, filePath: string) => {
+  try {
+    console.log('📖 [Main] Reading video file:', filePath);
+    const buffer = await fs.readFile(filePath);
+    return {
+      success: true,
+      data: buffer.buffer, // Return ArrayBuffer
+    };
+  } catch (error) {
+    console.error('❌ [Main] Error reading video file:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return {

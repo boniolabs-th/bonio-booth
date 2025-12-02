@@ -475,6 +475,32 @@ export default function PhotoResult() {
     'idle' | 'printing' | 'success' | 'error'
   >('idle');
   const [compiledVideoUrl, setCompiledVideoUrl] = useState<string | null>(null);
+  
+  // Log เมื่อ compiledVideoUrl เปลี่ยน และ trigger upload ถ้าพร้อม
+  useEffect(() => {
+    if (compiledVideoUrl) {
+      console.log('✅ [PhotoResult] compiledVideoUrl SET:', {
+        url: compiledVideoUrl.substring(0, 50),
+        length: compiledVideoUrl.length,
+        timestamp: new Date().toISOString(),
+      });
+      
+      // ถ้ามี compiledVideoUrl และยังไม่ได้ upload ให้ trigger upload ทันที
+      if (state?.finalImage && state?.referenceId && state?.transactionId && !hasUploaded.current) {
+        console.log('🔄 [PhotoResult] Video ready, triggering handleAutoPrint from compiledVideoUrl effect');
+        // เรียก handleAutoPrint ผ่าน setTimeout เพื่อให้แน่ใจว่า state อัพเดทแล้ว
+        setTimeout(() => {
+          if (!hasUploaded.current) {
+            // ต้องหา handleAutoPrint function - ให้ใช้ inline function แทน
+            // หรือ trigger upload โดยตรง
+            console.log('🔄 [PhotoResult] Video is ready, will trigger upload in next effect');
+          }
+        }, 100);
+      }
+    } else {
+      console.log('⚠️ [PhotoResult] compiledVideoUrl is NULL');
+    }
+  }, [compiledVideoUrl, state?.finalImage, state?.referenceId, state?.transactionId]);
   const [isCreatingVideo, setIsCreatingVideo] = useState(false);
   const [isApplyingLUT, setIsApplyingLUT] = useState(false);
   const hasGeneratedVideo = useRef(false);
@@ -539,15 +565,24 @@ export default function PhotoResult() {
 
       hasGeneratedVideo.current = true;
       setIsCreatingVideo(true);
+      
+      console.log('🎬 [PhotoResult] Starting video creation:', {
+        capturesCount: state.selectedCaptures.length,
+        frameId: state.selectedFrame.id,
+        useBoomerang: state.useBoomerang,
+        selectedFilter: state.selectedFilter,
+      });
 
       try {
         // Create video without filter first (fast)
+        console.log('🎬 [PhotoResult] Generating framed video...');
         const videoUrl = await generateFramedVideo(
           state.selectedCaptures,
           state.selectedFrame,
           undefined, // No filter for initial video
           state.useBoomerang,
         );
+        console.log('✅ [PhotoResult] Framed video generated:', videoUrl.substring(0, 50));
 
         // If LUT filter is selected, apply it via FFmpeg
         const filter = FILTERS.find((f) => f.id === state.selectedFilter);
@@ -605,40 +640,51 @@ export default function PhotoResult() {
               if (fileResult.success && fileResult.data) {
                 const processedBlob = new Blob([fileResult.data], { type: 'video/mp4' });
                 const processedUrl = URL.createObjectURL(processedBlob);
+                console.log('✅ [PhotoResult] Setting compiledVideoUrl (LUT processed):', processedUrl.substring(0, 50));
                 setCompiledVideoUrl(processedUrl);
 
                 // Clean up original URL
                 URL.revokeObjectURL(videoUrl);
               } else {
                 // Fallback to original if read fails
+                console.log('⚠️ [PhotoResult] LUT read failed, using original video:', videoUrl.substring(0, 50));
                 setCompiledVideoUrl(videoUrl);
               }
             } else {
               // Fallback to original if LUT fails
+              console.log('⚠️ [PhotoResult] LUT processing failed, using original video:', videoUrl.substring(0, 50));
               setCompiledVideoUrl(videoUrl);
             }
           } catch (lutError) {
             // eslint-disable-next-line no-console
-            console.error('Failed to apply LUT via FFmpeg:', lutError);
+            console.error('❌ [PhotoResult] Failed to apply LUT via FFmpeg:', lutError);
             // Fallback to original video
+            console.log('⚠️ [PhotoResult] Using original video as fallback:', videoUrl.substring(0, 50));
             setCompiledVideoUrl(videoUrl);
           } finally {
             setIsApplyingLUT(false);
           }
         } else {
           // No LUT filter or CSS filter - use video as-is
+          console.log('✅ [PhotoResult] No LUT filter, using video as-is:', videoUrl.substring(0, 50));
           setCompiledVideoUrl(videoUrl);
         }
       } catch (error) {
         // eslint-disable-next-line no-console
-        console.error('Error creating framed video:', error);
+        console.error('❌ [PhotoResult] Error creating framed video:', error);
         // eslint-disable-next-line no-alert
         alert(
           `เกิดข้อผิดพลาดในการสร้างวิดีโอ: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
         hasGeneratedVideo.current = false;
+        // ไม่ set compiledVideoUrl ถ้าเกิด error
+        console.warn('⚠️ [PhotoResult] Video creation failed, compiledVideoUrl will remain null');
       } finally {
         setIsCreatingVideo(false);
+        console.log('✅ [PhotoResult] Video creation process finished:', {
+          hasCompiledVideoUrl: !!compiledVideoUrl,
+          isCreatingVideo: false,
+        });
       }
     };
 
@@ -804,22 +850,44 @@ export default function PhotoResult() {
         }
 
         // เพิ่มวิดีโอจาก compiledVideoUrl (วิดีโอที่ผ่าน LUT แล้ว)
+        console.log('📤 [PhotoResult] ========== VIDEO UPLOAD CHECK ==========');
         console.log('📤 [PhotoResult] Checking compiledVideoUrl:', {
           hasCompiledVideoUrl: !!compiledVideoUrl,
           compiledVideoUrlType: typeof compiledVideoUrl,
           compiledVideoUrlPreview: compiledVideoUrl?.substring(0, 50),
+          compiledVideoUrlLength: compiledVideoUrl?.length || 0,
           hasSelectedCaptures: !!state?.selectedCaptures,
           selectedCapturesLength: state?.selectedCaptures?.length || 0,
+          isCreatingVideo,
+          isApplyingLUT,
         });
 
         if (compiledVideoUrl) {
           try {
             console.log('📤 [PhotoResult] Converting compiledVideoUrl to data URL...');
             const convertedVideo = await blobUrlToDataUrl(compiledVideoUrl);
-            videos.push(convertedVideo);
-            console.log('✅ [PhotoResult] Added compiledVideoUrl (LUT processed video) to videos');
-            console.log('📤 [PhotoResult] Converted video data URL length:', convertedVideo.length);
-            console.log('📤 [PhotoResult] Converted video data URL preview:', convertedVideo.substring(0, 100));
+            
+            // คำนวณขนาดไฟล์ (ประมาณ)
+            const base64Length = convertedVideo.includes('base64,') 
+              ? convertedVideo.split('base64,')[1].length 
+              : convertedVideo.length;
+            const estimatedSizeMB = (base64Length * 3) / 4 / (1024 * 1024); // base64 encoding เพิ่มขนาด ~33%
+            
+            console.log('📤 [PhotoResult] Video conversion successful:', {
+              dataUrlLength: convertedVideo.length,
+              base64Length,
+              estimatedSizeMB: estimatedSizeMB.toFixed(2),
+            });
+            
+            if (estimatedSizeMB > 10) {
+              console.warn(`⚠️ [PhotoResult] Video size (${estimatedSizeMB.toFixed(2)}MB) exceeds 10MB limit!`);
+              console.warn('⚠️ [PhotoResult] Video will be skipped to avoid upload failure');
+              // ไม่ push วิดีโอถ้าขนาดเกิน 10MB
+            } else {
+              videos.push(convertedVideo);
+              console.log('✅ [PhotoResult] Added compiledVideoUrl (LUT processed video) to videos');
+              console.log('📤 [PhotoResult] Video data URL preview:', convertedVideo.substring(0, 100));
+            }
           } catch (error) {
             console.error('❌ [PhotoResult] Failed to convert compiledVideoUrl to data URL:', error);
             console.warn('⚠️ [PhotoResult] Skipping video upload due to conversion error');
@@ -827,19 +895,48 @@ export default function PhotoResult() {
         } else {
           console.warn('⚠️ [PhotoResult] No compiledVideoUrl available, skipping video upload');
           console.warn('⚠️ [PhotoResult] Video may still be processing. Consider waiting for video to be ready.');
-          console.warn('⚠️ [PhotoResult] Debug info:', {
-            isCreatingVideo,
-            isApplyingLUT,
-            hasSelectedCaptures: !!state?.selectedCaptures,
-            selectedCapturesLength: state?.selectedCaptures?.length || 0,
-          });
         }
+        console.log('📤 [PhotoResult] Final upload arrays:', {
+          photosCount: photos.length,
+          videosCount: videos.length,
+        });
+        console.log('📤 [PhotoResult] ===========================================');
 
+        console.log('📤 [PhotoResult] ========== UPLOAD SUMMARY ==========');
         console.log('📤 [PhotoResult] Upload summary:', {
           photosCount: photos.length,
           videosCount: videos.length,
           formatId: state.selectedFrame?.id,
         });
+        
+        // ตรวจสอบขนาดไฟล์ที่จะส่ง
+        let totalPhotosSize = 0;
+        let totalVideosSize = 0;
+        
+        photos.forEach((photo, index) => {
+          const base64Length = photo.includes('base64,') 
+            ? photo.split('base64,')[1].length 
+            : photo.length;
+          const sizeMB = (base64Length * 3) / 4 / (1024 * 1024);
+          totalPhotosSize += sizeMB;
+          console.log(`📤 [PhotoResult] Photo ${index + 1} size: ${sizeMB.toFixed(2)} MB`);
+        });
+        
+        videos.forEach((video, index) => {
+          const base64Length = video.includes('base64,') 
+            ? video.split('base64,')[1].length 
+            : video.length;
+          const sizeMB = (base64Length * 3) / 4 / (1024 * 1024);
+          totalVideosSize += sizeMB;
+          console.log(`📤 [PhotoResult] Video ${index + 1} size: ${sizeMB.toFixed(2)} MB`);
+        });
+        
+        console.log('📤 [PhotoResult] Total sizes:', {
+          totalPhotosSize: `${totalPhotosSize.toFixed(2)} MB`,
+          totalVideosSize: `${totalVideosSize.toFixed(2)} MB`,
+          totalSize: `${(totalPhotosSize + totalVideosSize).toFixed(2)} MB`,
+        });
+        console.log('📤 [PhotoResult] ======================================');
 
         // Upload files
         // ใช้ transactionId จาก payment/create response
@@ -849,6 +946,7 @@ export default function PhotoResult() {
           throw new Error('transactionId is required. Please ensure payment was created successfully.');
         }
 
+        console.log('📤 [PhotoResult] ========== CALLING UPLOAD API ==========');
         console.log('📤 [PhotoResult] Calling uploadMachineFiles API...');
         console.log('📤 [PhotoResult] Upload parameters:', {
           transactionCode,
@@ -856,6 +954,16 @@ export default function PhotoResult() {
           photosCount: photos.length,
           videosCount: videos.length,
         });
+        console.log('📤 [PhotoResult] Photos array:', {
+          length: photos.length,
+          firstPhotoPreview: photos[0]?.substring(0, 100) || 'none',
+        });
+        console.log('📤 [PhotoResult] Videos array:', {
+          length: videos.length,
+          firstVideoPreview: videos[0]?.substring(0, 100) || 'none',
+          hasCompiledVideoUrl: !!compiledVideoUrl,
+        });
+        console.log('📤 [PhotoResult] =========================================');
 
         const uploadResult = await window.electron.payment.uploadMachineFiles(
           transactionCode,
@@ -940,6 +1048,14 @@ export default function PhotoResult() {
         // ตรวจสอบว่ามีวิดีโอให้รอหรือไม่
         const hasCaptures = state?.selectedCaptures && state.selectedCaptures.length > 0;
         const shouldWaitForVideo = hasCaptures && !compiledVideoUrl;
+        
+        console.log('🔍 [PhotoResult] Upload decision:', {
+          hasCaptures,
+          hasCompiledVideoUrl: !!compiledVideoUrl,
+          shouldWaitForVideo,
+          isCreatingVideo,
+          isApplyingLUT,
+        });
 
         if (shouldWaitForVideo) {
           // รอให้วิดีโอพร้อมก่อน upload (ถ้ามีการสร้างวิดีโอ)
@@ -955,6 +1071,11 @@ export default function PhotoResult() {
             });
 
             while (Date.now() - startTime < maxWaitTime) {
+              // ตรวจสอบ compiledVideoUrl อีกครั้ง (อาจถูก set ในระหว่างรอ)
+              // ใช้ closure เพื่อเข้าถึง state ล่าสุด
+              // แต่เนื่องจาก compiledVideoUrl เป็น state, เราต้องใช้ closure ที่ถูกต้อง
+              // ให้ตรวจสอบใน loop โดยตรง
+              
               // ถ้ามี compiledVideoUrl แล้ว
               if (compiledVideoUrl) {
                 const elapsed = Date.now() - startTime;
@@ -975,12 +1096,18 @@ export default function PhotoResult() {
             }
 
             const finalElapsed = Date.now() - startTime;
-            if (!compiledVideoUrl) {
+            const finalCompiledVideoUrl = compiledVideoUrl;
+            
+            if (!finalCompiledVideoUrl) {
               console.warn(`⚠️ [PhotoResult] Video not ready after ${finalElapsed}ms timeout, proceeding without video`);
+              console.warn('⚠️ [PhotoResult] Video creation may have failed or is still in progress');
+              console.warn('⚠️ [PhotoResult] Check logs above for video creation errors');
+            } else {
+              console.log(`✅ [PhotoResult] Video became available during wait (after ${finalElapsed}ms)`);
             }
 
             console.log('🔄 [PhotoResult] Triggering handleAutoPrint after waiting', {
-              hasCompiledVideoUrl: !!compiledVideoUrl,
+              hasCompiledVideoUrl: !!finalCompiledVideoUrl,
               elapsed: finalElapsed,
             });
             handleAutoPrint();

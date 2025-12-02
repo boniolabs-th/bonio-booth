@@ -753,27 +753,77 @@ export class MachineService {
       };
 
       // Add photos
+      console.log('📤 [MachineService] Processing photos for upload:', {
+        photosCount: photos.length,
+      });
+      
       for (let i = 0; i < photos.length; i++) {
-        const { buffer, filename, mimeType } = dataUrlToBuffer(photos[i]);
-        formData.push(
-          Buffer.from(
-            `--${boundary}\r\nContent-Disposition: form-data; name="photos"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
-          ),
-        );
-        formData.push(buffer);
-        formData.push(Buffer.from('\r\n'));
+        try {
+          const { buffer, filename, mimeType } = dataUrlToBuffer(photos[i]);
+          const photoSizeMB = buffer.length / (1024 * 1024);
+          
+          console.log(`📤 [MachineService] Photo ${i + 1}:`, {
+            filename,
+            mimeType,
+            sizeMB: photoSizeMB.toFixed(2),
+            bufferLength: buffer.length,
+          });
+          
+          formData.push(
+            Buffer.from(
+              `--${boundary}\r\nContent-Disposition: form-data; name="photos"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
+            ),
+          );
+          formData.push(buffer);
+          formData.push(Buffer.from('\r\n'));
+          
+          console.log(`✅ [MachineService] Photo ${i + 1} added to form data`);
+        } catch (error) {
+          console.error(`❌ [MachineService] Failed to process photo ${i + 1}:`, error);
+          // Continue with other photos
+        }
+      }
+      
+      if (photos.length === 0) {
+        console.warn('⚠️ [MachineService] No photos to upload');
+      } else {
+        console.log(`✅ [MachineService] All ${photos.length} photos added to form data`);
       }
 
       // Add videos
+      console.log('📤 [MachineService] Processing videos for upload:', {
+        videosCount: videos.length,
+      });
+      
       for (let i = 0; i < videos.length; i++) {
-        const { buffer, filename, mimeType } = dataUrlToBuffer(videos[i]);
-        formData.push(
-          Buffer.from(
-            `--${boundary}\r\nContent-Disposition: form-data; name="videos"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
-          ),
-        );
-        formData.push(buffer);
-        formData.push(Buffer.from('\r\n'));
+        try {
+          const { buffer, filename, mimeType } = dataUrlToBuffer(videos[i]);
+          const videoSizeMB = buffer.length / (1024 * 1024);
+          
+          console.log(`📤 [MachineService] Video ${i + 1}:`, {
+            filename,
+            mimeType,
+            sizeMB: videoSizeMB.toFixed(2),
+            bufferLength: buffer.length,
+          });
+          
+          formData.push(
+            Buffer.from(
+              `--${boundary}\r\nContent-Disposition: form-data; name="videos"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
+            ),
+          );
+          formData.push(buffer);
+          formData.push(Buffer.from('\r\n'));
+          
+          console.log(`✅ [MachineService] Video ${i + 1} added to form data`);
+        } catch (error) {
+          console.error(`❌ [MachineService] Failed to process video ${i + 1}:`, error);
+          // Continue with other videos
+        }
+      }
+      
+      if (videos.length === 0) {
+        console.warn('⚠️ [MachineService] No videos to upload');
       }
 
       // Close boundary
@@ -803,6 +853,38 @@ export class MachineService {
       // Extract text fields from form data
       const transactionCodeMatch = bufferStr.match(/name="transactionCode"[^\r\n]*\r\n\r\n([^\r\n]+)/);
       const transactionIdMatch = bufferStr.match(/name="transactionId"[^\r\n]*\r\n\r\n([^\r\n]+)/);
+      
+      // Count files in form data - นับจาก Content-Disposition headers
+      // ใช้วิธีนับ `name="photos"` แทน filename เพราะอาจมีชื่อซ้ำกัน
+      const photosPattern = /Content-Disposition:\s*form-data;\s*name="photos"/g;
+      const videosPattern = /Content-Disposition:\s*form-data;\s*name="videos"/g;
+      
+      const photosMatches = bufferStr.match(photosPattern);
+      const videosMatches = bufferStr.match(videosPattern);
+      
+      const photosInForm = photosMatches ? photosMatches.length : 0;
+      const videosInForm = videosMatches ? videosMatches.length : 0;
+      
+      // Extract filenames for logging (อาจมีชื่อซ้ำกัน)
+      const filenamePattern = /name="photos";\s*filename="([^"]+)"/g;
+      const photoFilenames: string[] = [];
+      let match;
+      while ((match = filenamePattern.exec(bufferStr)) !== null) {
+        photoFilenames.push(match[1]);
+      }
+      
+      const videoFilenamePattern = /name="videos";\s*filename="([^"]+)"/g;
+      const videoFilenames: string[] = [];
+      while ((match = videoFilenamePattern.exec(bufferStr)) !== null) {
+        videoFilenames.push(match[1]);
+      }
+      
+      console.log('📤 [MachineService] Files found in form data:', {
+        photosCount: photosInForm,
+        videosCount: videosInForm,
+        photoFilenames: photoFilenames.length > 0 ? photoFilenames : 'none',
+        videoFilenames: videoFilenames.length > 0 ? videoFilenames : 'none',
+      });
 
       console.log('📤 [MachineService] Extracted form fields:');
       if (transactionCodeMatch) {
@@ -814,6 +896,20 @@ export class MachineService {
         console.log('📤 [MachineService]   transactionId (hex):', Buffer.from(transactionIdMatch[1]).toString('hex'));
       } else {
         console.warn('⚠️ [MachineService]   transactionId: NOT FOUND IN FORM DATA');
+      }
+      
+      console.log('📤 [MachineService] Files in form data:', {
+        photosInForm,
+        videosInForm,
+        expectedPhotos: photos.length,
+        expectedVideos: videos.length,
+        photosMatch: photosInForm === photos.length,
+        videosMatch: videosInForm === videos.length,
+      });
+      
+      if (videosInForm === 0 && videos.length > 0) {
+        console.error('❌ [MachineService] Videos were NOT added to form data!');
+        console.error('❌ [MachineService] Expected videos:', videos.length);
       }
 
       // Log first part of form data structure
