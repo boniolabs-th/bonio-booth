@@ -14,6 +14,7 @@ async function example1_BasicUsage() {
     const themeResponse = await machineService.getTheme();
     console.log('Theme:', themeResponse.theme.name);
     console.log('Background:', themeResponse.theme.background);
+    console.log('BackgroundSecond:', themeResponse.theme.backgroundSecond);
     
     // เรียก API verify
     const verifyResponse = await machineService.verify();
