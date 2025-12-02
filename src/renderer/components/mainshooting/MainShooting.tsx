@@ -203,7 +203,7 @@ export default function MainShooting() {
           const newCaptures: Capture[] = [];
 
           // eslint-disable-next-line no-plusplus
-          for (let i = 0; i < 6; i += 1) {
+          for (let i = 0; i < requiredCaptures; i += 1) {
             // Start recording video
             startRecording();
 
@@ -260,9 +260,14 @@ export default function MainShooting() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Navigate when we have all 6 captures
+  // คำนวณจำนวน capture ที่ต้องการ = จำนวน slots + 2
+  const requiredCaptures = state.selectedFrame?.slots
+    ? state.selectedFrame.slots.length + 2
+    : 6; // fallback ถ้าไม่มี frame
+
+  // Navigate when we have all required captures
   useEffect(() => {
-    if (captures.length === 6) {
+    if (captures.length === requiredCaptures) {
       setTimeout(() => {
         navigate('/photo-decorate', {
           state: {
@@ -273,7 +278,7 @@ export default function MainShooting() {
         });
       }, 1000);
     }
-  }, [captures.length, navigate, state, captures]);
+  }, [captures.length, requiredCaptures, navigate, state, captures]);
 
   return (
     <div className="main-shooting-container">
@@ -335,7 +340,7 @@ export default function MainShooting() {
       {/* Photo Thumbnails Grid */}
       <div className="thumbnails-container">
         <div className="thumbnails-grid">
-          {[0, 1, 2, 3, 4, 5].map((index) => (
+          {Array.from({ length: requiredCaptures }, (_, index) => (
             <div key={index} className="thumbnail-slot">
               {captures[index] ? (
                 <img
