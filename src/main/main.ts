@@ -90,7 +90,11 @@ async function initializeApp() {
  * สร้างรูปภาพที่มี padding รอบๆ เพื่อป้องกันการล้นและขาดขอบ
  * ใช้ BrowserWindow เพื่อ render รูปภาพให้เหมาะสมกับเครื่องปริ้น
  */
-async function generateImageWithPadding(base64: string, paddingPercent = 0): Promise<Buffer> {
+async function generateImageWithPadding(
+  base64: string,
+  paddingPercent = 0,
+  orientation: 'portrait' | 'landscape' = 'landscape'
+): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     let htmlPath: string | null = null;
     let resolved = false;
@@ -146,13 +150,13 @@ async function generateImageWithPadding(base64: string, paddingPercent = 0): Pro
         align-items: center;
       }
       img {
-        max-width: calc(100% + ${14}%);
-        max-height: calc(100% + ${14}%);
+        max-width: calc(100% ${orientation === 'portrait' ? '+' : '-'} ${orientation === 'portrait' ? '14' : '1'}%);
+        max-height: calc(100% ${orientation === 'portrait' ? '+' : '-'} ${orientation === 'portrait' ? '14' : '1'}%);
         width: auto;
         height: auto;
         object-fit: contain;
         display: block;
-        transform: rotate(90deg);
+        ${orientation === 'portrait' ? 'transform: rotate(90deg);' : ''}
       }
     </style>
   </head>
@@ -347,6 +351,7 @@ interface PrintConfig {
   frameId: string;
   frameName: string;
   copies?: number;
+  orientation?: 'portrait' | 'landscape';
 }
 
 let isPrinting = false;
@@ -403,8 +408,9 @@ ipcMain.on("print-photo", async (event, printConfig) => {
 
   try {
     // ใช้ generateImageWithPadding เพื่อเพิ่ม padding รอบรูปภาพ (5% ทั้ง 4 ด้าน)
-    console.log("Generating image with padding...");
-    const paddedImageBuffer = await generateImageWithPadding(printConfig.imageDataUrl, 5);
+    const orientation = printConfig.orientation || 'landscape';
+    console.log("Generating image with padding...", { orientation });
+    const paddedImageBuffer = await generateImageWithPadding(printConfig.imageDataUrl, 5, orientation);
     console.log("Padded image generated, size:", paddedImageBuffer.length, "bytes");
 
     const tempDir = app.getPath("temp");

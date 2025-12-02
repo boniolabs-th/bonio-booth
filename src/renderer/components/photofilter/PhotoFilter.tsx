@@ -285,6 +285,7 @@ export default function PhotoFilter() {
                 frameId: state.selectedFrame?.id || 'classic_2x6',
                 frameName: state.selectedFrame?.name || '2x6 Classic',
                 copies: state.quantity || 1,
+                orientation: state.selectedFrame?.orientation || 'landscape',
               });
               console.log('Print request sent - waiting for response...');
             } catch (printError) {
