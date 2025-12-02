@@ -908,17 +908,64 @@ export class MachineService {
             reject(error);
           });
 
-          req.setTimeout(this.timeout * 3, () => {
-            // Longer timeout for file uploads
-            console.error('❌ [MachineService] Upload timeout');
-            req.destroy();
-            reject(new Error('Upload timeout'));
+          // เพิ่ม timeout สำหรับ upload ไฟล์ใหญ่ (120 วินาที หรือ 2 นาที)
+          // คำนวณตามขนาดไฟล์: 1MB = 10 วินาที, ขั้นต่ำ 60 วินาที
+          const fileSizeMB = formBuffer.length / (1024 * 1024);
+          const calculatedTimeout = Math.max(60000, fileSizeMB * 10000); // ขั้นต่ำ 60 วินาที
+          const uploadTimeout = Math.min(calculatedTimeout, 300000); // สูงสุด 5 นาที
+          
+          console.log('📤 [MachineService] Upload timeout settings:', {
+            fileSizeMB: fileSizeMB.toFixed(2),
+            calculatedTimeout: `${(calculatedTimeout / 1000).toFixed(0)}s`,
+            uploadTimeout: `${(uploadTimeout / 1000).toFixed(0)}s`,
           });
 
+          req.setTimeout(uploadTimeout, () => {
+            // Longer timeout for file uploads
+            console.error(`❌ [MachineService] Upload timeout after ${uploadTimeout / 1000}s`);
+            req.destroy();
+            reject(new Error(`Upload timeout after ${uploadTimeout / 1000} seconds`));
+          });
+
+          // Write form buffer in chunks เพื่อแสดง progress และป้องกัน memory issues
+          const chunkSize = 1024 * 1024; // 1MB per chunk
+          let bytesWritten = 0;
+          let currentChunk = 0;
+
           console.log('📤 [MachineService] Writing form buffer to request...');
-          req.write(formBuffer);
-          req.end();
-          console.log('📤 [MachineService] Request sent');
+          console.log('📤 [MachineService] Total size:', `${(formBuffer.length / (1024 * 1024)).toFixed(2)} MB`);
+          console.log('📤 [MachineService] Chunk size:', `${(chunkSize / (1024 * 1024)).toFixed(2)} MB`);
+
+          const writeChunk = () => {
+            if (bytesWritten >= formBuffer.length) {
+              req.end();
+              console.log('✅ [MachineService] All data sent successfully');
+              return;
+            }
+
+            const chunk = formBuffer.slice(bytesWritten, bytesWritten + chunkSize);
+            const canContinue = req.write(chunk);
+
+            bytesWritten += chunk.length;
+            currentChunk += 1;
+
+            const progress = ((bytesWritten / formBuffer.length) * 100).toFixed(1);
+            if (currentChunk % 5 === 0 || bytesWritten === formBuffer.length) {
+              console.log(`📤 [MachineService] Upload progress: ${progress}% (${(bytesWritten / (1024 * 1024)).toFixed(2)} MB / ${(formBuffer.length / (1024 * 1024)).toFixed(2)} MB)`);
+            }
+
+            if (!canContinue) {
+              // Buffer is full, wait for drain event
+              req.once('drain', writeChunk);
+            } else {
+              // Continue writing
+              setImmediate(writeChunk);
+            }
+          };
+
+          // Start writing chunks
+          writeChunk();
+          console.log('📤 [MachineService] Request sent (chunked)');
         } catch (error) {
           reject(error instanceof Error ? error : new Error(String(error)));
         }
