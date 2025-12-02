@@ -38,7 +38,7 @@ export const FRAME_CONFIGS: FrameConfig[] = [
     image: classic2x3,
     width: 2400,
     height: 3600,
-    orientation: 'landscape' as const,
+    orientation: 'portrait' as const,
     slots: [
       { id: 'classic_slot_1', x: 35, y: 54, width: 1130, height: 1083, radius: 100 }, // Top left photo slot
       { id: 'classic_slot_2', x: 1237, y: 55, width: 1130, height: 1083, radius: 100 }, // Top right photo slot
@@ -80,7 +80,7 @@ export const FRAME_CONFIGS: FrameConfig[] = [
     image: blvd2x3,
     width: 2400,
     height: 3600,
-    orientation: 'landscape' as const,
+    orientation: 'portrait' as const,
     slots: [
       { id: 'blvd_2x3_slot_1', x: 100, y: 100, width: 1000, height: 1000, radius: 50 },
       { id: 'blvd_2x3_slot_2', x: 1300, y: 100, width: 1000, height: 1000, radius: 50 },
@@ -96,7 +96,7 @@ export const FRAME_CONFIGS: FrameConfig[] = [
     image: burningcity2x2,
     width: 2400,
     height: 3600,
-    orientation: 'landscape' as const,
+    orientation: 'portrait' as const,
     slots: [
       { id: 'burningcity_2x2_slot_1', x: 62, y: 83, width: 1127, height: 1547, radius: 0 },
       { id: 'burningcity_2x2_slot_2', x: 1212, y: 76, width: 1127, height: 1547, radius: 0 },
@@ -126,7 +126,7 @@ export const FRAME_CONFIGS: FrameConfig[] = [
     image: modern2x3,
     width: 1200, // 6 inches × 300 DPI
     height: 1800, // 8 inches × 300 DPI
-    orientation: 'landscape' as const,
+    orientation: 'portrait' as const,
     slots: [
       { id: 'modern_slot_1', x: 150, y: 150, width: 450, height: 300, radius: 15 }, // Top left
       { id: 'modern_slot_2', x: 675, y: 150, width: 450, height: 300, radius: 15 }, // Top middle

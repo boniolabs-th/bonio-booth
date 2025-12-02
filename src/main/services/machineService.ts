@@ -266,8 +266,8 @@ export class MachineService {
 
   constructor(options: MachineServiceOptions = {}) {
     // อ่าน API URL จาก environment variable หรือ options หรือ default
-    // this.apiBaseUrl =  'https://api-booth.boniolabs.com';
-    this.apiBaseUrl = 'http://localhost:3000';
+    this.apiBaseUrl =  'https://api-booth.boniolabs.com';
+    // this.apiBaseUrl = 'http://localhost:3000';
     this.machinePort = options.machinePort || Number(process.env.PORT) || 33333;
     // this.machineId = options.machineId || process.env.MACHINE_ID ;
     this.machineId = '69247c6b02dd728488995e27';
@@ -756,19 +756,19 @@ export class MachineService {
       console.log('📤 [MachineService] Processing photos for upload:', {
         photosCount: photos.length,
       });
-      
+
       for (let i = 0; i < photos.length; i++) {
         try {
           const { buffer, filename, mimeType } = dataUrlToBuffer(photos[i]);
           const photoSizeMB = buffer.length / (1024 * 1024);
-          
+
           console.log(`📤 [MachineService] Photo ${i + 1}:`, {
             filename,
             mimeType,
             sizeMB: photoSizeMB.toFixed(2),
             bufferLength: buffer.length,
           });
-          
+
           formData.push(
             Buffer.from(
               `--${boundary}\r\nContent-Disposition: form-data; name="photos"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
@@ -776,14 +776,14 @@ export class MachineService {
           );
           formData.push(buffer);
           formData.push(Buffer.from('\r\n'));
-          
+
           console.log(`✅ [MachineService] Photo ${i + 1} added to form data`);
         } catch (error) {
           console.error(`❌ [MachineService] Failed to process photo ${i + 1}:`, error);
           // Continue with other photos
         }
       }
-      
+
       if (photos.length === 0) {
         console.warn('⚠️ [MachineService] No photos to upload');
       } else {
@@ -794,19 +794,19 @@ export class MachineService {
       console.log('📤 [MachineService] Processing videos for upload:', {
         videosCount: videos.length,
       });
-      
+
       for (let i = 0; i < videos.length; i++) {
         try {
           const { buffer, filename, mimeType } = dataUrlToBuffer(videos[i]);
           const videoSizeMB = buffer.length / (1024 * 1024);
-          
+
           console.log(`📤 [MachineService] Video ${i + 1}:`, {
             filename,
             mimeType,
             sizeMB: videoSizeMB.toFixed(2),
             bufferLength: buffer.length,
           });
-          
+
           formData.push(
             Buffer.from(
               `--${boundary}\r\nContent-Disposition: form-data; name="videos"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
@@ -814,14 +814,14 @@ export class MachineService {
           );
           formData.push(buffer);
           formData.push(Buffer.from('\r\n'));
-          
+
           console.log(`✅ [MachineService] Video ${i + 1} added to form data`);
         } catch (error) {
           console.error(`❌ [MachineService] Failed to process video ${i + 1}:`, error);
           // Continue with other videos
         }
       }
-      
+
       if (videos.length === 0) {
         console.warn('⚠️ [MachineService] No videos to upload');
       }
@@ -853,18 +853,18 @@ export class MachineService {
       // Extract text fields from form data
       const transactionCodeMatch = bufferStr.match(/name="transactionCode"[^\r\n]*\r\n\r\n([^\r\n]+)/);
       const transactionIdMatch = bufferStr.match(/name="transactionId"[^\r\n]*\r\n\r\n([^\r\n]+)/);
-      
+
       // Count files in form data - นับจาก Content-Disposition headers
       // ใช้วิธีนับ `name="photos"` แทน filename เพราะอาจมีชื่อซ้ำกัน
       const photosPattern = /Content-Disposition:\s*form-data;\s*name="photos"/g;
       const videosPattern = /Content-Disposition:\s*form-data;\s*name="videos"/g;
-      
+
       const photosMatches = bufferStr.match(photosPattern);
       const videosMatches = bufferStr.match(videosPattern);
-      
+
       const photosInForm = photosMatches ? photosMatches.length : 0;
       const videosInForm = videosMatches ? videosMatches.length : 0;
-      
+
       // Extract filenames for logging (อาจมีชื่อซ้ำกัน)
       const filenamePattern = /name="photos";\s*filename="([^"]+)"/g;
       const photoFilenames: string[] = [];
@@ -872,13 +872,13 @@ export class MachineService {
       while ((match = filenamePattern.exec(bufferStr)) !== null) {
         photoFilenames.push(match[1]);
       }
-      
+
       const videoFilenamePattern = /name="videos";\s*filename="([^"]+)"/g;
       const videoFilenames: string[] = [];
       while ((match = videoFilenamePattern.exec(bufferStr)) !== null) {
         videoFilenames.push(match[1]);
       }
-      
+
       console.log('📤 [MachineService] Files found in form data:', {
         photosCount: photosInForm,
         videosCount: videosInForm,
@@ -897,7 +897,7 @@ export class MachineService {
       } else {
         console.warn('⚠️ [MachineService]   transactionId: NOT FOUND IN FORM DATA');
       }
-      
+
       console.log('📤 [MachineService] Files in form data:', {
         photosInForm,
         videosInForm,
@@ -906,7 +906,7 @@ export class MachineService {
         photosMatch: photosInForm === photos.length,
         videosMatch: videosInForm === videos.length,
       });
-      
+
       if (videosInForm === 0 && videos.length > 0) {
         console.error('❌ [MachineService] Videos were NOT added to form data!');
         console.error('❌ [MachineService] Expected videos:', videos.length);
@@ -1009,7 +1009,7 @@ export class MachineService {
           const fileSizeMB = formBuffer.length / (1024 * 1024);
           const calculatedTimeout = Math.max(60000, fileSizeMB * 10000); // ขั้นต่ำ 60 วินาที
           const uploadTimeout = Math.min(calculatedTimeout, 300000); // สูงสุด 5 นาที
-          
+
           console.log('📤 [MachineService] Upload timeout settings:', {
             fileSizeMB: fileSizeMB.toFixed(2),
             calculatedTimeout: `${(calculatedTimeout / 1000).toFixed(0)}s`,

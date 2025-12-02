@@ -475,7 +475,7 @@ export default function PhotoResult() {
     'idle' | 'printing' | 'success' | 'error'
   >('idle');
   const [compiledVideoUrl, setCompiledVideoUrl] = useState<string | null>(null);
-  
+
   // Log เมื่อ compiledVideoUrl เปลี่ยน และ trigger upload ถ้าพร้อม
   useEffect(() => {
     if (compiledVideoUrl) {
@@ -484,23 +484,28 @@ export default function PhotoResult() {
         length: compiledVideoUrl.length,
         timestamp: new Date().toISOString(),
       });
-      
-      // ถ้ามี compiledVideoUrl และยังไม่ได้ upload ให้ trigger upload ทันที
-      if (state?.finalImage && state?.referenceId && state?.transactionId && !hasUploaded.current) {
-        console.log('🔄 [PhotoResult] Video ready, triggering handleAutoPrint from compiledVideoUrl effect');
-        // เรียก handleAutoPrint ผ่าน setTimeout เพื่อให้แน่ใจว่า state อัพเดทแล้ว
-        setTimeout(() => {
-          if (!hasUploaded.current) {
-            // ต้องหา handleAutoPrint function - ให้ใช้ inline function แทน
-            // หรือ trigger upload โดยตรง
-            console.log('🔄 [PhotoResult] Video is ready, will trigger upload in next effect');
-          }
-        }, 100);
+
+      // ถ้ามี compiledVideoUrl และยังไม่ได้ upload และมีข้อมูลครบ ให้ trigger upload
+      if (
+        state?.finalImage &&
+        state?.referenceId &&
+        state?.transactionId &&
+        !hasUploaded.current
+      ) {
+        console.log(
+          '🔄 [PhotoResult] Video ready, will trigger upload in main useEffect',
+        );
+        // ไม่ต้อง trigger ที่นี่ เพราะ main useEffect จะ trigger อัตโนมัติเมื่อ compiledVideoUrl เปลี่ยน
       }
     } else {
       console.log('⚠️ [PhotoResult] compiledVideoUrl is NULL');
     }
-  }, [compiledVideoUrl, state?.finalImage, state?.referenceId, state?.transactionId]);
+  }, [
+    compiledVideoUrl,
+    state?.finalImage,
+    state?.referenceId,
+    state?.transactionId,
+  ]);
   const [isCreatingVideo, setIsCreatingVideo] = useState(false);
   const [isApplyingLUT, setIsApplyingLUT] = useState(false);
   const hasGeneratedVideo = useRef(false);
@@ -565,7 +570,7 @@ export default function PhotoResult() {
 
       hasGeneratedVideo.current = true;
       setIsCreatingVideo(true);
-      
+
       console.log('🎬 [PhotoResult] Starting video creation:', {
         capturesCount: state.selectedCaptures.length,
         frameId: state.selectedFrame.id,
@@ -582,7 +587,10 @@ export default function PhotoResult() {
           undefined, // No filter for initial video
           state.useBoomerang,
         );
-        console.log('✅ [PhotoResult] Framed video generated:', videoUrl.substring(0, 50));
+        console.log(
+          '✅ [PhotoResult] Framed video generated:',
+          videoUrl.substring(0, 50),
+        );
 
         // If LUT filter is selected, apply it via FFmpeg
         const filter = FILTERS.find((f) => f.id === state.selectedFilter);
@@ -606,7 +614,8 @@ export default function PhotoResult() {
             const arrayBuffer = await blob.arrayBuffer();
 
             // Save to temp file via IPC (send ArrayBuffer directly)
-            const saveResult = await window.electron.video.saveTempVideo(arrayBuffer);
+            const saveResult =
+              await window.electron.video.saveTempVideo(arrayBuffer);
 
             if (!saveResult.success || !saveResult.path) {
               throw new Error('Failed to save temp video file');
@@ -635,38 +644,60 @@ export default function PhotoResult() {
 
             if (lutResult.success && lutResult.path) {
               // Read the processed file via IPC
-              const fileResult = await window.electron.video.readVideoFile(lutResult.path);
+              const fileResult = await window.electron.video.readVideoFile(
+                lutResult.path,
+              );
 
               if (fileResult.success && fileResult.data) {
-                const processedBlob = new Blob([fileResult.data], { type: 'video/mp4' });
+                const processedBlob = new Blob([fileResult.data], {
+                  type: 'video/mp4',
+                });
                 const processedUrl = URL.createObjectURL(processedBlob);
-                console.log('✅ [PhotoResult] Setting compiledVideoUrl (LUT processed):', processedUrl.substring(0, 50));
+                console.log(
+                  '✅ [PhotoResult] Setting compiledVideoUrl (LUT processed):',
+                  processedUrl.substring(0, 50),
+                );
                 setCompiledVideoUrl(processedUrl);
 
                 // Clean up original URL
                 URL.revokeObjectURL(videoUrl);
               } else {
                 // Fallback to original if read fails
-                console.log('⚠️ [PhotoResult] LUT read failed, using original video:', videoUrl.substring(0, 50));
+                console.log(
+                  '⚠️ [PhotoResult] LUT read failed, using original video:',
+                  videoUrl.substring(0, 50),
+                );
                 setCompiledVideoUrl(videoUrl);
               }
             } else {
               // Fallback to original if LUT fails
-              console.log('⚠️ [PhotoResult] LUT processing failed, using original video:', videoUrl.substring(0, 50));
+              console.log(
+                '⚠️ [PhotoResult] LUT processing failed, using original video:',
+                videoUrl.substring(0, 50),
+              );
               setCompiledVideoUrl(videoUrl);
             }
           } catch (lutError) {
             // eslint-disable-next-line no-console
-            console.error('❌ [PhotoResult] Failed to apply LUT via FFmpeg:', lutError);
+            console.error(
+              '❌ [PhotoResult] Failed to apply LUT via FFmpeg:',
+              lutError,
+            );
             // Fallback to original video
-            console.log('⚠️ [PhotoResult] Using original video as fallback:', videoUrl.substring(0, 50));
+            console.log(
+              '⚠️ [PhotoResult] Using original video as fallback:',
+              videoUrl.substring(0, 50),
+            );
             setCompiledVideoUrl(videoUrl);
           } finally {
             setIsApplyingLUT(false);
           }
         } else {
           // No LUT filter or CSS filter - use video as-is
-          console.log('✅ [PhotoResult] No LUT filter, using video as-is:', videoUrl.substring(0, 50));
+          console.log(
+            '✅ [PhotoResult] No LUT filter, using video as-is:',
+            videoUrl.substring(0, 50),
+          );
           setCompiledVideoUrl(videoUrl);
         }
       } catch (error) {
@@ -678,7 +709,9 @@ export default function PhotoResult() {
         );
         hasGeneratedVideo.current = false;
         // ไม่ set compiledVideoUrl ถ้าเกิด error
-        console.warn('⚠️ [PhotoResult] Video creation failed, compiledVideoUrl will remain null');
+        console.warn(
+          '⚠️ [PhotoResult] Video creation failed, compiledVideoUrl will remain null',
+        );
       } finally {
         setIsCreatingVideo(false);
         console.log('✅ [PhotoResult] Video creation process finished:', {
@@ -689,7 +722,12 @@ export default function PhotoResult() {
     };
 
     createFramedVideo();
-  }, [state?.selectedCaptures, state?.selectedFrame, state?.selectedFilter, state?.useBoomerang]);
+  }, [
+    state?.selectedCaptures,
+    state?.selectedFrame,
+    state?.selectedFilter,
+    state?.useBoomerang,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -707,7 +745,10 @@ export default function PhotoResult() {
       alreadyPrinted: (state as any)?.alreadyPrinted,
       printStatus,
     });
-    console.log('🔄 [PhotoResult] Full state object:', JSON.stringify(state, null, 2));
+    console.log(
+      '🔄 [PhotoResult] Full state object:',
+      JSON.stringify(state, null, 2),
+    );
 
     const handleAutoPrint = async () => {
       // ป้องกันการ upload ซ้ำ
@@ -718,7 +759,9 @@ export default function PhotoResult() {
 
       // ถ้าเพิ่งพิมพ์จาก PhotoFilter แล้ว ก็ยังต้อง upload files
       if ((state as any)?.alreadyPrinted) {
-        console.log('⚠️ [PhotoResult] Already printed from PhotoFilter, but will still upload files');
+        console.log(
+          '⚠️ [PhotoResult] Already printed from PhotoFilter, but will still upload files',
+        );
         // ไม่ return ต่อ ให้ upload files ต่อไป
       }
 
@@ -770,15 +813,21 @@ export default function PhotoResult() {
         // ใช้ mchOrderNo (reference_id) จาก payment response เป็น transaction code
         // Format เป็น TXN-{mchOrderNo} ตามที่ API ต้องการ
         if (!state.referenceId) {
-          const errorMsg = '❌ [PhotoResult] No mchOrderNo (referenceId) found in state! Cannot upload files.';
+          const errorMsg =
+            '❌ [PhotoResult] No mchOrderNo (referenceId) found in state! Cannot upload files.';
           console.error(errorMsg);
-          console.error('📤 [PhotoResult] Full state:', JSON.stringify(state, null, 2));
+          console.error(
+            '📤 [PhotoResult] Full state:',
+            JSON.stringify(state, null, 2),
+          );
           console.error('📤 [PhotoResult] Available IDs:', {
             orderId: state.orderId,
             referenceId: state.referenceId,
             transactionId: state.transactionId,
           });
-          throw new Error('mchOrderNo (referenceId) is required. Please ensure payment was created successfully.');
+          throw new Error(
+            'mchOrderNo (referenceId) is required. Please ensure payment was created successfully.',
+          );
         }
 
         // Format transaction code เป็น TXN-{mchOrderNo}
@@ -789,10 +838,22 @@ export default function PhotoResult() {
 
         console.log('📤 [PhotoResult] Starting upload files...');
         console.log('📤 [PhotoResult] mchOrderNo (referenceId):', mchOrderNo);
-        console.log('📤 [PhotoResult] Formatted Transaction Code:', transactionCode);
-        console.log('📤 [PhotoResult] Transaction ID from state:', state.transactionId);
-        console.log('📤 [PhotoResult] Transaction ID type:', typeof state.transactionId);
-        console.log('📤 [PhotoResult] Transaction ID length:', state.transactionId?.length);
+        console.log(
+          '📤 [PhotoResult] Formatted Transaction Code:',
+          transactionCode,
+        );
+        console.log(
+          '📤 [PhotoResult] Transaction ID from state:',
+          state.transactionId,
+        );
+        console.log(
+          '📤 [PhotoResult] Transaction ID type:',
+          typeof state.transactionId,
+        );
+        console.log(
+          '📤 [PhotoResult] Transaction ID length:',
+          state.transactionId?.length,
+        );
         console.log('📤 [PhotoResult] Available IDs:', {
           orderId: state.orderId,
           referenceId: state.referenceId,
@@ -808,9 +869,13 @@ export default function PhotoResult() {
         if (state.finalImage) {
           const convertedImage = await blobUrlToDataUrl(state.finalImage);
           photos.push(convertedImage);
-          console.log('📤 [PhotoResult] Added finalImage (order 1 - print image) to photos');
+          console.log(
+            '📤 [PhotoResult] Added finalImage (order 1 - print image) to photos',
+          );
         } else {
-          console.warn('⚠️ [PhotoResult] No finalImage available, cannot upload photo');
+          console.warn(
+            '⚠️ [PhotoResult] No finalImage available, cannot upload photo',
+          );
         }
 
         // เพิ่มรูปอื่นๆ จาก selectedCaptures ที่ไม่ได้เป็น finalImage (order 2, 3, ...)
@@ -825,32 +890,41 @@ export default function PhotoResult() {
             const capture = state.selectedCaptures[i];
             if (capture.photo) {
               const convertedPhoto = await blobUrlToDataUrl(capture.photo);
-              
+
               // เปรียบเทียบว่าเป็นรูปเดียวกันหรือไม่ (เปรียบเทียบ base64 data)
               // ใช้ substring เพื่อเปรียบเทียบส่วน base64 data เท่านั้น (ข้าม data:image/...;base64,)
-              const photoBase64 = convertedPhoto.includes('base64,') 
-                ? convertedPhoto.split('base64,')[1] 
+              const photoBase64 = convertedPhoto.includes('base64,')
+                ? convertedPhoto.split('base64,')[1]
                 : convertedPhoto;
-              const finalBase64 = finalImageDataUrl && finalImageDataUrl.includes('base64,')
-                ? finalImageDataUrl.split('base64,')[1]
-                : finalImageDataUrl;
-              
+              const finalBase64 =
+                finalImageDataUrl && finalImageDataUrl.includes('base64,')
+                  ? finalImageDataUrl.split('base64,')[1]
+                  : finalImageDataUrl;
+
               // เปรียบเทียบ 1000 ตัวอักษรแรก (เพื่อความเร็ว)
-              const isSameAsFinalImage = finalBase64 && 
-                photoBase64.substring(0, 1000) === finalBase64.substring(0, 1000);
-              
+              const isSameAsFinalImage =
+                finalBase64 &&
+                photoBase64.substring(0, 1000) ===
+                  finalBase64.substring(0, 1000);
+
               if (!isSameAsFinalImage) {
                 photos.push(convertedPhoto);
-                console.log(`📤 [PhotoResult] Added capture[${i}].photo (order ${photos.length}) to photos`);
+                console.log(
+                  `📤 [PhotoResult] Added capture[${i}].photo (order ${photos.length}) to photos`,
+                );
               } else {
-                console.log(`📤 [PhotoResult] Skipped capture[${i}].photo (same as finalImage - order 1)`);
+                console.log(
+                  `📤 [PhotoResult] Skipped capture[${i}].photo (same as finalImage - order 1)`,
+                );
               }
             }
           }
         }
 
         // เพิ่มวิดีโอจาก compiledVideoUrl (วิดีโอที่ผ่าน LUT แล้ว)
-        console.log('📤 [PhotoResult] ========== VIDEO UPLOAD CHECK ==========');
+        console.log(
+          '📤 [PhotoResult] ========== VIDEO UPLOAD CHECK ==========',
+        );
         console.log('📤 [PhotoResult] Checking compiledVideoUrl:', {
           hasCompiledVideoUrl: !!compiledVideoUrl,
           compiledVideoUrlType: typeof compiledVideoUrl,
@@ -864,43 +938,65 @@ export default function PhotoResult() {
 
         if (compiledVideoUrl) {
           try {
-            console.log('📤 [PhotoResult] Converting compiledVideoUrl to data URL...');
+            console.log(
+              '📤 [PhotoResult] Converting compiledVideoUrl to data URL...',
+            );
             const convertedVideo = await blobUrlToDataUrl(compiledVideoUrl);
-            
+
             // คำนวณขนาดไฟล์ (ประมาณ)
-            const base64Length = convertedVideo.includes('base64,') 
-              ? convertedVideo.split('base64,')[1].length 
+            const base64Length = convertedVideo.includes('base64,')
+              ? convertedVideo.split('base64,')[1].length
               : convertedVideo.length;
             const estimatedSizeMB = (base64Length * 3) / 4 / (1024 * 1024); // base64 encoding เพิ่มขนาด ~33%
-            
+
             console.log('📤 [PhotoResult] Video conversion successful:', {
               dataUrlLength: convertedVideo.length,
               base64Length,
               estimatedSizeMB: estimatedSizeMB.toFixed(2),
             });
-            
+
             if (estimatedSizeMB > 10) {
-              console.warn(`⚠️ [PhotoResult] Video size (${estimatedSizeMB.toFixed(2)}MB) exceeds 10MB limit!`);
-              console.warn('⚠️ [PhotoResult] Video will be skipped to avoid upload failure');
+              console.warn(
+                `⚠️ [PhotoResult] Video size (${estimatedSizeMB.toFixed(2)}MB) exceeds 10MB limit!`,
+              );
+              console.warn(
+                '⚠️ [PhotoResult] Video will be skipped to avoid upload failure',
+              );
               // ไม่ push วิดีโอถ้าขนาดเกิน 10MB
             } else {
               videos.push(convertedVideo);
-              console.log('✅ [PhotoResult] Added compiledVideoUrl (LUT processed video) to videos');
-              console.log('📤 [PhotoResult] Video data URL preview:', convertedVideo.substring(0, 100));
+              console.log(
+                '✅ [PhotoResult] Added compiledVideoUrl (LUT processed video) to videos',
+              );
+              console.log(
+                '📤 [PhotoResult] Video data URL preview:',
+                convertedVideo.substring(0, 100),
+              );
             }
           } catch (error) {
-            console.error('❌ [PhotoResult] Failed to convert compiledVideoUrl to data URL:', error);
-            console.warn('⚠️ [PhotoResult] Skipping video upload due to conversion error');
+            console.error(
+              '❌ [PhotoResult] Failed to convert compiledVideoUrl to data URL:',
+              error,
+            );
+            console.warn(
+              '⚠️ [PhotoResult] Skipping video upload due to conversion error',
+            );
           }
         } else {
-          console.warn('⚠️ [PhotoResult] No compiledVideoUrl available, skipping video upload');
-          console.warn('⚠️ [PhotoResult] Video may still be processing. Consider waiting for video to be ready.');
+          console.warn(
+            '⚠️ [PhotoResult] No compiledVideoUrl available, skipping video upload',
+          );
+          console.warn(
+            '⚠️ [PhotoResult] Video may still be processing. Consider waiting for video to be ready.',
+          );
         }
         console.log('📤 [PhotoResult] Final upload arrays:', {
           photosCount: photos.length,
           videosCount: videos.length,
         });
-        console.log('📤 [PhotoResult] ===========================================');
+        console.log(
+          '📤 [PhotoResult] ===========================================',
+        );
 
         console.log('📤 [PhotoResult] ========== UPLOAD SUMMARY ==========');
         console.log('📤 [PhotoResult] Upload summary:', {
@@ -908,29 +1004,33 @@ export default function PhotoResult() {
           videosCount: videos.length,
           formatId: state.selectedFrame?.id,
         });
-        
+
         // ตรวจสอบขนาดไฟล์ที่จะส่ง
         let totalPhotosSize = 0;
         let totalVideosSize = 0;
-        
+
         photos.forEach((photo, index) => {
-          const base64Length = photo.includes('base64,') 
-            ? photo.split('base64,')[1].length 
+          const base64Length = photo.includes('base64,')
+            ? photo.split('base64,')[1].length
             : photo.length;
           const sizeMB = (base64Length * 3) / 4 / (1024 * 1024);
           totalPhotosSize += sizeMB;
-          console.log(`📤 [PhotoResult] Photo ${index + 1} size: ${sizeMB.toFixed(2)} MB`);
+          console.log(
+            `📤 [PhotoResult] Photo ${index + 1} size: ${sizeMB.toFixed(2)} MB`,
+          );
         });
-        
+
         videos.forEach((video, index) => {
-          const base64Length = video.includes('base64,') 
-            ? video.split('base64,')[1].length 
+          const base64Length = video.includes('base64,')
+            ? video.split('base64,')[1].length
             : video.length;
           const sizeMB = (base64Length * 3) / 4 / (1024 * 1024);
           totalVideosSize += sizeMB;
-          console.log(`📤 [PhotoResult] Video ${index + 1} size: ${sizeMB.toFixed(2)} MB`);
+          console.log(
+            `📤 [PhotoResult] Video ${index + 1} size: ${sizeMB.toFixed(2)} MB`,
+          );
         });
-        
+
         console.log('📤 [PhotoResult] Total sizes:', {
           totalPhotosSize: `${totalPhotosSize.toFixed(2)} MB`,
           totalVideosSize: `${totalVideosSize.toFixed(2)} MB`,
@@ -941,12 +1041,17 @@ export default function PhotoResult() {
         // Upload files
         // ใช้ transactionId จาก payment/create response
         if (!state.transactionId) {
-          const errorMsg = '❌ [PhotoResult] No transactionId found in state! Cannot upload files.';
+          const errorMsg =
+            '❌ [PhotoResult] No transactionId found in state! Cannot upload files.';
           console.error(errorMsg);
-          throw new Error('transactionId is required. Please ensure payment was created successfully.');
+          throw new Error(
+            'transactionId is required. Please ensure payment was created successfully.',
+          );
         }
 
-        console.log('📤 [PhotoResult] ========== CALLING UPLOAD API ==========');
+        console.log(
+          '📤 [PhotoResult] ========== CALLING UPLOAD API ==========',
+        );
         console.log('📤 [PhotoResult] Calling uploadMachineFiles API...');
         console.log('📤 [PhotoResult] Upload parameters:', {
           transactionCode,
@@ -963,7 +1068,9 @@ export default function PhotoResult() {
           firstVideoPreview: videos[0]?.substring(0, 100) || 'none',
           hasCompiledVideoUrl: !!compiledVideoUrl,
         });
-        console.log('📤 [PhotoResult] =========================================');
+        console.log(
+          '📤 [PhotoResult] =========================================',
+        );
 
         const uploadResult = await window.electron.payment.uploadMachineFiles(
           transactionCode,
@@ -975,7 +1082,10 @@ export default function PhotoResult() {
         console.log('📤 [PhotoResult] Upload result:', uploadResult);
 
         if (uploadResult.success && uploadResult.files?.length > 0) {
-          console.log('✅ [PhotoResult] Upload successful! Files:', uploadResult.files);
+          console.log(
+            '✅ [PhotoResult] Upload successful! Files:',
+            uploadResult.files,
+          );
 
           // หา photo URL แรก
           const photoFile = uploadResult.files.find(
@@ -988,16 +1098,23 @@ export default function PhotoResult() {
 
           // เก็บ qrcodeStorageUrl จาก response
           if (uploadResult.qrcodeStorageUrl) {
-            console.log('✅ [PhotoResult] QR Code Storage URL:', uploadResult.qrcodeStorageUrl);
+            console.log(
+              '✅ [PhotoResult] QR Code Storage URL:',
+              uploadResult.qrcodeStorageUrl,
+            );
             setQrcodeStorageUrl(uploadResult.qrcodeStorageUrl);
           } else {
             console.warn('⚠️ [PhotoResult] No qrcodeStorageUrl in response');
           }
 
           // แสดง URLs ทั้งหมด
-          uploadResult.files.forEach((file: { type: string; url: string; order: number }) => {
-            console.log(`📁 [PhotoResult] ${file.type} (order: ${file.order}): ${file.url}`);
-          });
+          uploadResult.files.forEach(
+            (file: { type: string; url: string; order: number }) => {
+              console.log(
+                `📁 [PhotoResult] ${file.type} (order: ${file.order}): ${file.url}`,
+              );
+            },
+          );
         } else {
           console.error('❌ [PhotoResult] Upload failed:', uploadResult);
         }
@@ -1008,7 +1125,9 @@ export default function PhotoResult() {
         console.log('🖨️ [PhotoResult] Skipping print (simulated)');
         setTimeout(() => {
           setPrintStatus('success');
-          console.log('✅ [PhotoResult] Print status set to success (simulated)');
+          console.log(
+            '✅ [PhotoResult] Print status set to success (simulated)',
+          );
         }, 2000); // สมมติว่าพิมพ์เสร็จใน 2 วินาที
 
         // // Print หลังจาก upload เสร็จ (ถูก comment ออกเพื่อเทส API)
@@ -1046,9 +1165,10 @@ export default function PhotoResult() {
     if (state?.finalImage && state?.referenceId && state?.transactionId) {
       if (!hasUploaded.current) {
         // ตรวจสอบว่ามีวิดีโอให้รอหรือไม่
-        const hasCaptures = state?.selectedCaptures && state.selectedCaptures.length > 0;
+        const hasCaptures =
+          state?.selectedCaptures && state.selectedCaptures.length > 0;
         const shouldWaitForVideo = hasCaptures && !compiledVideoUrl;
-        
+
         console.log('🔍 [PhotoResult] Upload decision:', {
           hasCaptures,
           hasCompiledVideoUrl: !!compiledVideoUrl,
@@ -1070,12 +1190,15 @@ export default function PhotoResult() {
               maxWaitTime,
             });
 
+            // ใช้ ref เพื่อ track compiledVideoUrl ที่ update
+            let currentCompiledVideoUrl = compiledVideoUrl;
+
             while (Date.now() - startTime < maxWaitTime) {
               // ตรวจสอบ compiledVideoUrl อีกครั้ง (อาจถูก set ในระหว่างรอ)
-              // ใช้ closure เพื่อเข้าถึง state ล่าสุด
-              // แต่เนื่องจาก compiledVideoUrl เป็น state, เราต้องใช้ closure ที่ถูกต้อง
-              // ให้ตรวจสอบใน loop โดยตรง
-              
+              // เนื่องจาก compiledVideoUrl เป็น state, เราต้องใช้ closure ที่ถูกต้อง
+              // แต่ใน loop นี้ compiledVideoUrl จะไม่ update อัตโนมัติ
+              // ให้ break ออกไปและให้ useEffect trigger handleAutoPrint อีกครั้ง
+
               // ถ้ามี compiledVideoUrl แล้ว
               if (compiledVideoUrl) {
                 const elapsed = Date.now() - startTime;
@@ -1083,47 +1206,72 @@ export default function PhotoResult() {
                 break;
               }
 
+              // ตรวจสอบอีกครั้งหลังจาก await (อาจจะ update แล้ว)
+              // แต่เนื่องจาก closure, compiledVideoUrl จะไม่ update
+              // ให้ break ออกไปและให้ useEffect trigger อีกครั้ง
+
               // Log progress ทุก 2 วินาที
               const elapsed = Date.now() - startTime;
               if (elapsed % 2000 < checkInterval) {
-                console.log(`⏳ [PhotoResult] Still waiting for video... (${Math.round(elapsed / 1000)}s / ${maxWaitTime / 1000}s)`, {
-                  isCreatingVideo,
-                  isApplyingLUT,
-                });
+                console.log(
+                  `⏳ [PhotoResult] Still waiting for video... (${Math.round(elapsed / 1000)}s / ${maxWaitTime / 1000}s)`,
+                  {
+                    isCreatingVideo,
+                    isApplyingLUT,
+                  },
+                );
               }
 
-              await new Promise((resolve) => setTimeout(resolve, checkInterval));
+              await new Promise((resolve) =>
+                setTimeout(resolve, checkInterval),
+              );
             }
 
             const finalElapsed = Date.now() - startTime;
             const finalCompiledVideoUrl = compiledVideoUrl;
-            
+
             if (!finalCompiledVideoUrl) {
-              console.warn(`⚠️ [PhotoResult] Video not ready after ${finalElapsed}ms timeout, proceeding without video`);
-              console.warn('⚠️ [PhotoResult] Video creation may have failed or is still in progress');
-              console.warn('⚠️ [PhotoResult] Check logs above for video creation errors');
+              console.warn(
+                `⚠️ [PhotoResult] Video not ready after ${finalElapsed}ms timeout, proceeding without video`,
+              );
+              console.warn(
+                '⚠️ [PhotoResult] Video creation may have failed or is still in progress',
+              );
+              console.warn(
+                '⚠️ [PhotoResult] Check logs above for video creation errors',
+              );
             } else {
-              console.log(`✅ [PhotoResult] Video became available during wait (after ${finalElapsed}ms)`);
+              console.log(
+                `✅ [PhotoResult] Video became available during wait (after ${finalElapsed}ms)`,
+              );
             }
 
-            console.log('🔄 [PhotoResult] Triggering handleAutoPrint after waiting', {
-              hasCompiledVideoUrl: !!finalCompiledVideoUrl,
-              elapsed: finalElapsed,
-            });
+            console.log(
+              '🔄 [PhotoResult] Triggering handleAutoPrint after waiting',
+              {
+                hasCompiledVideoUrl: !!finalCompiledVideoUrl,
+                elapsed: finalElapsed,
+              },
+            );
             handleAutoPrint();
           };
 
           waitForVideo();
         } else {
           // วิดีโอพร้อมแล้ว หรือไม่มีวิดีโอให้รอ - upload ทันที
-          console.log('🔄 [PhotoResult] Video ready (or not needed), triggering handleAutoPrint immediately', {
-            hasCompiledVideoUrl: !!compiledVideoUrl,
-            hasCaptures,
-          });
+          console.log(
+            '🔄 [PhotoResult] Video ready (or not needed), triggering handleAutoPrint immediately',
+            {
+              hasCompiledVideoUrl: !!compiledVideoUrl,
+              hasCaptures,
+            },
+          );
           handleAutoPrint();
         }
       } else {
-        console.log('⚠️ [PhotoResult] Already uploaded, skipping handleAutoPrint');
+        console.log(
+          '⚠️ [PhotoResult] Already uploaded, skipping handleAutoPrint',
+        );
       }
     } else {
       console.warn('⚠️ [PhotoResult] Missing required data:', {
@@ -1140,6 +1288,150 @@ export default function PhotoResult() {
     // ไม่ต้องใส่ dependencies อื่นๆ เพื่อป้องกันการเรียกซ้ำ
   ]);
 
+  // Trigger upload อีกครั้งเมื่อ compiledVideoUrl พร้อม (ถ้ายังไม่ได้ upload)
+  useEffect(() => {
+    if (
+      compiledVideoUrl &&
+      state?.finalImage &&
+      state?.referenceId &&
+      state?.transactionId &&
+      !hasUploaded.current
+    ) {
+      console.log(
+        '🔄 [PhotoResult] Video became available, triggering upload now',
+      );
+      // เรียก handleAutoPrint โดยตรง
+      const triggerUpload = async () => {
+        // รอสักครู่เพื่อให้แน่ใจว่า state อัพเดทแล้ว
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        if (!hasUploaded.current) {
+          console.log(
+            '🔄 [PhotoResult] Executing upload with video now available',
+          );
+          // เรียก handleAutoPrint โดยตรง
+          // แต่ต้องสร้าง function handleAutoPrint ใหม่หรือใช้ ref
+          // ให้ใช้ inline function แทน
+          const uploadWithVideo = async () => {
+            if (hasUploaded.current) {
+              console.log('⚠️ [PhotoResult] Already uploaded, skipping...');
+              return;
+            }
+
+            hasUploaded.current = true;
+            setPrintStatus('printing');
+            setIsUploading(true);
+
+            try {
+              // Helper function: แปลง blob URL เป็น base64 data URL
+              const blobUrlToDataUrl = async (url: string): Promise<string> => {
+                if (url.startsWith('data:')) {
+                  return url;
+                }
+                if (url.startsWith('blob:')) {
+                  try {
+                    const response = await fetch(url);
+                    const blob = await response.blob();
+                    return new Promise((resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        resolve(reader.result as string);
+                      };
+                      reader.onerror = reject;
+                      reader.readAsDataURL(blob);
+                    });
+                  } catch (error) {
+                    console.error(
+                      'Error converting blob URL to data URL:',
+                      error,
+                    );
+                    throw error;
+                  }
+                }
+                return url;
+              };
+
+              if (!state.referenceId || !state.transactionId) {
+                throw new Error('Missing required IDs');
+              }
+
+              const mchOrderNo = state.referenceId;
+              const transactionCode = mchOrderNo.startsWith('TXN-')
+                ? mchOrderNo
+                : `TXN-${mchOrderNo}`;
+
+              const photos: string[] = [];
+              const videos: string[] = [];
+
+              // เพิ่ม finalImage
+              if (state.finalImage) {
+                const convertedImage = await blobUrlToDataUrl(state.finalImage);
+                photos.push(convertedImage);
+              }
+
+              // เพิ่มวิดีโอ
+              if (compiledVideoUrl) {
+                try {
+                  const convertedVideo =
+                    await blobUrlToDataUrl(compiledVideoUrl);
+                  videos.push(convertedVideo);
+                  console.log(
+                    '✅ [PhotoResult] Added video to upload (from compiledVideoUrl effect)',
+                  );
+                } catch (error) {
+                  console.error(
+                    '❌ [PhotoResult] Failed to convert video:',
+                    error,
+                  );
+                }
+              }
+
+              console.log('📤 [PhotoResult] Uploading with video:', {
+                photosCount: photos.length,
+                videosCount: videos.length,
+              });
+
+              const uploadResult =
+                await window.electron.payment.uploadMachineFiles(
+                  transactionCode,
+                  photos,
+                  videos,
+                  state.transactionId,
+                );
+
+              if (uploadResult.success) {
+                console.log('✅ [PhotoResult] Upload successful with video!');
+                if (uploadResult.qrcodeStorageUrl) {
+                  setQrcodeStorageUrl(uploadResult.qrcodeStorageUrl);
+                }
+              }
+
+              setIsUploading(false);
+              setPrintStatus('success');
+            } catch (error) {
+              console.error(
+                '❌ [PhotoResult] Error in upload with video:',
+                error,
+              );
+              setIsUploading(false);
+              setPrintStatus('error');
+              hasUploaded.current = false;
+            }
+          };
+
+          uploadWithVideo();
+        }
+      };
+
+      triggerUpload();
+    }
+  }, [
+    compiledVideoUrl,
+    state?.finalImage,
+    state?.referenceId,
+    state?.transactionId,
+  ]);
+
   const handleFinish = () => {
     navigate('/');
   };
@@ -1147,7 +1439,10 @@ export default function PhotoResult() {
   const generateQRCode = () => {
     // ใช้ qrcodeStorageUrl จาก API response เป็น data สำหรับสร้าง QR code
     if (qrcodeStorageUrl) {
-      console.log('📱 [PhotoResult] Generating QR code from qrcodeStorageUrl:', qrcodeStorageUrl);
+      console.log(
+        '📱 [PhotoResult] Generating QR code from qrcodeStorageUrl:',
+        qrcodeStorageUrl,
+      );
       // แปลง URL link เป็น QR code image โดยใช้ QR code generator API
       const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrcodeStorageUrl)}`;
       return qrCodeUrl;
@@ -1155,14 +1450,18 @@ export default function PhotoResult() {
 
     // Fallback: Generate QR code from uploaded file URL (ถ้าไม่มี qrcodeStorageUrl)
     if (uploadedFileUrl) {
-      console.log('📱 [PhotoResult] Generating QR code from uploadedFileUrl (fallback)');
+      console.log(
+        '📱 [PhotoResult] Generating QR code from uploadedFileUrl (fallback)',
+      );
       const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(uploadedFileUrl)}`;
       return qrCodeUrl;
     }
 
     // Fallback: Generate QR code for the final image or download link
     // For demo purposes, this would be a placeholder
-    console.warn('⚠️ [PhotoResult] No QR code URL available, using placeholder');
+    console.warn(
+      '⚠️ [PhotoResult] No QR code URL available, using placeholder',
+    );
     return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMTAgMTBoODB2ODBIMTBWMTB6IiBmaWxsPSJibGFjayIvPgo8cGF0aCBkPSJNMjAgMjBoNjB2NjBIMjBWMjB6IiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMzAgMzBoNDB2NDBIMzBWMzB6IiBmaWxsPSJibGFjayIvPgo8L3N2Zz4K';
   };
 
@@ -1297,11 +1596,7 @@ export default function PhotoResult() {
               </div>
             ) : (
               <div className="qr-display">
-                <img
-                  src={generateQRCode()}
-                  alt="QR Code"
-                  className="qr-code"
-                />
+                <img src={generateQRCode()} alt="QR Code" className="qr-code" />
               </div>
             )}
           </div>
