@@ -754,17 +754,53 @@ export default function PhotoResult() {
         });
 
         // เตรียม photos และ videos
-        // ส่งเฉพาะ: 1) finalImage (รูปที่ print) 2) วิดีโอจาก compiledVideoUrl
+        // ส่ง: 1) finalImage (รูปที่ print - order 1) 2) รูปอื่นๆ จาก selectedCaptures (order 2, 3, ...) 3) วิดีโอจาก compiledVideoUrl
         const photos: string[] = [];
         const videos: string[] = [];
 
-        // เพิ่ม finalImage (รูปที่ print) - ต้องเป็นรูปเดียวกับที่ print
+        // เพิ่ม finalImage (รูปที่ print) - order 1
         if (state.finalImage) {
           const convertedImage = await blobUrlToDataUrl(state.finalImage);
           photos.push(convertedImage);
-          console.log('📤 [PhotoResult] Added finalImage (same as print image) to photos');
+          console.log('📤 [PhotoResult] Added finalImage (order 1 - print image) to photos');
         } else {
           console.warn('⚠️ [PhotoResult] No finalImage available, cannot upload photo');
+        }
+
+        // เพิ่มรูปอื่นๆ จาก selectedCaptures ที่ไม่ได้เป็น finalImage (order 2, 3, ...)
+        if (state.selectedCaptures && state.selectedCaptures.length > 0) {
+          // แปลง finalImage เป็น data URL เพื่อเปรียบเทียบ
+          let finalImageDataUrl: string | null = null;
+          if (state.finalImage) {
+            finalImageDataUrl = await blobUrlToDataUrl(state.finalImage);
+          }
+
+          for (let i = 0; i < state.selectedCaptures.length; i++) {
+            const capture = state.selectedCaptures[i];
+            if (capture.photo) {
+              const convertedPhoto = await blobUrlToDataUrl(capture.photo);
+              
+              // เปรียบเทียบว่าเป็นรูปเดียวกันหรือไม่ (เปรียบเทียบ base64 data)
+              // ใช้ substring เพื่อเปรียบเทียบส่วน base64 data เท่านั้น (ข้าม data:image/...;base64,)
+              const photoBase64 = convertedPhoto.includes('base64,') 
+                ? convertedPhoto.split('base64,')[1] 
+                : convertedPhoto;
+              const finalBase64 = finalImageDataUrl && finalImageDataUrl.includes('base64,')
+                ? finalImageDataUrl.split('base64,')[1]
+                : finalImageDataUrl;
+              
+              // เปรียบเทียบ 1000 ตัวอักษรแรก (เพื่อความเร็ว)
+              const isSameAsFinalImage = finalBase64 && 
+                photoBase64.substring(0, 1000) === finalBase64.substring(0, 1000);
+              
+              if (!isSameAsFinalImage) {
+                photos.push(convertedPhoto);
+                console.log(`📤 [PhotoResult] Added capture[${i}].photo (order ${photos.length}) to photos`);
+              } else {
+                console.log(`📤 [PhotoResult] Skipped capture[${i}].photo (same as finalImage - order 1)`);
+              }
+            }
+          }
         }
 
         // เพิ่มวิดีโอจาก compiledVideoUrl (วิดีโอที่ผ่าน LUT แล้ว)
