@@ -266,10 +266,11 @@ export class MachineService {
 
   constructor(options: MachineServiceOptions = {}) {
     // อ่าน API URL จาก environment variable หรือ options หรือ default
-    this.apiBaseUrl =  'https://api-booth.boniolabs.com';
-    // this.apiBaseUrl = 'http://localhost:3000';
-    this.machinePort = options.machinePort || Number(process.env.PORT) || 44444;
-    this.machineId = options.machineId || process.env.MACHINE_ID ;
+    // this.apiBaseUrl =  'https://api-booth.boniolabs.com';
+    this.apiBaseUrl = 'http://localhost:3000';
+    this.machinePort = options.machinePort || Number(process.env.PORT) || 33333;
+    // this.machineId = options.machineId || process.env.MACHINE_ID ;
+    this.machineId = '69247c6b02dd728488995e27';
     this.timeout = options.timeout || Number(process.env.API_TIMEOUT) || 10000;
 
     console.log('🔧 [MachineService] Configuration:', {

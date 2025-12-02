@@ -52,6 +52,8 @@ async function initializeApp() {
       paperLevel: initResponse.machine.paperLevel,
     });
 
+    console.log('✅ Full initResponse=====:', JSON.stringify(initResponse, null, 2));
+
     // Send theme to renderer process
     if (mainWindow && initResponse.theme.background) {
       mainWindow.webContents.send('theme-loaded', initResponse.theme);
