@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { BackButton } from '..';
+import { BackButton, Countdown } from '..';
 import './TermsAndServices.css';
+import { useCallback } from 'react';
 
 export default function TermsAndServices() {
   const navigate = useNavigate();
@@ -9,9 +10,18 @@ export default function TermsAndServices() {
     navigate('/');
   };
 
+  const handleCountdownComplete = useCallback(() => {
+    handleBack();
+  }, [handleBack]);
+
   return (
     <div className="terms-container">
       <BackButton onBackClick={handleBack} />
+      <Countdown
+        seconds={30}
+        onComplete={handleCountdownComplete}
+        visible={false}
+      />
 
       <div className="terms-content">
         <h1 className="terms-title">
@@ -47,8 +57,8 @@ export default function TermsAndServices() {
               2. การจัดเก็บและใช้ข้อมูล (Data Storage and Use)
             </h2>
             <p className="term-content">
-              ระบบอาจจัดเก็บภาพถ่าย วิดีโอ หรือข้อมูลส่วนบุคคล
-              (เช่น อีเมล หมายเลขโทรศัพท์) เพื่อวัตถุประสงค์ในการให้บริการ
+              ระบบอาจจัดเก็บภาพถ่าย วิดีโอ หรือข้อมูลส่วนบุคคล (เช่น อีเมล
+              หมายเลขโทรศัพท์) เพื่อวัตถุประสงค์ในการให้บริการ
               การจัดการข้อมูลจะดำเนินการตามนโยบายความเป็นส่วนตัว
               คุณมีสิทธิ์ในการขอให้ลบข้อมูลของคุณได้
             </p>
@@ -60,7 +70,8 @@ export default function TermsAndServices() {
             </h2>
             <p className="term-content">
               คุณสามารถแชร์ภาพผ่าน QR Code อีเมล หรือโซเชียลมีเดียได้
-              หากได้รับอนุญาต ภาพของคุณอาจถูกนำไปใช้ในแกลเลอรีของงานอีเวนต์หรือกิจกรรมส่งเสริมการขาย
+              หากได้รับอนุญาต
+              ภาพของคุณอาจถูกนำไปใช้ในแกลเลอรีของงานอีเวนต์หรือกิจกรรมส่งเสริมการขาย
             </p>
           </div>
 
@@ -86,8 +97,8 @@ export default function TermsAndServices() {
 
         <div className="terms-contact">
           <p>
-            หากมีคำถามเกี่ยวกับการใช้งานหรือข้อตกลงนี้
-            สามารถติดต่อได้ที่อีเมล: support@photobooth-demo.com
+            หากมีคำถามเกี่ยวกับการใช้งานหรือข้อตกลงนี้ สามารถติดต่อได้ที่อีเมล:
+            support@photobooth-demo.com
           </p>
         </div>
 
@@ -119,4 +130,3 @@ export default function TermsAndServices() {
     </div>
   );
 }
-

@@ -48,7 +48,8 @@ export default function PaymentQR() {
     ? state.netAmount
     : originalPrice - discountAmount;
 
-  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(30); // 5 minutes in seconds
+  const [isTimeout, setIsTimeout] = useState(false); // Track ว่า timeout แล้วหรือยัง
   const [qrCode, setQrCode] = useState<string>(state?.qrcode || '');
   const [referenceId, setReferenceId] = useState<string>(state?.referenceId || '');
   const [isLoading, setIsLoading] = useState(!state?.qrcode);
@@ -130,9 +131,14 @@ export default function PaymentQR() {
   // Countdown timer
   useEffect(() => {
     if (timeLeft <= 0) {
-      // Time's up, redirect back to home
-      navigate('/');
-      return;
+      // Time's up, blur QR code และ redirect back to home หลังจาก delay
+      setIsTimeout(true);
+      // Delay การ navigate เพื่อให้เห็น blur effect
+      const redirectTimer = setTimeout(() => {
+        navigate('/');
+      }, 30000); // Delay 30 seconds
+
+      return () => clearTimeout(redirectTimer);
     }
 
     const timer = setInterval(() => {
@@ -298,7 +304,14 @@ export default function PaymentQR() {
                   )} */}
                 </div>
               ) : (
-                <div className="qr-code-wrapper">
+                <div
+                  className="qr-code-wrapper"
+                  style={{
+                    filter: isTimeout ? 'blur(8px)' : 'none',
+                    transition: 'filter 0.5s ease-in-out',
+                    pointerEvents: isTimeout ? 'none' : 'auto',
+                  }}
+                >
                   <img
                     src={qrCode}
                     alt="Payment QR Code"
@@ -355,7 +368,12 @@ export default function PaymentQR() {
         {/* Timer */}
         <div className="timer-container">
           <div className="timer-circle">
-            <span className="timer-text">{formatTime(timeLeft)}</span>
+            {!isTimeout && (
+              <span className="timer-text">{formatTime(timeLeft)}</span>
+            )}
+            {isTimeout && (
+              <span className="timer-text">Timeout</span>
+            )}
           </div>
           {/* <p className="timer-label">{getTimerLabel()}</p> */}
           <p className="title-thai timer-label"> กรุณาชำระเงินภายในเวลาที่กำหนด</p>
