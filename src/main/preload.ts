@@ -59,6 +59,9 @@ const electronHandler = {
     getMachinePrices: () => {
       return ipcRenderer.invoke('get-machine-prices');
     },
+    getMachineData: () => {
+      return ipcRenderer.invoke('get-machine-data');
+    },
     uploadMachineFiles: (
       transactionCode: string,
       photos: string[],

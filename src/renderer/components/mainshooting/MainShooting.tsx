@@ -24,6 +24,7 @@ export default function MainShooting() {
   const location = useLocation();
   const state = location.state as LocationState;
 
+  const [cameraCountdown, setCameraCountdown] = useState(3);
   const [countdown, setCountdown] = useState(3);
   const [captures, setCaptures] = useState<Capture[]>([]);
   const [showCountdown, setShowCountdown] = useState(false);
@@ -37,6 +38,9 @@ export default function MainShooting() {
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const cameraCountdownRef = useRef<number>(3);
+  const isInitializedRef = useRef<boolean>(false);
 
   const handleBack = () => {
     // Stop camera when going back
@@ -173,44 +177,126 @@ export default function MainShooting() {
     callback: () => void,
   ): Promise<void> => {
     return new Promise((resolve) => {
-      setCountdown(duration);
+      // Clear any existing timer
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+
+      let currentCount = duration;
+      setCountdown(currentCount);
       setShowCountdown(true);
 
-      const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            setShowCountdown(false);
-            callback();
-            resolve();
-            return 0;
+      countdownTimerRef.current = setInterval(() => {
+        currentCount -= 1;
+        setCountdown(currentCount);
+
+        if (currentCount <= 0) {
+          if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
           }
-          return prev - 1;
-        });
+          setShowCountdown(false);
+          callback();
+          resolve();
+        }
       }, 1000);
     });
   };
 
-  // Initialize camera when component mounts
+  // รับ cameraCountdown จาก machine-init event และ request ข้อมูลทันที (fallback)
   useEffect(() => {
+    // ฟังก์ชันสำหรับ set cameraCountdown
+    const setCameraCountdownData = (countdownValue: number) => {
+      if (countdownValue && countdownValue > 0) {
+        setCameraCountdown(countdownValue);
+        cameraCountdownRef.current = countdownValue;
+        console.log('📸 Camera countdown loaded:', countdownValue);
+      }
+    };
+
+    // 1. รับจาก event (ถ้า event ถูกส่งมา)
+    const handleMachineInit = (...args: unknown[]) => {
+      const data = args[0] as { machine?: { cameraCountdown?: number } };
+      if (data?.machine?.cameraCountdown) {
+        setCameraCountdownData(data.machine.cameraCountdown);
+      }
+    };
+
+    const removeListener = window.electron?.ipcRenderer.on(
+      'machine-init',
+      handleMachineInit,
+    );
+
+    // 2. Request ข้อมูลทันที (fallback ถ้า event ยังไม่มา)
+    const requestMachineData = async () => {
+      try {
+        const result = await window.electron?.payment.getMachineData();
+        if (result?.success && result?.machine?.cameraCountdown) {
+          setCameraCountdownData(result.machine.cameraCountdown);
+        }
+      } catch (error) {
+        console.error('Failed to get machine data:', error);
+      }
+    };
+
+    // Request ทันที
+    requestMachineData();
+
+    return () => {
+      if (removeListener) {
+        removeListener();
+      }
+    };
+  }, []);
+
+  // Initialize camera when component mounts (run only once)
+  useEffect(() => {
+    // Prevent multiple initializations
+    if (isInitializedRef.current) {
+      return;
+    }
+
     const initializeCamera = async () => {
       try {
+        isInitializedRef.current = true;
+
         // Wait for camera to load before starting
         await startCamera();
 
-        // Capture loop for 6 captures
+        // Wait for cameraCountdown to be loaded from API
+        let countdownValue = cameraCountdownRef.current;
+        if (countdownValue === 3) {
+          // Try to get machine data if still using default value
+          try {
+            const result = await window.electron?.payment.getMachineData();
+            if (result?.success && result?.machine?.cameraCountdown) {
+              countdownValue = result.machine.cameraCountdown;
+              cameraCountdownRef.current = countdownValue;
+              setCameraCountdown(countdownValue);
+              console.log('📸 Camera countdown loaded in initializeCamera:', countdownValue);
+            }
+          } catch (error) {
+            console.error('Failed to get machine data in initializeCamera:', error);
+          }
+        }
+
+        // Capture loop for required captures
         const captureLoop = async () => {
           const newCaptures: Capture[] = [];
 
           // eslint-disable-next-line no-plusplus
           for (let i = 0; i < requiredCaptures; i += 1) {
+            console.log(`📷 Starting capture ${i + 1}/${requiredCaptures}`);
+
             // Start recording video
             startRecording();
 
-            // Countdown 3 seconds
+            // Countdown using cameraCountdown from API
             // eslint-disable-next-line no-await-in-loop
-            await startCountdown(3, () => {
+            await startCountdown(cameraCountdownRef.current, () => {
               // Callback when countdown reaches 0
+              console.log(`✅ Countdown finished for capture ${i + 1}`);
             });
 
             // Stop recording and get video URL
@@ -228,20 +314,25 @@ export default function MainShooting() {
               });
               // Update state to show progress
               setCaptures([...newCaptures]);
+              console.log(`✅ Capture ${i + 1} completed`);
             }
 
             // Wait 1 second before next capture (unless it's the last one)
-            if (i < 5) {
+            if (i < requiredCaptures - 1) {
               // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
               await new Promise((resolve) => setTimeout(resolve, 1000));
             }
           }
+
+          console.log(`🎉 All ${requiredCaptures} captures completed!`);
         };
 
         captureLoop();
-      } catch {
+      } catch (error) {
         // Camera initialization failed
+        console.error('Camera initialization failed:', error);
         setCameraError('Failed to initialize camera');
+        isInitializedRef.current = false;
       }
     };
 
@@ -249,6 +340,10 @@ export default function MainShooting() {
 
     return () => {
       // Cleanup camera on unmount
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }

@@ -50,6 +50,7 @@ async function initializeApp() {
       theme: initResponse.theme.name,
       frames: initResponse.frames.length,
       paperLevel: initResponse.machine.paperLevel,
+      cameraCountdown: initResponse.machine?.cameraCountdown || 3,
     });
 
     console.log('✅ Full initResponse=====:', JSON.stringify(initResponse, null, 2));
@@ -594,6 +595,27 @@ ipcMain.handle('get-machine-prices', async () => {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage, prices: [] };
+  }
+});
+
+// Handler สำหรับ request machine data (รวม cameraCountdown)
+ipcMain.handle('get-machine-data', async () => {
+  try {
+    if (cachedInitData?.machine) {
+      return { success: true, machine: cachedInitData.machine };
+    }
+    // ถ้ายังไม่มี cache ให้เรียก API ใหม่
+    const initResponse = await machineService.init();
+    cachedInitData = {
+      machine: initResponse.machine,
+      prices: initResponse.machine.prices || [],
+    };
+    return { success: true, machine: initResponse.machine };
+  } catch (error) {
+    console.error('Error in get-machine-data handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
   }
 });
 
