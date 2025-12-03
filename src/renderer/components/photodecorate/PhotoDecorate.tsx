@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { FRAME_CONFIGS, FrameConfig } from '../../utils/frameConfig';
 import './PhotoDecorate.css';
+import { Countdown } from '..';
 
 interface Capture {
   video: string;
@@ -72,6 +73,12 @@ export default function PhotoDecorate() {
   const handleFrameImageLoad = () => {
     calculateScaleFactor();
   };
+
+  const handleCountdownComplete = useCallback(() => {
+    console.log('⏰ [PhotoDecorate] Countdown completed, auto-navigating to home');
+    navigate('/');
+  }, [navigate]);
+
 
   const proceedToResult = (
     finalImageData: string,
@@ -266,6 +273,13 @@ export default function PhotoDecorate() {
         <h1 className="decorate-title">เลือกรูปของคุณ</h1>
         <p className="decorate-subtitle">SELECT YOUR PHOTO</p>
       </div>
+
+      {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
+      <Countdown
+        seconds={30}
+        onComplete={handleCountdownComplete}
+        visible={true}
+      />
 
       {/* Main Layout */}
       <div className="decorate-main">

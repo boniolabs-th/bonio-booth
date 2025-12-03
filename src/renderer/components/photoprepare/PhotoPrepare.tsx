@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useState } from 'react';
-import { BackButton } from '..';
+import { useCallback, useState } from 'react';
+import { BackButton, Countdown } from '..';
 import { FRAME_CONFIGS, FrameConfig } from '../../utils/frameConfig';
 import './PhotoPrepare.css';
 
@@ -36,11 +36,21 @@ export default function PhotoPrepare() {
       },
     });
   };
+  const handleCountdownComplete = useCallback(() => {
+    handleConfirm();
+  }, [handleConfirm]);
 
   return (
     <div className="photo-prepare-container">
       {/* Back Button */}
       <BackButton onBackClick={handleBack} />
+
+      {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
+      <Countdown
+        seconds={30}
+        onComplete={handleCountdownComplete}
+        visible={true}
+      />
 
       {/* Main Content */}
       <div className="main-content">
@@ -131,10 +141,7 @@ export default function PhotoPrepare() {
                     stroke="currentColor"
                     strokeWidth="2"
                   />
-                  <polygon
-                    points="10,8 10,16 16,12"
-                    fill="currentColor"
-                  />
+                  <polygon points="10,8 10,16 16,12" fill="currentColor" />
                 </svg>
                 {/* Printer Icon */}
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none">

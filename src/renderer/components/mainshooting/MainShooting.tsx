@@ -261,7 +261,7 @@ export default function MainShooting() {
   }, []);
 
   // คำนวณจำนวน capture ที่ต้องการ = จำนวน slots + 2
-  const requiredCaptures = state.selectedFrame?.slots
+  const requiredCaptures = state?.selectedFrame?.slots
     ? state.selectedFrame.slots.length + 2
     : 6; // fallback ถ้าไม่มี frame
 

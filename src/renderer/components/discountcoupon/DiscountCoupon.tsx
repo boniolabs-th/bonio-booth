@@ -187,9 +187,9 @@ export default function DiscountCoupon() {
           </div>
           {/* Row 4: Z X C V B N M */}
           <div className="keypad-row">
-            {['', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', ''].map((key) => (
+            {['', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', ''].map((key,index) => (
               <button
-                key={key}
+                key={index}
                 type="button"
                 className="keypad-button"
                 style={{ visibility: key !== '' ? 'visible' : 'hidden' }}

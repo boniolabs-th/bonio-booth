@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { FrameConfig, FILTERS } from '../../utils/frameConfig';
 import { generateBoomerangAssets } from '../../utils/boomerang';
 import {
@@ -10,6 +10,7 @@ import {
 } from '../../utils/lutProcessor';
 
 import './PhotoResult.css';
+import { Countdown } from '..';
 
 interface Capture {
   video: string;
@@ -1436,6 +1437,13 @@ export default function PhotoResult() {
     navigate('/');
   };
 
+  const handleCountdownComplete = useCallback(() => {
+    console.log(
+      '⏰ [PhotoResult] Countdown completed, auto-navigating to home',
+    );
+    handleFinish();
+  }, [handleFinish]);
+
   const generateQRCode = () => {
     // ใช้ qrcodeStorageUrl จาก API response เป็น data สำหรับสร้าง QR code
     if (qrcodeStorageUrl) {
@@ -1487,6 +1495,13 @@ export default function PhotoResult() {
         <h1 className="result-title">กำลังพิมพ์รูปภาพ...</h1>
         <p className="result-subtitle">Printing your memory...</p>
       </div>
+
+      {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
+      <Countdown
+        seconds={30}
+        onComplete={handleCountdownComplete}
+        visible={true}
+      />
 
       {/* Main Layout - Photo Strip Center */}
       <div className="result-main">

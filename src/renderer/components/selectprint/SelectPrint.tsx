@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { BackButton } from '..';
+import { BackButton, Countdown } from '..';
 import './SelectPrint.css';
 import couponIcon from '../../../../assets/icons/svg/coupon.svg';
 import qrIcon from '../../../../assets/icons/svg/qrcode.svg';
@@ -23,7 +23,7 @@ export default function SelectPrint() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
-  
+
   const [prices, setPrices] = useState<Price[]>([]);
   const [quantity, setQuantity] = useState(state?.quantity || 1);
   const [discountCode] = useState(state?.discountCode || undefined);
@@ -46,7 +46,10 @@ export default function SelectPrint() {
       }
     };
 
-    const removeListener = window.electron?.ipcRenderer.on('machine-init', handleMachineInit);
+    const removeListener = window.electron?.ipcRenderer.on(
+      'machine-init',
+      handleMachineInit,
+    );
 
     // 2. Request ข้อมูลทันที (fallback ถ้า event ยังไม่มา)
     const requestPrices = async () => {
@@ -77,38 +80,44 @@ export default function SelectPrint() {
     };
   }, [prices.length]);
 
+  const handleCountdownComplete = useCallback(() => {
+    console.log(
+      '⏰ [SelectPrint] Countdown completed, auto-navigating to home',
+    );
+    navigate('/');
+  }, [navigate]);
+
   // คำนวณราคาตาม quantity
   const getPriceForQuantity = (qty: number): number => {
     if (prices.length === 0) {
       // Fallback: ใช้ราคา 125 บาทต่อชิ้น
       return DEFAULT_PRICE_PER_PIECE * qty;
     }
-    
+
     // หาราคาที่ตรงกับ quantity
     const priceEntry = prices.find((p) => p.quantity === qty);
     if (priceEntry) {
       return priceEntry.price;
     }
-    
+
     // ถ้าไม่เจอ ให้ใช้ราคาสูงสุดที่น้อยกว่า quantity
     const sortedPrices = [...prices].sort((a, b) => a.quantity - b.quantity);
-    const closestPrice = sortedPrices
-      .filter((p) => p.quantity <= qty)
-      .pop();
-    
+    const closestPrice = sortedPrices.filter((p) => p.quantity <= qty).pop();
+
     if (closestPrice) {
       return closestPrice.price;
     }
-    
+
     // ถ้ายังไม่เจอ ให้ใช้ราคาต่ำสุด * quantity
     const minPrice = sortedPrices[0];
-    return minPrice ? (minPrice.price / minPrice.quantity) * qty : DEFAULT_PRICE_PER_PIECE * qty;
+    return minPrice
+      ? (minPrice.price / minPrice.quantity) * qty
+      : DEFAULT_PRICE_PER_PIECE * qty;
   };
 
   // หา maximum quantity จาก prices
-  const maxQuantity = prices.length > 0 
-    ? Math.max(...prices.map((p) => p.quantity))
-    : 10; // Default max ถ้าไม่มี prices
+  const maxQuantity =
+    prices.length > 0 ? Math.max(...prices.map((p) => p.quantity)) : 10; // Default max ถ้าไม่มี prices
 
   const currentPrice = getPriceForQuantity(quantity);
 
@@ -172,9 +181,9 @@ export default function SelectPrint() {
           paymentDetailsId: result.paymentDetailsId,
           orderId: result.order_id,
         };
-        
+
         console.log('💳 [SelectPrint] Navigating with state:', navigationState);
-        
+
         navigate('/payment-qr', {
           state: navigationState,
         });
@@ -192,6 +201,13 @@ export default function SelectPrint() {
     <div className="select-print-container">
       {/* Back Button */}
       <BackButton backButtonPath="/" />
+
+      {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
+      <Countdown
+        seconds={300}
+        onComplete={handleCountdownComplete}
+        visible={true}
+      />
 
       {/* Main Content */}
       <div className="main-content">

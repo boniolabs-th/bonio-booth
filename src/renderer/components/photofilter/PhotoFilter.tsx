@@ -1,10 +1,11 @@
 /* eslint-disable jsx-a11y/img-redundant-alt */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { FrameConfig, FILTERS } from '../../utils/frameConfig';
 import { getCachedLUT, getLUTFilePath } from '../../utils/lutProcessor';
 import { applyLUTWithWorker } from '../../utils/lutWorkerHelper';
 import './PhotoFilter.css';
+import { Countdown } from '..';
 
 interface Capture {
   video: string;
@@ -34,6 +35,11 @@ export default function PhotoFilter() {
     'idle' | 'printing' | 'success' | 'error'
   >('idle');
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const handleCountdownComplete = useCallback(() => {
+    console.log('⏰ [PhotoFilter] Countdown completed, auto-navigating to home');
+    navigate('/');
+  }, [navigate]);
 
   // Filter รูปภาพแต่ละรูป (รองรับทั้ง CSS และ LUT)
   const applyFilterToPhoto = async (photoUrl: string): Promise<string> => {
@@ -383,6 +389,13 @@ export default function PhotoFilter() {
         <h1 className="filter-title">ตกแต่งรูปของคุณ</h1>
         <p className="filter-subtitle">DECORATE YOUR PHOTO</p>
       </div>
+
+      {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
+      <Countdown
+        seconds={30}
+        onComplete={handleCountdownComplete}
+        visible={true}
+      />
 
       {/* Main Layout */}
       <div className="filter-main">
