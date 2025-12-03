@@ -19,6 +19,85 @@ interface Capture {
   boomerangFrames?: string[]; // Captured frames used for boomerang playback
 }
 
+// Crop overlay component that shows the crop area based on slot ratio
+function CropOverlay({
+  slotWidth,
+  slotHeight,
+}: {
+  slotWidth: number;
+  slotHeight: number;
+}) {
+  const slotRatio = slotWidth / slotHeight;
+
+  // Calculate the crop area dimensions as percentages
+  // The crop area will be centered and fill the container while maintaining the slot ratio
+  const getCropDimensions = () => {
+    // Fill the container - use 100% of the limiting dimension
+    if (slotRatio >= 1) {
+      // Slot is wider or square - width fills 100%, height adjusts
+      const cropWidth = 100;
+      const cropHeight = 100 / slotRatio;
+      return { cropWidth, cropHeight };
+    }
+    // Slot is taller - height fills 100%, width adjusts
+    const cropHeight = 100;
+    const cropWidth = 100 * slotRatio;
+    return { cropWidth, cropHeight };
+  };
+
+  const { cropWidth, cropHeight } = getCropDimensions();
+
+  // Calculate position to center the crop area
+  const cropX = (100 - cropWidth) / 2;
+  const cropY = (100 - cropHeight) / 2;
+
+  return (
+    <div className="crop-overlay">
+      <svg
+        className="crop-overlay-svg"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <mask id="cropMask">
+            {/* White = visible, Black = hidden */}
+            {/* Fill entire area with white (semi-transparent overlay) */}
+            <rect x="0" y="0" width="100" height="100" fill="white" />
+            {/* Cut out the crop area (black = transparent) */}
+            <rect
+              x={cropX}
+              y={cropY}
+              width={cropWidth}
+              height={cropHeight}
+              fill="black"
+            />
+          </mask>
+        </defs>
+        {/* Semi-transparent overlay with the crop area cut out */}
+        <rect
+          x="0"
+          y="0"
+          width="100"
+          height="100"
+          fill="rgba(0, 0, 0, 0.6)"
+          mask="url(#cropMask)"
+        />
+        {/* Border around the crop area */}
+        <rect
+          x={cropX}
+          y={cropY}
+          width={cropWidth}
+          height={cropHeight}
+          fill="none"
+          stroke="white"
+          strokeWidth="0.3"
+          strokeDasharray="2,1"
+        />
+      </svg>
+    </div>
+  );
+}
+
 export default function MainShooting() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -395,9 +474,7 @@ export default function MainShooting() {
 
       {/* Main Content */}
       <div className="main-content">
-        <div
-          className={`camera-container ${state.selectedFrame?.orientation === 'portrait' ? 'portrait' : 'landscape'}`}
-        >
+        <div className="camera-container">
           <video
             ref={videoRef}
             autoPlay
@@ -406,6 +483,14 @@ export default function MainShooting() {
             className="camera-feed"
           />
           <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+          {/* Crop Overlay - shows the crop area based on slot ratio */}
+          {!isCameraLoading && state.selectedFrame?.slots?.[0] && (
+            <CropOverlay
+              slotWidth={state.selectedFrame.slots[0].width}
+              slotHeight={state.selectedFrame.slots[0].height}
+            />
+          )}
 
           {/* Camera Loading Overlay */}
           {isCameraLoading && (
@@ -442,19 +527,29 @@ export default function MainShooting() {
       {/* Photo Thumbnails Grid */}
       <div className="thumbnails-container">
         <div className="thumbnails-grid">
-          {Array.from({ length: requiredCaptures }, (_, index) => (
-            <div key={index} className="thumbnail-slot">
-              {captures[index] ? (
-                <img
-                  src={captures[index].photo}
-                  alt={`Capture ${index + 1}`}
-                  className="thumbnail-image"
-                />
-              ) : (
-                <div className="thumbnail-placeholder" />
-              )}
-            </div>
-          ))}
+          {Array.from({ length: requiredCaptures }, (_, index) => {
+            const slot = state.selectedFrame?.slots?.[0];
+            const aspectRatio = slot
+              ? `${slot.width} / ${slot.height}`
+              : '16 / 9';
+            return (
+              <div
+                key={index}
+                className="thumbnail-slot"
+                style={{ aspectRatio }}
+              >
+                {captures[index] ? (
+                  <img
+                    src={captures[index].photo}
+                    alt={`Capture ${index + 1}`}
+                    className="thumbnail-image"
+                  />
+                ) : (
+                  <div className="thumbnail-placeholder" />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
