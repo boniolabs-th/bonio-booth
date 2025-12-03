@@ -204,7 +204,7 @@ export default function SelectPrint() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={30}
+        seconds={30000}
         onComplete={handleCountdownComplete}
         visible={true}
       />
@@ -272,7 +272,15 @@ export default function SelectPrint() {
             onClick={handleDiscountCoupon}
           >
             <div className="button-icon">
-              <img src={couponIcon} alt="Coupon Icon" className="coupon-icon" />
+              <div
+                className="coupon-icon"
+                role="img"
+                aria-label="Coupon Icon"
+                style={{
+                  WebkitMaskImage: `url(${couponIcon})`,
+                  maskImage: `url(${couponIcon})`,
+                }}
+              />
             </div>
             <span className="button-text-thai">ใช้</span>
             <span className="button-text-english">Discount Coupon</span>

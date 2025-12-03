@@ -1,16 +1,28 @@
 import { createRoot } from 'react-dom/client';
 import App from './App';
 
+interface ThemeData {
+  _id?: string;
+  name?: string;
+  code?: string;
+  background?: string;
+  backgroundSecond?: string;
+  primaryColor?: string;
+  fontColor?: string;
+  frames?: any[];
+  isActive?: boolean;
+}
+
 const container = document.getElementById('root') as HTMLElement;
 const root = createRoot(container);
 root.render(<App />);
 
 // Cache theme data
-let cachedTheme: { background?: string; backgroundSecond?: string; primaryColor?: string; fontColor?: string } | null = null;
+let cachedTheme: ThemeData | null = null;
 
 // รับ theme data จาก main process และตั้งค่า background
 window.electron?.ipcRenderer.on('theme-loaded', (...args: unknown[]) => {
-  const theme = args[0] as { background?: string; backgroundSecond?: string; primaryColor?: string; fontColor?: string };
+  const theme = args[0] as ThemeData;
   console.log('🎨 Theme received:', theme);
 
   // Cache theme data
@@ -26,7 +38,10 @@ window.electron?.ipcRenderer.on('theme-loaded', (...args: unknown[]) => {
   }
 
   if (theme?.primaryColor) {
-    document.documentElement.style.setProperty('--primary-color', theme.primaryColor);
+    document.documentElement.style.setProperty(
+      '--primary-color',
+      theme.primaryColor,
+    );
   }
 
   if (theme?.fontColor) {
@@ -47,11 +62,15 @@ window.addEventListener('message', (event) => {
 
     // Use background for home page ('/'), backgroundSecond for all other pages
     const isHomePage = pathname === '/';
-    const backgroundUrl = isHomePage ? cachedTheme.background : cachedTheme.backgroundSecond;
+    const backgroundUrl = isHomePage
+      ? cachedTheme.background
+      : cachedTheme.backgroundSecond;
 
     if (backgroundUrl) {
       document.body.style.backgroundImage = `url(${backgroundUrl})`;
-      console.log(`✅ Background switched to: ${isHomePage ? 'background' : 'backgroundSecond'}`);
+      console.log(
+        `✅ Background switched to: ${isHomePage ? 'background' : 'backgroundSecond'}`,
+      );
     }
   }
 });
@@ -60,30 +79,41 @@ window.addEventListener('message', (event) => {
 setTimeout(() => {
   if (!cachedTheme) {
     console.log('🔍 Requesting theme data...');
-    window.electron?.payment.getThemeData().then((result: any) => {
-      if (result.success && result.theme) {
-        console.log('🎨 Theme data loaded from cache:', result.theme);
-        cachedTheme = result.theme;
+    window.electron?.payment
+      .getThemeData()
+      .then((result: any) => {
+        if (result.success && result.theme) {
+          console.log('🎨 Theme data loaded from cache:', result.theme);
+          cachedTheme = result.theme;
 
-        // Set initial background
-        if (result.theme.background) {
-          document.body.style.backgroundImage = `url(${result.theme.background})`;
-          document.body.style.backgroundSize = 'contain';
-          document.body.style.backgroundPosition = 'center';
-          document.body.style.backgroundRepeat = 'no-repeat';
-        }
+          // Set initial background
+          if (result.theme.background) {
+            document.body.style.backgroundImage = `url(${result.theme.background})`;
+            document.body.style.backgroundSize = 'contain';
+            document.body.style.backgroundPosition = 'center';
+            document.body.style.backgroundRepeat = 'no-repeat';
+          }
 
-        if (result.theme.primaryColor) {
-          document.documentElement.style.setProperty('--primary-color', result.theme.primaryColor);
-        }
+          if (result.theme.primaryColor) {
+            document.documentElement.style.setProperty(
+              '--primary-color',
+              result.theme.primaryColor,
+            );
+          }
 
-        if (result.theme.fontColor) {
-          document.body.style.color = result.theme.fontColor;
+          if (result.theme.fontColor) {
+            document.body.style.color = result.theme.fontColor;
+            document.documentElement.style.setProperty(
+              '--font-color',
+              result.theme.fontColor,
+            );
+          }
         }
-      }
-    }).catch((error: any) => {
-      console.error('❌ Failed to get theme data:', error);
-    });
+        return result;
+      })
+      .catch((error: any) => {
+        console.error('❌ Failed to get theme data:', error);
+      });
   }
 }, 1000);
 

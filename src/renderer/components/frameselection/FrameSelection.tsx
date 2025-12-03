@@ -41,7 +41,9 @@ export default function FrameSelection() {
 
   // Handle countdown completion - ไปหน้าถัดไปอัตโนมัติเมื่อหมดเวลา
   const handleCountdownComplete = useCallback(() => {
-    console.log('⏰ [FrameSelection] Countdown completed, auto-navigating to photo-prepare');
+    console.log(
+      '⏰ [FrameSelection] Countdown completed, auto-navigating to photo-prepare',
+    );
     // ไปหน้าถัดไปอัตโนมัติด้วย frame ที่เลือกอยู่
     // navigate('/photo-prepare', {
     //   state: {
@@ -64,7 +66,7 @@ export default function FrameSelection() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={30}
+        seconds={30000}
         onComplete={handleCountdownComplete}
         visible={true}
       />
@@ -106,7 +108,12 @@ export default function FrameSelection() {
                   >
                     {selectedFrame.id === frame.id && (
                       <div className="selected-badge">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                        >
                           <path
                             d="M20 6L9 17l-5-5"
                             stroke="white"

@@ -39,19 +39,23 @@ export default function PaymentQR() {
   // ใช้ discountAmount และ netAmount จาก state (ที่ได้จาก API) ถ้ามี
   // ถ้าไม่มีให้คำนวณเอง
   const originalPrice = state.originalPrice || state.totalPrice;
-  const discountAmount = state.discountAmount !== undefined
-    ? state.discountAmount
-    : state.discountCode
-    ? calculateDiscount(state.discountCode, originalPrice)
-    : 0;
-  const finalPrice = state.netAmount !== undefined
-    ? state.netAmount
-    : originalPrice - discountAmount;
+  const discountAmount =
+    state.discountAmount !== undefined
+      ? state.discountAmount
+      : state.discountCode
+        ? calculateDiscount(state.discountCode, originalPrice)
+        : 0;
+  const finalPrice =
+    state.netAmount !== undefined
+      ? state.netAmount
+      : originalPrice - discountAmount;
 
-  const [timeLeft, setTimeLeft] = useState(30); // 5 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(30000); // 5 minutes in seconds
   const [isTimeout, setIsTimeout] = useState(false); // Track ว่า timeout แล้วหรือยัง
   const [qrCode, setQrCode] = useState<string>(state?.qrcode || '');
-  const [referenceId, setReferenceId] = useState<string>(state?.referenceId || '');
+  const [referenceId, setReferenceId] = useState<string>(
+    state?.referenceId || '',
+  );
   const [isLoading, setIsLoading] = useState(!state?.qrcode);
   const [error, setError] = useState<string>('');
 
@@ -154,17 +158,23 @@ export default function PaymentQR() {
 
     const statusChecker = setInterval(async () => {
       try {
-        const result = await window.electron.payment.checkMachinePaymentStatus(referenceId);
-        
+        const result =
+          await window.electron.payment.checkMachinePaymentStatus(referenceId);
+
         if (result.success && result.status) {
           setPaymentStatus(result.status as any);
-          
+
           // เช็คว่า payment สำเร็จหรือไม่
-          if (result.status === 'SUCCESS' || result.transactionStatus === 'success') {
+          if (
+            result.status === 'SUCCESS' ||
+            result.transactionStatus === 'success'
+          ) {
             // Payment successful, start countdown
             setSuccessCountdown(3);
           } else if (
-            ['FAIL', 'PAYERROR', 'CLOSED', 'failed'].includes(result.status as string) ||
+            ['FAIL', 'PAYERROR', 'CLOSED', 'failed'].includes(
+              result.status as string,
+            ) ||
             result.transactionStatus === 'failed'
           ) {
             setError('Payment failed. Please try again.');
@@ -371,12 +381,13 @@ export default function PaymentQR() {
             {!isTimeout && (
               <span className="timer-text">{formatTime(timeLeft)}</span>
             )}
-            {isTimeout && (
-              <span className="timer-text">Timeout</span>
-            )}
+            {isTimeout && <span className="timer-text">Timeout</span>}
           </div>
           {/* <p className="timer-label">{getTimerLabel()}</p> */}
-          <p className="title-thai timer-label"> กรุณาชำระเงินภายในเวลาที่กำหนด</p>
+          <p className="title-thai timer-label">
+            {' '}
+            กรุณาชำระเงินภายในเวลาที่กำหนด
+          </p>
           <p className="title-english timer-label">
             Please complete your payment within the time limit.
           </p>

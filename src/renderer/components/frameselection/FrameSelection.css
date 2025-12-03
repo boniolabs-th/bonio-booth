@@ -2,12 +2,8 @@
   position: relative;
   width: 100%;
   height: 100%;
-  /* background: white; */
   display: flex;
   flex-direction: column;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #333;
-  /* overflow: hidden; */
 }
 
 /* Main Content */
@@ -65,7 +61,6 @@
   font-weight: 700;
   margin: 0 0 8px 0;
   text-align: center;
-  color: #2c2c2c;
   line-height: 1.2;
 }
 
@@ -73,7 +68,6 @@
   font-size: 1rem;
   margin: 0;
   text-align: center;
-  color: #2c2c2c;
   font-weight: 500;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -127,12 +121,12 @@
 }
 
 .frame-thumbnail:hover {
-  border-color: #ffa500;
+  border-color: var(--primary-color);
   transform: scale(1.05);
 }
 
 .frame-thumbnail.selected {
-  border: 2px solid #ffa500;
+  border: 2px solid var(--primary-color);
   box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
 }
 
@@ -160,7 +154,7 @@
   transform: translateX(-50%);
   width: 24px;
   height: 24px;
-  background: #ffa500;
+  background: var(--primary-color);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -203,32 +197,6 @@
   letter-spacing: 2px;
 }
 
-/* Confirm Button
-.confirm-button {
-  padding: 18px 80px;
-  font-size: 24px;
-  font-weight: 600;
-  color: white;
-  background: #ffa500;
-  border: none;
-  border-radius: 50px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 6px 20px rgba(255, 165, 0, 0.4);
-  min-width: 250px;
-}
-
-.confirm-button:hover {
-  background: #ff8c00;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(255, 165, 0, 0.5);
-}
-
-.confirm-button:active {
-  transform: translateY(0);
-  box-shadow: 0 4px 15px rgba(255, 165, 0, 0.4);
-} */
-
 
 /* Boomerang Option Section */
 .boomerang-option-section {
@@ -243,7 +211,6 @@
 .boomerang-option-title {
   font-size: 18px;
   font-weight: 600;
-  color: #2c2c2c;
   margin-bottom: 16px;
   text-align: center;
 }
@@ -269,13 +236,13 @@
 }
 
 .boomerang-option-button:hover {
-  border-color: #ffa500;
+  border-color: var(--primary-color);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(255, 165, 0, 0.2);
 }
 
 .boomerang-option-button.active {
-  border-color: #ffa500;
+  border-color: var(--primary-color);
   background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, rgba(255, 140, 0, 0.1) 100%);
   box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
 }
@@ -292,7 +259,7 @@
 }
 
 .boomerang-option-button.active .boomerang-option-icon {
-  color: #ffa500;
+  color: var(--primary-color);
 }
 
 .boomerang-option-content {
@@ -310,7 +277,7 @@
 }
 
 .boomerang-option-button.active .boomerang-option-name {
-  color: #ffa500;
+  color: var(--primary-color);
 }
 
 .boomerang-option-desc {
@@ -324,12 +291,11 @@
   font-size: 24px;
   font-weight: 600;
   color: white;
-  background: linear-gradient(135deg, #ffa500 0%, #ff8c00 100%);
+  background: var(--primary-color);
   border: none;
   border-radius: 16px;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 6px 20px rgba(255, 165, 0, 0.4);
   min-width: 250px;
 }
 
