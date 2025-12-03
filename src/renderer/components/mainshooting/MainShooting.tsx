@@ -289,6 +289,13 @@ export default function MainShooting() {
           for (let i = 0; i < requiredCaptures; i += 1) {
             console.log(`📷 Starting capture ${i + 1}/${requiredCaptures}`);
 
+            // Wait 3 seconds before first capture
+            // if (i === 0) {
+            //   console.log('⏳ Waiting 3 seconds before first capture...');
+            //   // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
+            //   await new Promise((resolve) => setTimeout(resolve, 3000));
+            // }
+
             // Start recording video
             startRecording();
 
