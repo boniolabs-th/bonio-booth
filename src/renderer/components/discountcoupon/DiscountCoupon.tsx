@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { BackButton } from '..';
+import { BackButton, Countdown } from '..';
 import './DiscountCoupon.css';
 
 interface LocationState {
@@ -46,6 +46,10 @@ export default function DiscountCoupon() {
       setError(null);
     }
   };
+
+  const handleCountdownComplete = useCallback(() => {
+    navigate('/');
+  }, [navigate]);
 
   const handleConfirm = async () => {
     // Check if code is not empty
@@ -102,9 +106,12 @@ export default function DiscountCoupon() {
           orderId: paymentResult.order_id,
           couponCodeId: paymentResult.couponCodeId,
         };
-        
-        console.log('💳 [DiscountCoupon] Navigating with state:', navigationState);
-        
+
+        console.log(
+          '💳 [DiscountCoupon] Navigating with state:',
+          navigationState,
+        );
+
         navigate('/payment-qr', {
           state: navigationState,
         });
@@ -125,6 +132,13 @@ export default function DiscountCoupon() {
   return (
     <div className="discount-coupon-container">
       <BackButton onBackClick={handleBack} />
+
+      {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ (ซ่อนการแสดงผล) */}
+      <Countdown
+        seconds={30}
+        onComplete={handleCountdownComplete}
+        visible={false}
+      />
 
       <div className="discount-content">
         {/* Title Section */}
@@ -187,7 +201,7 @@ export default function DiscountCoupon() {
           </div>
           {/* Row 4: Z X C V B N M */}
           <div className="keypad-row">
-            {['', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', ''].map((key,index) => (
+            {['', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', ''].map((key, index) => (
               <button
                 key={index}
                 type="button"

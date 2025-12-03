@@ -35,8 +35,9 @@ export default function Countdown({
   }, [seconds]);
 
   // เรียก onComplete เมื่อ timeLeft ถึง 0 (แยกออกจาก countdown logic เพื่อหลีกเลี่ยง setState ใน render)
+  // ไม่ต้องเช็ค visible เพราะต้องการให้ onComplete ทำงานแม้ซ่อนอยู่
   useEffect(() => {
-    if (timeLeft === 0 && visible && !hasCompletedRef.current) {
+    if (timeLeft === 0 && !hasCompletedRef.current) {
       hasCompletedRef.current = true;
       // ใช้ setTimeout เพื่อให้แน่ใจว่าไม่ได้เรียกในระหว่าง render cycle
       setTimeout(() => {
@@ -45,11 +46,11 @@ export default function Countdown({
         }
       }, 0);
     }
-  }, [timeLeft, visible]);
+  }, [timeLeft]);
 
-  // Countdown logic
+  // Countdown logic - ทำงานแม้ visible={false} (แค่ซ่อนการแสดงผล)
   useEffect(() => {
-    if (!visible || timeLeft <= 0) {
+    if (timeLeft <= 0) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -72,7 +73,7 @@ export default function Countdown({
         intervalRef.current = null;
       }
     };
-  }, [visible, timeLeft]);
+  }, [timeLeft]);
 
   // Cleanup เมื่อ component unmount
   useEffect(() => {
