@@ -1,4 +1,5 @@
 export { default as BackButton } from './backbutton';
+export { default as Countdown } from './countdown';
 export { default as Home } from './home';
 export { default as SelectPrint } from './selectprint';
 export { default as FrameSelection } from './frameselection';

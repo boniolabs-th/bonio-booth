@@ -1,0 +1,86 @@
+.countdown-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  pointer-events: none; /* ไม่ให้ countdown block การคลิก */
+}
+
+.countdown-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.7);
+  border: 3px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.countdown-circle:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.countdown-text {
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: bold;
+  font-family: 'Arial', sans-serif;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  user-select: none;
+}
+
+/* Warning state เมื่อเหลือเวลาน้อย (น้อยกว่า 10 วินาที) */
+.countdown-container.warning .countdown-circle {
+  background-color: rgba(255, 87, 34, 0.9);
+  border-color: #ff5722;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+/* Critical state เมื่อเหลือเวลาน้อยมาก (น้อยกว่า 5 วินาที) */
+.countdown-container.critical .countdown-circle {
+  background-color: rgba(244, 67, 54, 0.9);
+  border-color: #f44336;
+  animation: pulse-fast 0.5s infinite;
+}
+
+@keyframes pulse-fast {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+/* Responsive สำหรับหน้าจอเล็ก */
+@media (max-width: 768px) {
+  .countdown-container {
+    top: 15px;
+    right: 15px;
+  }
+
+  .countdown-circle {
+    width: 60px;
+    height: 60px;
+  }
+
+  .countdown-text {
+    font-size: 18px;
+  }
+}
+

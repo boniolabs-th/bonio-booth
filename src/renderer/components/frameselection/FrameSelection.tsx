@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useState } from 'react';
-import { BackButton } from '..';
+import { useState, useCallback } from 'react';
+import { BackButton, Countdown } from '..';
 import { FRAME_CONFIGS, FrameConfig } from '../../utils/frameConfig';
 import './FrameSelection.css';
 
@@ -39,10 +39,35 @@ export default function FrameSelection() {
     });
   };
 
+  // Handle countdown completion - ไปหน้าถัดไปอัตโนมัติเมื่อหมดเวลา
+  const handleCountdownComplete = useCallback(() => {
+    console.log('⏰ [FrameSelection] Countdown completed, auto-navigating to photo-prepare');
+    // ไปหน้าถัดไปอัตโนมัติด้วย frame ที่เลือกอยู่
+    // navigate('/photo-prepare', {
+    //   state: {
+    //     ...state,
+    //     selectedFrame,
+    //     useBoomerang,
+    //     transactionId: state.transactionId,
+    //     referenceId: state.referenceId,
+    //     paymentDetailsId: state.paymentDetailsId,
+    //   },
+    // });
+
+    navigate('/');
+  }, [navigate]);
+
   return (
     <div className="frame-selection-container">
       {/* Back Button */}
       <BackButton onBackClick={handleBack} />
+
+      {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
+      <Countdown
+        seconds={30}
+        onComplete={handleCountdownComplete}
+        visible={true}
+      />
 
       {/* Main Content */}
       <div className="main-content-frame">
