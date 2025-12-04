@@ -135,7 +135,7 @@ export default function DiscountCoupon() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ (ซ่อนการแสดงผล) */}
       <Countdown
-        seconds={30}
+        seconds={30000}
         onComplete={handleCountdownComplete}
         visible={false}
       />

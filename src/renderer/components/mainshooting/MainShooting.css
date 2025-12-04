@@ -40,26 +40,24 @@
 }
 
 /* Title Section */
-.title-section {
+.title-section-shooting {
   text-align: center;
-  padding: 20px 40px 10px;
-  /* background: white; */
-  background:  rgba(0, 0, 0, 0.2);
+  margin-top: 15%;
   z-index: 5;
 }
 
 .title-thai {
-  font-size: 2.5rem;
+  font-size: 4rem;
   font-weight: 700;
-  color: #2c2c2c;
+  color: var(--font-color);
   margin: 0 0 8px 0;
   line-height: 1.2;
 }
 
 .title-english {
-  font-size: 1rem;
+  font-size: 2rem;
   font-weight: 500;
-  color: #2c2c2c;
+  color: var(--font-color);
   margin: 0;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -83,6 +81,7 @@
   border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  width: 100%;
   max-height: 65vh;
   display: flex;
   align-items: center;
@@ -90,11 +89,14 @@
 }
 
 .camera-feed {
-  width: auto;
-  height: 100%;
+  width: 100%;
+  height: auto;
   max-height: 65vh;
   object-fit: contain;
   border-radius: 20px;
+  /* Mirror the live preview horizontally */
+  transform: scaleX(-1);
+  transform-origin: center;
 }
 
 /* Crop Overlay - darkens area outside the crop zone */

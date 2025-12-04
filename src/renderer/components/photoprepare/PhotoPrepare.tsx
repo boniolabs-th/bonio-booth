@@ -47,7 +47,7 @@ export default function PhotoPrepare() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={30000}
+        seconds={30}
         onComplete={handleCountdownComplete}
         visible={true}
       />
@@ -72,7 +72,7 @@ export default function PhotoPrepare() {
               </div>
               <div className="step-content">
                 <div className="step-icon">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                  <svg width="56" height="56" viewBox="0 0 24 24" fill="none">
                     <path
                       d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
                       stroke="currentColor"
@@ -106,7 +106,7 @@ export default function PhotoPrepare() {
               </div>
               <div className="step-content">
                 <div className="step-icon">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                  <svg width="56" height="56" viewBox="0 0 24 24" fill="none">
                     <circle
                       cx="12"
                       cy="12"
@@ -135,7 +135,7 @@ export default function PhotoPrepare() {
               <div className="step-content">
                 <div className="step-icon-group">
                   {/* Frame with Play Icon */}
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                  <svg width="56" height="56" viewBox="0 0 24 24" fill="none">
                     <rect
                       x="3"
                       y="3"
@@ -148,7 +148,7 @@ export default function PhotoPrepare() {
                     <polygon points="10,8 10,16 16,12" fill="currentColor" />
                   </svg>
                   {/* Printer Icon */}
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                  <svg width="56" height="56" viewBox="0 0 24 24" fill="none">
                     <polyline
                       points="6,9 6,2 18,2 18,9"
                       stroke="currentColor"

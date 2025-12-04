@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { FrameConfig, FILTERS } from '../../utils/frameConfig';
 import { getCachedLUT, getLUTFilePath } from '../../utils/lutProcessor';
 import { applyLUTWithWorker } from '../../utils/lutWorkerHelper';
+import { drawPhotoInSlot } from '../../utils/canvasUtils';
 import './PhotoFilter.css';
 import { Countdown } from '..';
 
@@ -30,16 +31,120 @@ export default function PhotoFilter() {
   const [selectedFilter, setSelectedFilter] = useState<string>('none');
   const [previewImage, setPreviewImage] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [isGeneratingPreview, setIsGeneratingPreview] = useState<boolean>(false);
+  const [isGeneratingPreview, setIsGeneratingPreview] =
+    useState<boolean>(false);
   const [printStatus, setPrintStatus] = useState<
     'idle' | 'printing' | 'success' | 'error'
   >('idle');
+  const [lutThumbnails, setLutThumbnails] = useState<Record<string, string>>(
+    {},
+  );
+  const [isGeneratingThumbnails, setIsGeneratingThumbnails] =
+    useState<boolean>(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleCountdownComplete = useCallback(() => {
-    console.log('⏰ [PhotoFilter] Countdown completed, auto-navigating to home');
+    console.log(
+      '⏰ [PhotoFilter] Countdown completed, auto-navigating to home',
+    );
     navigate('/');
   }, [navigate]);
+
+  // Generate LUT preview thumbnails for filter selection
+  const generateLutThumbnails = useCallback(async () => {
+    if (!state.selectedCaptures?.length) return;
+
+    setIsGeneratingThumbnails(true);
+    const thumbnails: Record<string, string> = {};
+
+    // Get LUT filters only
+    const lutFilters = FILTERS.filter((f) => f.type === 'lut' && f.lutFile);
+
+    // Create a small thumbnail from the first photo for faster processing
+    const createThumbnail = (photoUrl: string): Promise<HTMLCanvasElement> => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Cannot create canvas context'));
+            return;
+          }
+          // Use smaller size for thumbnails (faster processing)
+          const maxSize = 200;
+          const scale = Math.min(maxSize / img.width, maxSize / img.height);
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas);
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = photoUrl;
+      });
+    };
+
+    try {
+      // Create thumbnail canvas once
+      const thumbnailCanvas = await createThumbnail(
+        state.selectedCaptures[0].photo,
+      );
+
+      // Process all LUT filters concurrently
+      const processFilter = async (
+        filter: (typeof lutFilters)[0],
+      ): Promise<{ id: string; dataUrl: string } | null> => {
+        try {
+          // Clone the thumbnail canvas for each filter
+          const canvas = document.createElement('canvas');
+          canvas.width = thumbnailCanvas.width;
+          canvas.height = thumbnailCanvas.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return null;
+
+          ctx.drawImage(thumbnailCanvas, 0, 0);
+
+          // Apply LUT
+          const lutPath = getLUTFilePath(filter.lutFile!);
+          const lut = await getCachedLUT(lutPath);
+          const processedCanvas = await applyLUTWithWorker(canvas, lut);
+          return {
+            id: filter.id,
+            dataUrl: processedCanvas.toDataURL('image/jpeg', 0.8),
+          };
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error(
+            `Failed to generate thumbnail for ${filter.id}:`,
+            error,
+          );
+          return null;
+        }
+      };
+
+      // Process all filters concurrently
+      const results = await Promise.all(lutFilters.map(processFilter));
+
+      // Build thumbnails object from results
+      results.forEach((result) => {
+        if (result) {
+          thumbnails[result.id] = result.dataUrl;
+        }
+      });
+
+      setLutThumbnails(thumbnails);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to generate LUT thumbnails:', error);
+    } finally {
+      setIsGeneratingThumbnails(false);
+    }
+  }, [state.selectedCaptures]);
+
+  // Generate LUT thumbnails on mount
+  useEffect(() => {
+    generateLutThumbnails();
+  }, [generateLutThumbnails]);
 
   // Filter รูปภาพแต่ละรูป (รองรับทั้ง CSS และ LUT)
   const applyFilterToPhoto = async (photoUrl: string): Promise<string> => {
@@ -157,46 +262,13 @@ export default function PhotoFilter() {
 
             const photoImg = new Image();
             photoImg.onload = () => {
-              ctx.save();
-
-              // Calculate crop dimensions (cover behavior - crop to fit slot)
-              const photoAspect = photoImg.width / photoImg.height;
-              const slotAspect = slot.width / slot.height;
-
-              let sourceX = 0;
-              let sourceY = 0;
-              let sourceWidth = photoImg.width;
-              let sourceHeight = photoImg.height;
-
-              if (photoAspect > slotAspect) {
-                // Photo is wider - crop sides
-                sourceWidth = photoImg.height * slotAspect;
-                sourceX = (photoImg.width - sourceWidth) / 2;
-              } else {
-                // Photo is taller - crop top/bottom
-                sourceHeight = photoImg.width / slotAspect;
-                sourceY = (photoImg.height - sourceHeight) / 2;
-              }
-
-              const targetX = slot.x * scaleX;
-              const targetY = slot.y * scaleY;
-              const targetWidth = slot.width * scaleX;
-              const targetHeight = slot.height * scaleY;
-
-              // Draw filtered photo in slot
-              ctx.drawImage(
+              drawPhotoInSlot({
+                ctx,
                 photoImg,
-                sourceX,
-                sourceY,
-                sourceWidth,
-                sourceHeight,
-                targetX,
-                targetY,
-                targetWidth,
-                targetHeight,
-              );
-
-              ctx.restore();
+                slot,
+                scaleX,
+                scaleY,
+              });
 
               loadedPhotos += 1;
               if (loadedPhotos === totalPhotos) {
@@ -384,12 +456,6 @@ export default function PhotoFilter() {
 
   return (
     <div className="photo-filter-container">
-      {/* Header */}
-      <div className="filter-header">
-        <h1 className="filter-title">ตกแต่งรูปของคุณ</h1>
-        <p className="filter-subtitle">DECORATE YOUR PHOTO</p>
-      </div>
-
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
         seconds={30}
@@ -397,131 +463,159 @@ export default function PhotoFilter() {
         visible={true}
       />
 
-      {/* Main Layout */}
-      <div className="filter-main">
-        {/* Left - Photo Strip */}
-
-        <div className="canvas-section">
-          <div className="canvas-container">
-            {previewImage ? (
-              <img
-                src={previewImage}
-                alt="Photo with frame preview"
-                className="canvas-image"
-              />
-            ) : state.finalImage ? (
-              <img
-                src={state.finalImage}
-                alt="Photo with frame"
-                className="canvas-image"
-              />
-            ) : null}
-            {isGeneratingPreview && (
-              <div className="preview-loading-overlay">
-                <div className="preview-spinner">
-                  <svg
-                    width="60"
-                    height="60"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <circle
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      strokeOpacity="0.25"
-                    />
-                    <path
-                      d="M12 2a10 10 0 0 1 10 10"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </div>
-                <p className="preview-loading-text">กำลังประมวลผล Filter...</p>
-              </div>
-            )}
+      {/* Main Content */}
+      <div className="main-content-filter">
+        {/* Row 1: Title (20%) */}
+        <div className="row-top">
+          <div className="title-section">
+            <h1 className="filter-title">ตกแต่งรูปของคุณ</h1>
+            <p className="filter-subtitle">DECORATE YOUR PHOTO</p>
           </div>
         </div>
-        {/* Right - Canvas Area */}
-        <div className="photo-strip-section">
-          {/* Filter Preview Section */}
-          {state.selectedCaptures.length > 0 && (
-            <div className="filter-preview-section">
-              <div className="filter-preview-title">เลือก Filter</div>
-              <div className="filter-preview-grid">
-                {FILTERS.map((filter) => {
-                  const getFilterStyle = (filterId: string) => {
-                    const f = FILTERS.find((fl) => fl.id === filterId);
-                    // Only return CSS filter (LUT preview handled separately)
-                    if (f?.type === 'css') {
-                      return f?.filter || '';
-                    }
-                    return '';
-                  };
 
-                  return (
-                    <button
-                      key={filter.id}
-                      type="button"
-                      className={`filter-preview-item ${
-                        selectedFilter === filter.id ? 'active' : ''
-                      }`}
-                      onClick={() => handleFilterClick(filter.id)}
-                    >
-                      <div className="filter-preview-image">
-                        <img
-                          src={state.selectedCaptures[0].photo}
-                          alt={filter.name}
-                          style={{ filter: getFilterStyle(filter.id) }}
+        {/* Row 2: Main Layout (60%) */}
+        <div className="row-middle">
+          <div className="filter-main">
+            {/* Left - Canvas Preview */}
+            <div className="canvas-section">
+              <div className="canvas-container">
+                {previewImage ? (
+                  <img
+                    src={previewImage}
+                    alt="Photo with frame preview"
+                    className="canvas-image"
+                  />
+                ) : state.finalImage ? (
+                  <img
+                    src={state.finalImage}
+                    alt="Photo with frame"
+                    className="canvas-image"
+                  />
+                ) : null}
+                {isGeneratingPreview && (
+                  <div className="preview-loading-overlay">
+                    <div className="preview-spinner">
+                      <svg
+                        width="60"
+                        height="60"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                        <path
+                          d="M12 2a10 10 0 0 1 10 10"
+                          strokeLinecap="round"
                         />
-                        {filter.type === 'lut' && (
-                          <div className="lut-badge">LUT</div>
-                        )}
-                      </div>
-                      <div className="filter-preview-name">{filter.name}</div>
-                    </button>
-                  );
-                })}
+                      </svg>
+                    </div>
+                    <p className="preview-loading-text">
+                      กำลังประมวลผล Filter...
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Bottom Button */}
-      <div className="filter-footer">
-        <button
-          type="button"
-          className="print-button"
-          onClick={handlePrint}
-          disabled={isProcessing}
-        >
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+            {/* Right - Filter Selection */}
+            <div className="photo-strip-section">
+              {/* Filter Preview Section */}
+              {state.selectedCaptures.length > 0 && (
+                <div className="filter-preview-section">
+                  <div className="filter-preview-title">เลือก Filter</div>
+                  <div className="filter-preview-grid">
+                    {FILTERS.map((filter) => {
+                      const getFilterStyle = (filterId: string) => {
+                        const f = FILTERS.find((fl) => fl.id === filterId);
+                        // Only return CSS filter (LUT preview handled separately)
+                        if (f?.type === 'css') {
+                          return f?.filter || '';
+                        }
+                        return '';
+                      };
+
+                      // Get thumbnail source - use LUT processed thumbnail if available
+                      const getThumbnailSrc = () => {
+                        if (filter.type === 'lut' && lutThumbnails[filter.id]) {
+                          return lutThumbnails[filter.id];
+                        }
+                        return state.selectedCaptures[0].photo;
+                      };
+
+                      return (
+                        <button
+                          key={filter.id}
+                          type="button"
+                          className={`filter-preview-item ${
+                            selectedFilter === filter.id ? 'active' : ''
+                          }`}
+                          onClick={() => handleFilterClick(filter.id)}
+                        >
+                          <div className="filter-preview-image">
+                            {filter.type === 'lut' &&
+                            !lutThumbnails[filter.id] &&
+                            isGeneratingThumbnails ? (
+                              <div className="lut-thumbnail-loading">
+                                <div className="lut-thumbnail-spinner" />
+                              </div>
+                            ) : (
+                              <img
+                                src={getThumbnailSrc()}
+                                alt={filter.name}
+                                style={{ filter: getFilterStyle(filter.id) }}
+                              />
+                            )}
+                            {filter.type === 'lut' && (
+                              <div className="lut-badge">LUT</div>
+                            )}
+                          </div>
+                          <div className="filter-preview-name">
+                            {filter.name}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Row 3: Button (20%) */}
+        <div className="row-bottom">
+          <button
+            type="button"
+            className="next-button-filter"
+            onClick={handlePrint}
+            disabled={isProcessing}
           >
-            <polyline points="6 9 6 2 18 2 18 9" />
-            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-            <rect x="6" y="14" width="12" height="8" />
-          </svg>
-          {isProcessing
-            ? 'กำลังประมวลผล...'
-            : printStatus === 'printing'
-              ? 'กำลังพิมพ์...'
-              : printStatus === 'success'
-                ? 'พิมพ์สำเร็จ ✓'
-                : printStatus === 'error'
-                  ? 'พิมพ์ไม่สำเร็จ ✗'
-                  : 'พิมพ์รูปภาพ'}
-        </button>
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            {isProcessing
+              ? 'กำลังประมวลผล...'
+              : printStatus === 'printing'
+                ? 'กำลังพิมพ์...'
+                : printStatus === 'success'
+                  ? 'พิมพ์สำเร็จ ✓'
+                  : printStatus === 'error'
+                    ? 'พิมพ์ไม่สำเร็จ ✗'
+                    : 'พิมพ์รูปภาพ'}
+          </button>
+        </div>
       </div>
 
       {/* Hidden canvas for applying filter */}

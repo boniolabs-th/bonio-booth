@@ -24,7 +24,7 @@
 }
 
 .title-thai {
-  font-size: 2.5rem;
+  font-size: 4rem;
   font-weight: 700;
   color: var(--font-color);
   margin: 0 0 8px 0;
@@ -32,7 +32,7 @@
 }
 
 .title-english {
-  font-size: 1rem;
+  font-size: 2rem;
   font-weight: 500;
   color: var(--font-color);
   margin: 0;
@@ -179,7 +179,7 @@
   filter: brightness(0) invert(1);
 }
 .button-text-thai {
-  font-size: 1rem;
+  font-size: 2rem;
   font-weight: 600;
   line-height: 1.2;
 }

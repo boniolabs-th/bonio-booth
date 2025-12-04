@@ -1,11 +1,8 @@
 .photo-confirmation-container {
   width: 100vw;
   height: 100vh;
-  /* background: white; */
   display: flex;
   flex-direction: column;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: white;
   overflow: hidden;
 }
 
@@ -19,12 +16,6 @@
   box-sizing: border-box;
   position: relative;
   z-index: 10;
-}
-
-.back-button:hover {
-  background: rgba(255, 255, 255, 1);
-  transform: scale(1.05);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
 }
 
 .logo-container {
@@ -59,7 +50,6 @@
   font-size: 32px;
   font-weight: bold;
   margin-bottom: 40px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Photos Grid */
@@ -79,7 +69,6 @@
   background: rgba(200, 200, 200, 0.9);
   border-radius: 15px;
   overflow: hidden;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
   transition: transform 0.3s ease;
 }
 
