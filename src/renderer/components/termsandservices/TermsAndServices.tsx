@@ -110,7 +110,7 @@ export default function TermsAndServices() {
         </div>
       </div>
 
-      <div className="terms-back-button">
+      {/* <div className="terms-back-button">
         <button type="button" onClick={handleBack} className="back-home-button">
           <svg
             width="24"
@@ -126,7 +126,7 @@ export default function TermsAndServices() {
           </svg>
           กลับไปหน้าหลัก
         </button>
-      </div>
+      </div> */}
     </div>
   );
 }

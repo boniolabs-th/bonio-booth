@@ -23,25 +23,33 @@ interface Capture {
 function CropOverlay({
   slotWidth,
   slotHeight,
+  videoWidth,
+  videoHeight,
 }: {
   slotWidth: number;
   slotHeight: number;
+  videoWidth: number;
+  videoHeight: number;
 }) {
   const slotRatio = slotWidth / slotHeight;
+  const videoRatio = videoWidth / videoHeight;
 
-  // Calculate the crop area dimensions as percentages
-  // The crop area will be centered and fill the container while maintaining the slot ratio
+  // Calculate the crop area dimensions as percentages of the video feed
+  // The crop area maintains the slot ratio and is centered within the video
   const getCropDimensions = () => {
-    // Fill the container - use 100% of the limiting dimension
-    if (slotRatio >= 1) {
-      // Slot is wider or square - width fills 100%, height adjusts
-      const cropWidth = 100;
-      const cropHeight = 100 / slotRatio;
-      return { cropWidth, cropHeight };
+    let cropWidth: number;
+    let cropHeight: number;
+
+    if (slotRatio >= videoRatio) {
+      // Slot is wider than video - width fills 100%, height adjusts
+      cropWidth = 100;
+      cropHeight = (100 * videoRatio) / slotRatio;
+    } else {
+      // Slot is taller than video - height fills 100%, width adjusts
+      cropHeight = 100;
+      cropWidth = (100 * slotRatio) / videoRatio;
     }
-    // Slot is taller - height fills 100%, width adjusts
-    const cropHeight = 100;
-    const cropWidth = 100 * slotRatio;
+
     return { cropWidth, cropHeight };
   };
 
@@ -103,7 +111,7 @@ export default function MainShooting() {
   const location = useLocation();
   const state = location.state as LocationState;
 
-  const [cameraCountdown, setCameraCountdown] = useState(3);
+  const [, setCameraCountdown] = useState(3);
   const [countdown, setCountdown] = useState(3);
   const [captures, setCaptures] = useState<Capture[]>([]);
   const [showCountdown, setShowCountdown] = useState(false);
@@ -111,6 +119,10 @@ export default function MainShooting() {
   const [isCameraLoading, setIsCameraLoading] = useState(true);
   const [cameraError, setCameraError] = useState<string>('');
   const [isRecording, setIsRecording] = useState(false);
+  const [videoDimensions, setVideoDimensions] = useState<{
+    width: number;
+    height: number;
+  }>({ width: 1920, height: 1080 });
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -134,14 +146,8 @@ export default function MainShooting() {
       setIsCameraLoading(true);
       setCameraError('');
 
-      // Determine video constraints based on frame orientation
-      const isPortrait = state.selectedFrame?.orientation === 'portrait';
-      const videoConstraints = isPortrait
-        ? { width: 1080, height: 1920 } // Portrait mode
-        : { width: 1920, height: 1080 }; // Landscape mode
-
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: videoConstraints,
+        video: true,
         audio: false,
       });
       streamRef.current = stream;
@@ -152,6 +158,12 @@ export default function MainShooting() {
         // Wait for video to be ready before proceeding
         await new Promise<void>((resolve) => {
           const onLoadedMetadata = () => {
+            if (videoRef.current) {
+              setVideoDimensions({
+                width: videoRef.current.videoWidth,
+                height: videoRef.current.videoHeight,
+              });
+            }
             setIsCameraLoading(false);
             videoRef.current?.removeEventListener(
               'loadedmetadata',
@@ -467,7 +479,7 @@ export default function MainShooting() {
       <BackButton onBackClick={handleBack} />
 
       {/* Title Section */}
-      <div className="title-section">
+      <div className="title-section-shooting">
         <h1 className="title-thai">มองกล้อง!</h1>
         <p className="title-english">LET&apos;S TAKE A PHOTO</p>
       </div>
@@ -489,6 +501,8 @@ export default function MainShooting() {
             <CropOverlay
               slotWidth={state.selectedFrame.slots[0].width}
               slotHeight={state.selectedFrame.slots[0].height}
+              videoWidth={videoDimensions.width}
+              videoHeight={videoDimensions.height}
             />
           )}
 
