@@ -260,6 +260,7 @@ export default function PhotoDecorate() {
                       className="frame-slot-preview"
                       style={{
                         position: 'absolute',
+                        zIndex: 1,
                         left: `${slotX}px`,
                         top: `${slotY}px`,
                         width: `${slotWidth}px`,
