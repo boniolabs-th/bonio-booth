@@ -1,12 +1,8 @@
 .payment-qr-container {
   width: 100vw;
   height: 100vh;
-  /* background: white; */
   display: flex;
   flex-direction: column;
-  color: #333;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .header {
@@ -15,12 +11,6 @@
   justify-content: space-between;
   padding: 20px 30px;
   position: relative;
-}
-
-.back-button:hover {
-  background: #f5f5f5;
-  transform: scale(1.05);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 
 .logo-container {
@@ -47,7 +37,6 @@
 .title {
   font-size: 2.5rem;
   font-weight: 600;
-  color: #333;
   margin-bottom: 60px;
   text-align: center;
 }
@@ -166,23 +155,18 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #e74c3c;
   font-size: 1.2rem;
   font-weight: 600;
 }
 
 .discount-label {
-  color: #e74c3c;
 }
 
 .discount-amount {
-  color: #e74c3c;
   font-weight: 700;
 }
 
 .price-container {
-  /* background: #2563eb; */
-  color: #333;
   padding: 8px 24px;
   border-radius: 12px;
   display: flex;
@@ -194,7 +178,6 @@
 
 .price-title {
   font-weight: 600;
-  color: #333;
   font-size: 1.5rem;
 }
 
@@ -213,7 +196,6 @@
   .title-thai {
     font-size: 1.2rem;
     font-weight: 500;
-    color: #ff7700;
     margin: 0;
     letter-spacing: 0.5px;
   }
@@ -221,7 +203,6 @@
   .title-english {
     font-size: 1.2rem;
     font-weight: 500;
-    color: #ff7700;
     margin: 0;
     letter-spacing: 0.5px;
   }
@@ -232,7 +213,7 @@
   margin-bottom: 16px;
   width: 100px;
   height: 100px;
-  border: 3px solid #ff7700;
+  border: 3px solid var(--primary-color);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -243,7 +224,7 @@
 .timer-text {
   font-size: 1.5rem;
   font-weight: 600;
-  color: #ff7700;
+  color: var(--primary-color);
 }
 
 /* Reset button styles for this component */
@@ -267,7 +248,7 @@
   width: 100%;
   height: 100%;
   border: 4px solid transparent;
-  border-top: 4px solid #ffa500;
+  border-top: 4px solid var(--primary-color);
   border-radius: 50%;
   animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
 }
@@ -275,7 +256,7 @@
 .spinner-ring:nth-child(1) {
   width: 100%;
   height: 100%;
-  border-top-color: #ffa500;
+  border-top-color: var(--primary-color);
   animation-delay: 0s;
 }
 
@@ -284,7 +265,7 @@
   height: 80%;
   top: 10%;
   left: 10%;
-  border-top-color: #ff8c00;
+  border-top-color: var(--primary-color);
   animation-delay: -0.4s;
   animation-duration: 1s;
 }
@@ -294,7 +275,7 @@
   height: 60%;
   top: 20%;
   left: 20%;
-  border-top-color: #ff7700;
+  border-top-color: var(--primary-color);
   animation-delay: -0.8s;
   animation-duration: 0.8s;
 }
@@ -311,11 +292,10 @@
 /* Error message */
 .error-message {
   text-align: center;
-  color: #e74c3c;
   padding: 20px;
-  background: #ffe6e6;
+  background: var(--primary-color);
   border-radius: 8px;
-  border: 2px solid #f8d7da;
+  border: 2px solid white;
   width: 280px;
   height: 280px;
   display: flex;
@@ -332,7 +312,7 @@
 
 .error-message button {
   padding: 10px 20px;
-  background: #3498db;
+  background: var(--primary-color);
   color: white;
   border: none;
   border-radius: 5px;
@@ -340,10 +320,6 @@
   font-size: 1rem;
   font-weight: 500;
   transition: background 0.2s;
-}
-
-.error-message button:hover {
-  background: #2980b9;
 }
 
 /* QR Code wrapper */

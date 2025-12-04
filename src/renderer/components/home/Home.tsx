@@ -25,7 +25,7 @@ function Home(): React.JSX.Element {
           src={icon}
           alt="Bonio Booth Logo"
           className="logo-image"
-          width="200"
+          width="100%"
           height="auto"
         />
       </section>
@@ -37,7 +37,7 @@ function Home(): React.JSX.Element {
           className="start-button"
           aria-label="Start using Bonio Booth"
         >
-          TAB TO START
+          TAP TO START
         </button>
       </section>
 
