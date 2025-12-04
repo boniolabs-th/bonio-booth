@@ -146,41 +146,138 @@ export default function MainShooting() {
       setIsCameraLoading(true);
       setCameraError('');
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+      // เช็คว่า mediaDevices มีอยู่จริงหรือไม่
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error(
+          'MediaDevices API is not supported. Please use a modern browser.',
+        );
+      }
+
+      console.log('📹 [Camera] Requesting camera access...');
+
+      // List available devices ก่อน
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(
+          (device) => device.kind === 'videoinput',
+        );
+        console.log(`📹 [Camera] Found ${videoDevices.length} camera device(s):`, 
+          videoDevices.map((d) => ({ id: d.deviceId, label: d.label || 'Unknown' }))
+        );
+
+        if (videoDevices.length === 0) {
+          throw new Error('ไม่พบกล้องที่เชื่อมต่ออยู่ กรุณาตรวจสอบการเชื่อมต่อกล้อง');
+        }
+      } catch (enumError) {
+        console.warn('⚠️ [Camera] Failed to enumerate devices:', enumError);
+        // ยังคงลองต่อไปแม้จะ enumerate ไม่ได้
+      }
+
+      // Request camera access with better constraints
+      const constraints: MediaStreamConstraints = {
+        video: {
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          facingMode: 'user', // ใช้กล้องหน้า (หรือ 'environment' สำหรับกล้องหลัง)
+        },
         audio: false,
+      };
+
+      console.log('📹 [Camera] Requesting stream with constraints:', constraints);
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      if (!stream) {
+        throw new Error('Failed to get camera stream');
+      }
+
+      console.log('✅ [Camera] Stream obtained:', {
+        tracks: stream.getTracks().map((t) => ({
+          kind: t.kind,
+          label: t.label,
+          enabled: t.enabled,
+          readyState: t.readyState,
+        })),
       });
+
       streamRef.current = stream;
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
 
         // Wait for video to be ready before proceeding
-        await new Promise<void>((resolve) => {
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Camera video timeout - video did not load within 10 seconds'));
+          }, 10000);
+
           const onLoadedMetadata = () => {
+            clearTimeout(timeout);
             if (videoRef.current) {
-              setVideoDimensions({
-                width: videoRef.current.videoWidth,
-                height: videoRef.current.videoHeight,
-              });
+              const width = videoRef.current.videoWidth;
+              const height = videoRef.current.videoHeight;
+              
+              if (width === 0 || height === 0) {
+                reject(new Error('Camera video dimensions are invalid'));
+                return;
+              }
+
+              console.log('✅ [Camera] Video metadata loaded:', { width, height });
+              setVideoDimensions({ width, height });
             }
             setIsCameraLoading(false);
             videoRef.current?.removeEventListener(
               'loadedmetadata',
               onLoadedMetadata,
             );
+            videoRef.current?.removeEventListener('error', onError);
             resolve();
           };
 
-          videoRef.current?.addEventListener(
-            'loadedmetadata',
-            onLoadedMetadata,
-          );
+          const onError = (event: Event) => {
+            clearTimeout(timeout);
+            console.error('❌ [Camera] Video element error:', event);
+            reject(new Error('Video element error'));
+          };
+
+          videoRef.current?.addEventListener('loadedmetadata', onLoadedMetadata);
+          videoRef.current?.addEventListener('error', onError);
         });
+      } else {
+        throw new Error('Video element is not available');
       }
+
+      console.log('✅ [Camera] Camera initialized successfully');
     } catch (error) {
       setIsCameraLoading(false);
-      setCameraError('Failed to access camera. Please check permissions.');
+      
+      let errorMessage = 'ไม่สามารถเชื่อมต่อกล้องได้';
+      
+      if (error instanceof Error) {
+        console.error('❌ [Camera] Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        });
+
+        // แปลง error message เป็นภาษาไทยที่เข้าใจง่าย
+        if (error.name === 'NotAllowedError' || error.message.includes('permission')) {
+          errorMessage = 'ไม่ได้รับอนุญาตให้เข้าถึงกล้อง กรุณาอนุญาตการเข้าถึงกล้องในระบบ';
+        } else if (error.name === 'NotFoundError' || error.message.includes('not found')) {
+          errorMessage = 'ไม่พบกล้องที่เชื่อมต่ออยู่ กรุณาตรวจสอบการเชื่อมต่อกล้อง';
+        } else if (error.name === 'NotReadableError' || error.message.includes('not readable')) {
+          errorMessage = 'กล้องถูกใช้งานโดยโปรแกรมอื่นอยู่ กรุณาปิดโปรแกรมอื่นที่ใช้กล้อง';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'การเชื่อมต่อกล้องใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง';
+        } else if (error.message.includes('dimensions')) {
+          errorMessage = 'ไม่สามารถอ่านขนาดภาพจากกล้องได้';
+        } else {
+          errorMessage = `ไม่สามารถเชื่อมต่อกล้องได้: ${error.message}`;
+        }
+      }
+
+      setCameraError(errorMessage);
+      console.error('❌ [Camera] Camera initialization failed:', error);
       throw error;
     }
   };

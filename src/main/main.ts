@@ -9,7 +9,7 @@
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, session } from 'electron';
 import { promises as fs } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -272,6 +272,25 @@ const createWindow = async () => {
     return path.join(RESOURCES_PATH, ...paths);
   };
 
+  // ตั้งค่า permissions สำหรับกล้องและไมโครโฟน ก่อนสร้าง window
+  // ต้องตั้งค่าก่อน loadURL เพื่อให้ permissions ทำงานได้ถูกต้อง
+  session.defaultSession.setPermissionRequestHandler(
+    (webContents, permission, callback) => {
+      console.log('📹 [Main] Permission requested:', permission);
+      const allowedPermissions = ['camera', 'microphone', 'media'];
+      if (allowedPermissions.includes(permission)) {
+        console.log('✅ [Main] Permission granted:', permission);
+        callback(true); // อนุญาต
+      } else {
+        console.log('❌ [Main] Permission denied:', permission);
+        callback(false); // ปฏิเสธ
+      }
+    },
+  );
+
+  // หมายเหตุ: camera และ microphone ใช้ PermissionRequestHandler แทน DevicePermissionHandler
+  // DevicePermissionHandler ใช้สำหรับ HID, Serial, USB เท่านั้น
+
   mainWindow = new BrowserWindow({
     show: false,
     width: 900,
@@ -280,6 +299,7 @@ const createWindow = async () => {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false, // ปิด sandbox เพื่อให้ mediaDevices ทำงานได้
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
@@ -339,6 +359,25 @@ app.on('window-all-closed', () => {
 app
   .whenReady()
   .then(() => {
+    // ตั้งค่า permissions ก่อนสร้าง window
+    // ตั้งค่า permissions สำหรับกล้องและไมโครโฟนใน default session
+    session.defaultSession.setPermissionRequestHandler(
+      (webContents, permission, callback) => {
+        console.log('📹 [App] Permission requested:', permission);
+        const allowedPermissions = ['camera', 'microphone', 'media'];
+        if (allowedPermissions.includes(permission)) {
+          console.log('✅ [App] Permission granted:', permission);
+          callback(true);
+        } else {
+          console.log('❌ [App] Permission denied:', permission);
+          callback(false);
+        }
+      },
+    );
+
+    // หมายเหตุ: camera และ microphone ใช้ PermissionRequestHandler แทน DevicePermissionHandler
+    // DevicePermissionHandler ใช้สำหรับ HID, Serial, USB เท่านั้น
+
     createWindow();
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
