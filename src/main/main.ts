@@ -762,6 +762,7 @@ ipcMain.handle(
         success: result.success,
         filesCount: result.files?.length || 0,
         message: result.message,
+        qrcodeStorageUrl: result.qrcodeStorageUrl || 'NOT PROVIDED',
       });
       return result;
     } catch (error) {

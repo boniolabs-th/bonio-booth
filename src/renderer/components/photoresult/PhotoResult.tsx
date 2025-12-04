@@ -1082,6 +1082,17 @@ export default function PhotoResult() {
 
         console.log('📤 [PhotoResult] Upload result:', uploadResult);
 
+        // เก็บ qrcodeStorageUrl จาก response (เช็คก่อน condition อื่นๆ)
+        if (uploadResult.qrcodeStorageUrl) {
+          console.log(
+            '✅ [PhotoResult] QR Code Storage URL:',
+            uploadResult.qrcodeStorageUrl,
+          );
+          setQrcodeStorageUrl(uploadResult.qrcodeStorageUrl);
+        } else {
+          console.warn('⚠️ [PhotoResult] No qrcodeStorageUrl in response');
+        }
+
         if (uploadResult.success && uploadResult.files?.length > 0) {
           console.log(
             '✅ [PhotoResult] Upload successful! Files:',
@@ -1095,17 +1106,6 @@ export default function PhotoResult() {
           if (photoFile?.url) {
             console.log('✅ [PhotoResult] Photo URL:', photoFile.url);
             setUploadedFileUrl(photoFile.url);
-          }
-
-          // เก็บ qrcodeStorageUrl จาก response
-          if (uploadResult.qrcodeStorageUrl) {
-            console.log(
-              '✅ [PhotoResult] QR Code Storage URL:',
-              uploadResult.qrcodeStorageUrl,
-            );
-            setQrcodeStorageUrl(uploadResult.qrcodeStorageUrl);
-          } else {
-            console.warn('⚠️ [PhotoResult] No qrcodeStorageUrl in response');
           }
 
           // แสดง URLs ทั้งหมด
@@ -1446,12 +1446,13 @@ export default function PhotoResult() {
 
   const generateQRCode = () => {
     // ใช้ qrcodeStorageUrl จาก API response เป็น data สำหรับสร้าง QR code
+    // qrcodeStorageUrl เป็น URL ของ photosession ที่ต้องใช้สร้าง QR code
     if (qrcodeStorageUrl) {
       console.log(
         '📱 [PhotoResult] Generating QR code from qrcodeStorageUrl:',
         qrcodeStorageUrl,
       );
-      // แปลง URL link เป็น QR code image โดยใช้ QR code generator API
+      // สร้าง QR code จาก qrcodeStorageUrl โดยใช้ external QR code generator
       const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrcodeStorageUrl)}`;
       return qrCodeUrl;
     }
