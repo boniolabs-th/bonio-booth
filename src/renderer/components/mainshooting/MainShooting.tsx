@@ -19,12 +19,99 @@ interface Capture {
   boomerangFrames?: string[]; // Captured frames used for boomerang playback
 }
 
+// Crop overlay component that shows the crop area based on slot ratio
+function CropOverlay({
+  slotWidth,
+  slotHeight,
+  videoWidth,
+  videoHeight,
+}: {
+  slotWidth: number;
+  slotHeight: number;
+  videoWidth: number;
+  videoHeight: number;
+}) {
+  const slotRatio = slotWidth / slotHeight;
+  const videoRatio = videoWidth / videoHeight;
+
+  // Calculate the crop area dimensions as percentages of the video feed
+  // The crop area maintains the slot ratio and is centered within the video
+  const getCropDimensions = () => {
+    let cropWidth: number;
+    let cropHeight: number;
+
+    if (slotRatio >= videoRatio) {
+      // Slot is wider than video - width fills 100%, height adjusts
+      cropWidth = 100;
+      cropHeight = (100 * videoRatio) / slotRatio;
+    } else {
+      // Slot is taller than video - height fills 100%, width adjusts
+      cropHeight = 100;
+      cropWidth = (100 * slotRatio) / videoRatio;
+    }
+
+    return { cropWidth, cropHeight };
+  };
+
+  const { cropWidth, cropHeight } = getCropDimensions();
+
+  // Calculate position to center the crop area
+  const cropX = (100 - cropWidth) / 2;
+  const cropY = (100 - cropHeight) / 2;
+
+  return (
+    <div className="crop-overlay">
+      <svg
+        className="crop-overlay-svg"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <mask id="cropMask">
+            {/* White = visible, Black = hidden */}
+            {/* Fill entire area with white (semi-transparent overlay) */}
+            <rect x="0" y="0" width="100" height="100" fill="white" />
+            {/* Cut out the crop area (black = transparent) */}
+            <rect
+              x={cropX}
+              y={cropY}
+              width={cropWidth}
+              height={cropHeight}
+              fill="black"
+            />
+          </mask>
+        </defs>
+        {/* Semi-transparent overlay with the crop area cut out */}
+        <rect
+          x="0"
+          y="0"
+          width="100"
+          height="100"
+          fill="rgba(0, 0, 0, 0.6)"
+          mask="url(#cropMask)"
+        />
+        {/* Border around the crop area */}
+        <rect
+          x={cropX}
+          y={cropY}
+          width={cropWidth}
+          height={cropHeight}
+          fill="none"
+          stroke="white"
+          strokeWidth="0.3"
+          strokeDasharray="2,1"
+        />
+      </svg>
+    </div>
+  );
+}
+
 export default function MainShooting() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
 
-  const [cameraCountdown, setCameraCountdown] = useState(3);
+  const [, setCameraCountdown] = useState(3);
   const [countdown, setCountdown] = useState(3);
   const [captures, setCaptures] = useState<Capture[]>([]);
   const [showCountdown, setShowCountdown] = useState(false);
@@ -32,6 +119,10 @@ export default function MainShooting() {
   const [isCameraLoading, setIsCameraLoading] = useState(true);
   const [cameraError, setCameraError] = useState<string>('');
   const [isRecording, setIsRecording] = useState(false);
+  const [videoDimensions, setVideoDimensions] = useState<{
+    width: number;
+    height: number;
+  }>({ width: 1920, height: 1080 });
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -55,41 +146,138 @@ export default function MainShooting() {
       setIsCameraLoading(true);
       setCameraError('');
 
-      // Determine video constraints based on frame orientation
-      const isPortrait = state.selectedFrame?.orientation === 'portrait';
-      const videoConstraints = isPortrait
-        ? { width: 1080, height: 1920 } // Portrait mode
-        : { width: 1920, height: 1080 }; // Landscape mode
+      // เช็คว่า mediaDevices มีอยู่จริงหรือไม่
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error(
+          'MediaDevices API is not supported. Please use a modern browser.',
+        );
+      }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: videoConstraints,
+      console.log('📹 [Camera] Requesting camera access...');
+
+      // List available devices ก่อน
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(
+          (device) => device.kind === 'videoinput',
+        );
+        console.log(`📹 [Camera] Found ${videoDevices.length} camera device(s):`, 
+          videoDevices.map((d) => ({ id: d.deviceId, label: d.label || 'Unknown' }))
+        );
+
+        if (videoDevices.length === 0) {
+          throw new Error('ไม่พบกล้องที่เชื่อมต่ออยู่ กรุณาตรวจสอบการเชื่อมต่อกล้อง');
+        }
+      } catch (enumError) {
+        console.warn('⚠️ [Camera] Failed to enumerate devices:', enumError);
+        // ยังคงลองต่อไปแม้จะ enumerate ไม่ได้
+      }
+
+      // Request camera access with better constraints
+      const constraints: MediaStreamConstraints = {
+        video: {
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          facingMode: 'user', // ใช้กล้องหน้า (หรือ 'environment' สำหรับกล้องหลัง)
+        },
         audio: false,
+      };
+
+      console.log('📹 [Camera] Requesting stream with constraints:', constraints);
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      if (!stream) {
+        throw new Error('Failed to get camera stream');
+      }
+
+      console.log('✅ [Camera] Stream obtained:', {
+        tracks: stream.getTracks().map((t) => ({
+          kind: t.kind,
+          label: t.label,
+          enabled: t.enabled,
+          readyState: t.readyState,
+        })),
       });
+
       streamRef.current = stream;
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
 
         // Wait for video to be ready before proceeding
-        await new Promise<void>((resolve) => {
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Camera video timeout - video did not load within 10 seconds'));
+          }, 10000);
+
           const onLoadedMetadata = () => {
+            clearTimeout(timeout);
+            if (videoRef.current) {
+              const width = videoRef.current.videoWidth;
+              const height = videoRef.current.videoHeight;
+              
+              if (width === 0 || height === 0) {
+                reject(new Error('Camera video dimensions are invalid'));
+                return;
+              }
+
+              console.log('✅ [Camera] Video metadata loaded:', { width, height });
+              setVideoDimensions({ width, height });
+            }
             setIsCameraLoading(false);
             videoRef.current?.removeEventListener(
               'loadedmetadata',
               onLoadedMetadata,
             );
+            videoRef.current?.removeEventListener('error', onError);
             resolve();
           };
 
-          videoRef.current?.addEventListener(
-            'loadedmetadata',
-            onLoadedMetadata,
-          );
+          const onError = (event: Event) => {
+            clearTimeout(timeout);
+            console.error('❌ [Camera] Video element error:', event);
+            reject(new Error('Video element error'));
+          };
+
+          videoRef.current?.addEventListener('loadedmetadata', onLoadedMetadata);
+          videoRef.current?.addEventListener('error', onError);
         });
+      } else {
+        throw new Error('Video element is not available');
       }
+
+      console.log('✅ [Camera] Camera initialized successfully');
     } catch (error) {
       setIsCameraLoading(false);
-      setCameraError('Failed to access camera. Please check permissions.');
+      
+      let errorMessage = 'ไม่สามารถเชื่อมต่อกล้องได้';
+      
+      if (error instanceof Error) {
+        console.error('❌ [Camera] Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        });
+
+        // แปลง error message เป็นภาษาไทยที่เข้าใจง่าย
+        if (error.name === 'NotAllowedError' || error.message.includes('permission')) {
+          errorMessage = 'ไม่ได้รับอนุญาตให้เข้าถึงกล้อง กรุณาอนุญาตการเข้าถึงกล้องในระบบ';
+        } else if (error.name === 'NotFoundError' || error.message.includes('not found')) {
+          errorMessage = 'ไม่พบกล้องที่เชื่อมต่ออยู่ กรุณาตรวจสอบการเชื่อมต่อกล้อง';
+        } else if (error.name === 'NotReadableError' || error.message.includes('not readable')) {
+          errorMessage = 'กล้องถูกใช้งานโดยโปรแกรมอื่นอยู่ กรุณาปิดโปรแกรมอื่นที่ใช้กล้อง';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'การเชื่อมต่อกล้องใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง';
+        } else if (error.message.includes('dimensions')) {
+          errorMessage = 'ไม่สามารถอ่านขนาดภาพจากกล้องได้';
+        } else {
+          errorMessage = `ไม่สามารถเชื่อมต่อกล้องได้: ${error.message}`;
+        }
+      }
+
+      setCameraError(errorMessage);
+      console.error('❌ [Camera] Camera initialization failed:', error);
       throw error;
     }
   };
@@ -388,16 +576,14 @@ export default function MainShooting() {
       <BackButton onBackClick={handleBack} />
 
       {/* Title Section */}
-      <div className="title-section">
+      <div className="title-section-shooting">
         <h1 className="title-thai">มองกล้อง!</h1>
         <p className="title-english">LET&apos;S TAKE A PHOTO</p>
       </div>
 
       {/* Main Content */}
       <div className="main-content">
-        <div
-          className={`camera-container ${state.selectedFrame?.orientation === 'portrait' ? 'portrait' : 'landscape'}`}
-        >
+        <div className="camera-container">
           <video
             ref={videoRef}
             autoPlay
@@ -406,6 +592,16 @@ export default function MainShooting() {
             className="camera-feed"
           />
           <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+          {/* Crop Overlay - shows the crop area based on slot ratio */}
+          {!isCameraLoading && state.selectedFrame?.slots?.[0] && (
+            <CropOverlay
+              slotWidth={state.selectedFrame.slots[0].width}
+              slotHeight={state.selectedFrame.slots[0].height}
+              videoWidth={videoDimensions.width}
+              videoHeight={videoDimensions.height}
+            />
+          )}
 
           {/* Camera Loading Overlay */}
           {isCameraLoading && (
@@ -442,19 +638,29 @@ export default function MainShooting() {
       {/* Photo Thumbnails Grid */}
       <div className="thumbnails-container">
         <div className="thumbnails-grid">
-          {Array.from({ length: requiredCaptures }, (_, index) => (
-            <div key={index} className="thumbnail-slot">
-              {captures[index] ? (
-                <img
-                  src={captures[index].photo}
-                  alt={`Capture ${index + 1}`}
-                  className="thumbnail-image"
-                />
-              ) : (
-                <div className="thumbnail-placeholder" />
-              )}
-            </div>
-          ))}
+          {Array.from({ length: requiredCaptures }, (_, index) => {
+            const slot = state.selectedFrame?.slots?.[0];
+            const aspectRatio = slot
+              ? `${slot.width} / ${slot.height}`
+              : '16 / 9';
+            return (
+              <div
+                key={index}
+                className="thumbnail-slot"
+                style={{ aspectRatio }}
+              >
+                {captures[index] ? (
+                  <img
+                    src={captures[index].photo}
+                    alt={`Capture ${index + 1}`}
+                    className="thumbnail-image"
+                  />
+                ) : (
+                  <div className="thumbnail-placeholder" />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

@@ -1,66 +1,116 @@
 /* PhotoDecorate - Portrait Touch Screen 16" optimized */
 
 .photo-decorate-container {
-  width: 100vw;
-  height: 100vh;
+  position: relative;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #f5f5f5 0%, #ffffff 100%);
+}
+
+/* Main Content */
+.main-content-decorate {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
 }
 
-/* Header Section */
-.decorate-header {
+/* Row 1: Title (20%) */
+.main-content-decorate .row-top {
+  flex: 0 0 20%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Row 2: Main content (dynamic height - fills remaining space) */
+.main-content-decorate .row-middle {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+/* Row 3: Button (20%) */
+.main-content-decorate .row-bottom {
+  flex: 0 0 20%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.title-section {
   text-align: center;
-  padding: 15px 20px 10px 20px;
-  flex-shrink: 0;
+  margin-bottom: 10px;
 }
 
 .decorate-title {
-  font-size: 32px;
+  font-size: 4rem;
   font-weight: 700;
-  color: #2c2c2c;
-  margin: 0 0 5px 0;
+  margin: 0 0 8px 0;
+  text-align: center;
   line-height: 1.2;
 }
 
 .decorate-subtitle {
-  font-size: 18px;
-  font-weight: 500;
-  color: #666666;
+  font-size: 2rem;
   margin: 0;
+  text-align: center;
+  font-weight: 500;
   letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 /* Main Layout - Split Left/Right */
 .decorate-main {
   display: flex;
   gap: 20px;
-  padding: 0 20px 20px 20px;
-  height: calc(100vh - 200px);
+  width: 100%;
+  height: 100%;
 }
 
 /* Left Side - Frame Preview */
 .frame-preview-section {
-  width: 40%;
+  width: 50%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 10px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .frame-preview-container {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  max-width: 520px;
-  max-height: 100%;
-  display: block;
+  height: 100%;
 }
 
 .frame-background-dec {
-  width: 100%;
-  height: auto;
+  display: block;
+  z-index: 10;
+  max-width: 100%;
   max-height: 100%;
-  object-fit: contain;
+  width: auto;
+  height: auto;
 }
 
 .frame-slot-preview {
@@ -76,6 +126,7 @@
 .slot-photo {
   width: 100%;
   height: 100%;
+  z-index: 1;
   object-fit: cover;
   object-position: center;
   max-width: 100%;
@@ -85,7 +136,8 @@
 
 /* Right Side - Photo Grid */
 .photo-grid-section {
-  width: 60%;
+  width: 50%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -105,7 +157,6 @@
 /* Photo Card */
 .photo-card {
   position: relative;
-  aspect-ratio: 16/9;
   border-radius: 16px;
   overflow: hidden;
   border: 4px solid transparent;
@@ -138,7 +189,7 @@
   box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.3),
               0 8px 24px rgba(255, 165, 0, 0.2);
 }
- 
+
 /* Orange overlay for selected photos */
 .photo-card.selected::before {
   content: '';
@@ -167,7 +218,6 @@
   width: 100px;
   height: 100px;
   background: transparent;
-  color: white;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -179,47 +229,33 @@
   border: 2px solid white;
 }
 
-/* Footer - Next Button */
-.decorate-footer {
-  padding: 15px 20px 20px 20px;
-  display: flex;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.next-button {
-  width: 90%;
-  max-width: 500px;
+/* Next Button */
+.next-button-decorate {
   padding: 16px 40px;
-  font-size: 26px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 600;
   color: white;
-  background: linear-gradient(135deg, #ffa500 0%, #ff8c00 100%);
+  background: var(--primary-color);
   border: none;
-  border-radius: 50px;
+  border-radius: 16px;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 6px 20px rgba(255, 165, 0, 0.3);
-  min-height: 60px;
-  letter-spacing: 0.5px;
+  min-width: 250px;
 }
 
-.next-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #ff8c00 0%, #ff7700 100%);
+.next-button-decorate:hover:not(:disabled) {
+  opacity: 0.9;
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(255, 165, 0, 0.4);
 }
 
-.next-button:active:not(:disabled) {
+.next-button-decorate:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
 }
 
-.next-button:disabled {
-  background: linear-gradient(135deg, #cccccc 0%, #aaaaaa 100%);
+.next-button-decorate:disabled {
+  background: #cccccc;
   cursor: not-allowed;
   opacity: 0.5;
-  box-shadow: none;
 }
 
 /* Scrollbar Styling */

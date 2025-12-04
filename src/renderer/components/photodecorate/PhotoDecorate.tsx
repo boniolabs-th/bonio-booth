@@ -3,6 +3,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { FRAME_CONFIGS, FrameConfig } from '../../utils/frameConfig';
+import { drawPhotoInSlot } from '../../utils/canvasUtils';
 import './PhotoDecorate.css';
 import { Countdown } from '..';
 
@@ -31,14 +32,12 @@ export default function PhotoDecorate() {
   }>({});
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
   const [scaleFactor, setScaleFactor] = useState({ x: 1, y: 1 });
+  const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameImgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const previewSlots = selectedFrame.previewSlots || selectedFrame.slots;
-  const frameAspectRatio = selectedFrame.height
-    ? selectedFrame.width / selectedFrame.height
-    : 1;
 
   const calculateScaleFactor = useCallback(() => {
     const container = containerRef.current;
@@ -68,16 +67,18 @@ export default function PhotoDecorate() {
 
     window.addEventListener('resize', handleResize);
     return () => {
-      window.removeEventListener('resize', handleResize);
+      clearTimeout(timer);
+      window.removeEventListener('resize', calculateScaleFactor);
     };
-  }, [calculateScaleFactor, selectedFrame.height, selectedFrame.width]);
+  }, [calculateScaleFactor]);
 
 
   const handleCountdownComplete = useCallback(() => {
-    console.log('⏰ [PhotoDecorate] Countdown completed, auto-navigating to home');
+    console.log(
+      '⏰ [PhotoDecorate] Countdown completed, auto-navigating to home',
+    );
     navigate('/');
   }, [navigate]);
-
 
   const proceedToResult = (
     finalImageData: string,
@@ -304,12 +305,6 @@ export default function PhotoDecorate() {
 
   return (
     <div className="photo-decorate-container">
-      {/* Header */}
-      <div className="decorate-header">
-        <h1 className="decorate-title">เลือกรูปของคุณ</h1>
-        <p className="decorate-subtitle">SELECT YOUR PHOTO</p>
-      </div>
-
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
         seconds={9999999}
@@ -393,42 +388,6 @@ export default function PhotoDecorate() {
             })}
           </div>
         </div>
-
-        {/* Right - Photo Grid */}
-        <div className="photo-grid-section">
-          <div className="photo-grid">
-            {state.captures.map((capture, index) => {
-              const sequenceNumber = selectedPhotos.indexOf(index);
-              const isSelected = sequenceNumber !== -1;
-
-              return (
-                <button
-                  key={capture.video || capture.photo}
-                  type="button"
-                  className={`photo-card ${isSelected ? 'selected' : ''}`}
-                  onClick={() => handlePhotoClick(index)}
-                >
-                  <img src={capture.photo} alt={`Capture ${index + 1}`} />
-                  {isSelected && (
-                    <div className="sequence-badge">{sequenceNumber + 1}</div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Button */}
-      <div className="decorate-footer">
-        <button
-          type="button"
-          className="next-button"
-          onClick={handleConfirm}
-          disabled={selectedPhotos.length !== selectedFrame.slots.length}
-        >
-          ต่อไป
-        </button>
       </div>
 
       {/* Hidden canvas for image generation */}

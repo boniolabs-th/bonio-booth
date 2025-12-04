@@ -140,7 +140,7 @@ export default function GetHelp() {
         </div>
       </div>
 
-      <div className="help-back-button">
+      {/* <div className="help-back-button">
         <button type="button" onClick={handleBack} className="back-home-button">
           <svg
             width="24"
@@ -156,7 +156,7 @@ export default function GetHelp() {
           </svg>
           กลับไปหน้าหลัก
         </button>
-      </div>
+      </div> */}
     </div>
   );
 }

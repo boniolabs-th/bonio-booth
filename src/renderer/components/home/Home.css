@@ -4,59 +4,68 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
-  text-align: center;
+  height: 100%;
+  width: 100%;
   gap: 4rem;
+  box-sizing: border-box;
+  text-align: center;
   padding: 2rem;
 }
 
 .logo-section {
+  align-self: stretch;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+  flex: 0 0 30%;
 }
 
 .logo-image {
-  max-width: 200px;
+  width: 50%;
   height: auto;
   object-fit: contain;
 }
 
 .action-section {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+  flex: 1 1 auto;
 }
 
 .start-button {
-  background-color: #2563eb;
-  color: white;
-  padding: 1rem 2rem;
+  background-color: var(--primary-color);
+  color: var(--font-color);
+  padding: 2rem 3rem;
   border-radius: 0.75rem;
   border: none;
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 2rem;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  min-width: 200px;
-}
-
-.start-button:hover {
-  background-color: #1d4ed8;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
 }
 
 .start-button:active {
   transform: translateY(0);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 .footer-section {
+  width: 70%;
   display: flex;
-  justify-content: center;
+  justify-content: space-around;
   align-items: center;
+  flex: 0 0 30%;
+}
+
+.footer-section button {
+  font-size: x-large;
+  background: none;
+  border: none;
+  color: var(--font-color);
+  cursor: pointer;
+  box-shadow: none;
 }
 
 .terms-link {

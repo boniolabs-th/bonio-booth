@@ -63,7 +63,9 @@ export default function FrameSelection() {
 
   // Handle countdown completion - ไปหน้าถัดไปอัตโนมัติเมื่อหมดเวลา
   const handleCountdownComplete = useCallback(() => {
-    console.log('⏰ [FrameSelection] Countdown completed, auto-navigating to photo-prepare');
+    console.log(
+      '⏰ [FrameSelection] Countdown completed, auto-navigating to photo-prepare',
+    );
     // ไปหน้าถัดไปอัตโนมัติด้วย frame ที่เลือกอยู่
     // navigate('/photo-prepare', {
     //   state: {
@@ -93,11 +95,13 @@ export default function FrameSelection() {
 
       {/* Main Content */}
       <div className="main-content-frame">
-        {/* Title Section */}
-        <div className="title-section">
-          <h1 className="title-frame">เลือกกรอบรูป</h1>
-          <p className="subtitle-frame">SELECT YOUR FRAME</p>
-        </div>
+        {/* Row 1: Title + Thumbnails (20%) */}
+        <div className="row-top">
+          {/* Title Section */}
+          <div className="title-section">
+            <h1 className="title-frame">เลือกกรอบรูป</h1>
+            <p className="subtitle-frame">SELECT YOUR FRAME</p>
+          </div>
 
         {/* Frame Thumbnails - Horizontal Scroll */}
         <div className="frames-thumbnails">
@@ -145,20 +149,25 @@ export default function FrameSelection() {
             })
           )}
         </div>
+      </div>
 
-        {/* Large Preview */}
-        <div className="frame-preview-large">
-          <img src={selectedFrame.image} alt={selectedFrame.name} />
+        {/* Row 2: Large Preview (60%) */}
+        <div className="row-middle">
+          <div className="frame-preview-large">
+            <img src={selectedFrame.image} alt={selectedFrame.name} />
+          </div>
         </div>
 
-        {/* Confirm Button */}
-        <button
-          type="button"
-          className="next-button-frame"
-          onClick={handleConfirm}
-        >
-          ต่อไป
-        </button>
+        {/* Row 3: Confirm Button (20%) */}
+        <div className="row-bottom">
+          <button
+            type="button"
+            className="next-button-frame"
+            onClick={handleConfirm}
+          >
+            ต่อไป
+          </button>
+        </div>
       </div>
     </div>
   );

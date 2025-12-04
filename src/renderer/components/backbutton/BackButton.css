@@ -1,7 +1,7 @@
 .back-button {
-  position: fixed;
-  top: 1rem;
-  left: 1rem;
+  position: absolute;
+  top: 2rem;
+  left: 2rem;
   z-index: 1000;
   background: none;
   padding: 0.5rem;
@@ -9,10 +9,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
   transition: all 0.2s ease;
-  width: 44px;
-  height: 44px;
+  width: 64px;
+  height: 64px;
   box-shadow: none;
   border: none;
 }

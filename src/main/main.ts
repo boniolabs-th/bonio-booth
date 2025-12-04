@@ -9,7 +9,7 @@
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, session } from 'electron';
 import { promises as fs } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -65,6 +65,7 @@ async function initializeApp() {
     cachedInitData = {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
+      theme: initResponse.theme,
     };
 
     // Send machine data (including prices) to renderer process
@@ -239,7 +240,7 @@ async function generateImageWithPadding(
 }
 
 let mainWindow: BrowserWindow | null = null;
-let cachedInitData: { machine?: { prices?: unknown[] }; prices?: unknown[] } | null = null;
+let cachedInitData: { machine?: { prices?: unknown[] }; prices?: unknown[]; theme?: any } | null = null;
 
 const installExtensions = async () => {
   const installer = require('electron-devtools-installer');
@@ -271,15 +272,35 @@ const createWindow = async () => {
     return path.join(RESOURCES_PATH, ...paths);
   };
 
+  // ตั้งค่า permissions สำหรับกล้องและไมโครโฟน ก่อนสร้าง window
+  // ต้องตั้งค่าก่อน loadURL เพื่อให้ permissions ทำงานได้ถูกต้อง
+  session.defaultSession.setPermissionRequestHandler(
+    (webContents, permission, callback) => {
+      console.log('📹 [Main] Permission requested:', permission);
+      const allowedPermissions = ['camera', 'microphone', 'media'];
+      if (allowedPermissions.includes(permission)) {
+        console.log('✅ [Main] Permission granted:', permission);
+        callback(true); // อนุญาต
+      } else {
+        console.log('❌ [Main] Permission denied:', permission);
+        callback(false); // ปฏิเสธ
+      }
+    },
+  );
+
+  // หมายเหตุ: camera และ microphone ใช้ PermissionRequestHandler แทน DevicePermissionHandler
+  // DevicePermissionHandler ใช้สำหรับ HID, Serial, USB เท่านั้น
+
   mainWindow = new BrowserWindow({
     show: false,
-    width: 1024,
-    height: 728,
+    width: 900,
+    height: 1600,
     icon: getAssetPath('icon.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: false,
+      sandbox: false, // ปิด sandbox เพื่อให้ mediaDevices ทำงานได้
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
@@ -339,6 +360,25 @@ app.on('window-all-closed', () => {
 app
   .whenReady()
   .then(() => {
+    // ตั้งค่า permissions ก่อนสร้าง window
+    // ตั้งค่า permissions สำหรับกล้องและไมโครโฟนใน default session
+    session.defaultSession.setPermissionRequestHandler(
+      (webContents, permission, callback) => {
+        console.log('📹 [App] Permission requested:', permission);
+        const allowedPermissions = ['camera', 'microphone', 'media'];
+        if (allowedPermissions.includes(permission)) {
+          console.log('✅ [App] Permission granted:', permission);
+          callback(true);
+        } else {
+          console.log('❌ [App] Permission denied:', permission);
+          callback(false);
+        }
+      },
+    );
+
+    // หมายเหตุ: camera และ microphone ใช้ PermissionRequestHandler แทน DevicePermissionHandler
+    // DevicePermissionHandler ใช้สำหรับ HID, Serial, USB เท่านั้น
+
     createWindow();
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
@@ -589,6 +629,7 @@ ipcMain.handle('get-machine-prices', async () => {
     cachedInitData = {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
+      theme: initResponse.theme,
     };
     return { success: true, prices: initResponse.machine.prices || [] };
   } catch (error) {
@@ -610,6 +651,7 @@ ipcMain.handle('get-machine-data', async () => {
     cachedInitData = {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
+      theme: initResponse.theme,
     };
     return { success: true, machine: initResponse.machine };
   } catch (error) {
@@ -707,6 +749,28 @@ ipcMain.handle('read-video-file', async (event, filePath: string) => {
       success: false,
       error: errorMessage,
     };
+  }
+});
+
+// Handler สำหรับ request theme data
+ipcMain.handle('get-theme-data', async () => {
+  try {
+    if (cachedInitData?.theme) {
+      return { success: true, theme: cachedInitData.theme };
+    }
+    // ถ้ายังไม่มี cache ให้เรียก API ใหม่
+    const initResponse = await machineService.init();
+    cachedInitData = {
+      machine: initResponse.machine,
+      prices: initResponse.machine.prices || [],
+      theme: initResponse.theme,
+    };
+    return { success: true, theme: initResponse.theme };
+  } catch (error) {
+    console.error('Error in get-theme-data handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
   }
 });
 
