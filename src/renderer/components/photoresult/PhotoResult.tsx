@@ -73,6 +73,7 @@ const generateFramedVideo = async (
   const loadFrameImage = () =>
     new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
+      img.crossOrigin = 'anonymous';
       img.onload = () => resolve(img);
       img.onerror = () => reject(new Error('ไม่สามารถโหลดภาพกรอบได้'));
       img.src = frame.image;
@@ -81,6 +82,7 @@ const generateFramedVideo = async (
   const loadVideoElement = (capture: Capture, index: number) =>
     new Promise<HTMLVideoElement>((resolve, reject) => {
       const videoElement = document.createElement('video');
+      videoElement.crossOrigin = 'anonymous';
       videoElement.src = capture.video;
       videoElement.muted = true;
       videoElement.preload = 'auto';
@@ -122,6 +124,10 @@ const generateFramedVideo = async (
 
     const scaleX = frameWidth / frame.width;
     const scaleY = frameHeight / frame.height;
+
+    // Fill with white background first (paper color)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, frameWidth, frameHeight);
 
     const loadBoomerangFrames = (capture: Capture, captureIndex: number) => {
       if (!capture.boomerangFrames || capture.boomerangFrames.length === 0) {
@@ -216,10 +222,11 @@ const generateFramedVideo = async (
           return;
         }
 
-        ctx.clearRect(0, 0, frameWidth, frameHeight);
-        ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+        // Fill with white background first (paper color)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, frameWidth, frameHeight);
 
-        frame.slots.forEach((slot, slotIndex) => {
+        const drawSlot = (slot: typeof frame.slots[0], slotIndex: number) => {
           const slotFrames = boomerangImages[slotIndex];
           if (!slotFrames || slotFrames.length === 0) {
             return;
@@ -274,6 +281,23 @@ const generateFramedVideo = async (
           );
 
           ctx.restore();
+        };
+
+        // 1. Draw background slots (zIndex < 0)
+        frame.slots.forEach((slot, slotIndex) => {
+          if ((slot.zIndex || 0) < 0) {
+            drawSlot(slot, slotIndex);
+          }
+        });
+
+        // 2. Draw frame
+        ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+
+        // 3. Draw foreground slots (zIndex >= 0)
+        frame.slots.forEach((slot, slotIndex) => {
+          if ((slot.zIndex || 0) >= 0) {
+            drawSlot(slot, slotIndex);
+          }
         });
 
         frameCursor += 1;
@@ -324,6 +348,10 @@ const generateFramedVideo = async (
 
   const scaleX = frameWidth / frame.width;
   const scaleY = frameHeight / frame.height;
+
+  // Fill with white background first (paper color)
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, frameWidth, frameHeight);
 
   videoElements.forEach((video) => {
     // eslint-disable-next-line no-param-reassign
@@ -403,10 +431,11 @@ const generateFramedVideo = async (
         return;
       }
 
-      ctx.clearRect(0, 0, frameWidth, frameHeight);
-      ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+      // Fill with white background first (paper color)
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, frameWidth, frameHeight);
 
-      frame.slots.forEach((slot, index) => {
+      const drawSlot = (slot: typeof frame.slots[0], index: number) => {
         const video = videoElements[index];
         if (!video) {
           return;
@@ -458,6 +487,23 @@ const generateFramedVideo = async (
         );
 
         ctx.restore();
+      };
+
+      // 1. Draw background slots (zIndex < 0)
+      frame.slots.forEach((slot, index) => {
+        if ((slot.zIndex || 0) < 0) {
+          drawSlot(slot, index);
+        }
+      });
+
+      // 2. Draw frame
+      ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+
+      // 3. Draw foreground slots (zIndex >= 0)
+      frame.slots.forEach((slot, index) => {
+        if ((slot.zIndex || 0) >= 0) {
+          drawSlot(slot, index);
+        }
       });
 
       animationFrameId = requestAnimationFrame(drawFrame);
@@ -581,11 +627,15 @@ export default function PhotoResult() {
 
       try {
         // Create video without filter first (fast)
-        console.log('🎬 [PhotoResult] Generating framed video...');
+        // ถ้าเป็น CSS Filter ให้ใส่ไปเลย แต่ถ้าเป็น LUT ให้ใส่ undefined ไปก่อน แล้วค่อยไปทำ FFmpeg
+        const filter = FILTERS.find((f) => f.id === state.selectedFilter);
+        const initialFilterId = filter?.type === 'css' ? state.selectedFilter : undefined;
+
+        console.log('🎬 [PhotoResult] Generating framed video...', { initialFilterId });
         const videoUrl = await generateFramedVideo(
           state.selectedCaptures,
           state.selectedFrame,
-          undefined, // No filter for initial video
+          initialFilterId,
           state.useBoomerang,
         );
         console.log(
@@ -594,7 +644,6 @@ export default function PhotoResult() {
         );
 
         // If LUT filter is selected, apply it via FFmpeg
-        const filter = FILTERS.find((f) => f.id === state.selectedFilter);
         // eslint-disable-next-line no-console
         console.log('Filter check:', {
           filterId: state.selectedFilter,

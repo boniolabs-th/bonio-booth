@@ -279,6 +279,7 @@ const createWindow = async () => {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      webSecurity: false,
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
@@ -628,12 +629,12 @@ ipcMain.handle('save-temp-video', async (event, arrayBuffer: ArrayBuffer) => {
 
     // Convert ArrayBuffer to Buffer
     const buffer = Buffer.from(arrayBuffer);
-    
+
     // Write file
     await fs.writeFile(filePath, buffer);
-    
+
     console.log('✅ [Main] Temp video saved:', filePath);
-    
+
     return {
       success: true,
       path: filePath,

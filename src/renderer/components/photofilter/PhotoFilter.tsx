@@ -42,11 +42,12 @@ export default function PhotoFilter() {
   }, [navigate]);
 
   // Filter รูปภาพแต่ละรูป (รองรับทั้ง CSS และ LUT)
-  const applyFilterToPhoto = async (photoUrl: string): Promise<string> => {
+  const applyFilterToPhoto = async (photoUrl: string): Promise<HTMLCanvasElement> => {
     const filter = FILTERS.find((f) => f.id === selectedFilter);
 
     return new Promise((resolve, reject) => {
       const img = new Image();
+      img.crossOrigin = 'anonymous';
 
       img.onload = async () => {
         const canvas = document.createElement('canvas');
@@ -72,12 +73,12 @@ export default function PhotoFilter() {
             const lut = await getCachedLUT(lutPath);
             const processedCanvas = await applyLUTWithWorker(canvas, lut);
 
-            resolve(processedCanvas.toDataURL('image/png'));
+            resolve(processedCanvas);
           } catch (error) {
             console.error('Failed to apply LUT:', error);
             // Fallback to original
             ctx.drawImage(img, 0, 0);
-            resolve(canvas.toDataURL('image/png'));
+            resolve(canvas);
           }
         } else {
           // Apply CSS filter (traditional)
@@ -85,7 +86,7 @@ export default function PhotoFilter() {
             ctx.filter = filter.filter;
           }
           ctx.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL('image/png'));
+          resolve(canvas);
         }
       };
 
@@ -115,6 +116,7 @@ export default function PhotoFilter() {
 
       // Load frame image
       const frameImg = new Image();
+      frameImg.crossOrigin = 'anonymous';
       frameImg.onload = async () => {
         const frameWidth = frameImg.naturalWidth || state.selectedFrame.width;
         const frameHeight =
@@ -126,93 +128,85 @@ export default function PhotoFilter() {
         const scaleX = frameWidth / state.selectedFrame.width;
         const scaleY = frameHeight / state.selectedFrame.height;
 
-        // Draw frame background
-        ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+        // Fill with white background first (paper color)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, frameWidth, frameHeight);
 
         // Filter และ draw รูปภาพแต่ละรูป
         try {
-          const filteredPhotos: string[] = [];
+          // Filter รูปภาพทั้งหมดแบบ Parallel
+          const filteredPhotos = await Promise.all(
+            state.selectedCaptures.map((capture) =>
+              applyFilterToPhoto(capture.photo)
+            )
+          );
 
-          // Filter รูปภาพทั้งหมด
-          for (let i = 0; i < state.selectedCaptures.length; i += 1) {
-            // eslint-disable-next-line no-await-in-loop
-            const filteredPhoto = await applyFilterToPhoto(
-              state.selectedCaptures[i].photo,
-            );
-            filteredPhotos.push(filteredPhoto);
-          }
+          // Helper function to draw a slot
+          const drawSlot = (slot: typeof state.selectedFrame.slots[0], slotIndex: number) => {
+            if (slotIndex >= filteredPhotos.length) return;
 
-          // Draw รูปภาพที่ filter แล้วเข้าไปใน frame
-          let loadedPhotos = 0;
-          const totalPhotos = state.selectedFrame.slots.length;
+            const photoCanvas = filteredPhotos[slotIndex];
 
-          state.selectedFrame.slots.forEach((slot, slotIndex) => {
-            if (slotIndex >= filteredPhotos.length) {
-              loadedPhotos += 1;
-              if (loadedPhotos === totalPhotos) {
-                resolve(canvas.toDataURL('image/png'));
-              }
-              return;
+            ctx.save();
+
+            // Calculate crop dimensions (cover behavior - crop to fit slot)
+            const photoAspect = photoCanvas.width / photoCanvas.height;
+            const slotAspect = slot.width / slot.height;
+
+            let sourceX = 0;
+            let sourceY = 0;
+            let sourceWidth = photoCanvas.width;
+            let sourceHeight = photoCanvas.height;
+
+            if (photoAspect > slotAspect) {
+              // Photo is wider - crop sides
+              sourceWidth = photoCanvas.height * slotAspect;
+              sourceX = (photoCanvas.width - sourceWidth) / 2;
+            } else {
+              // Photo is taller - crop top/bottom
+              sourceHeight = photoCanvas.width / slotAspect;
+              sourceY = (photoCanvas.height - sourceHeight) / 2;
             }
 
-            const photoImg = new Image();
-            photoImg.onload = () => {
-              ctx.save();
+            const targetX = slot.x * scaleX;
+            const targetY = slot.y * scaleY;
+            const targetWidth = slot.width * scaleX;
+            const targetHeight = slot.height * scaleY;
 
-              // Calculate crop dimensions (cover behavior - crop to fit slot)
-              const photoAspect = photoImg.width / photoImg.height;
-              const slotAspect = slot.width / slot.height;
+            // Draw filtered photo in slot
+            ctx.drawImage(
+              photoCanvas,
+              sourceX,
+              sourceY,
+              sourceWidth,
+              sourceHeight,
+              targetX,
+              targetY,
+              targetWidth,
+              targetHeight,
+            );
 
-              let sourceX = 0;
-              let sourceY = 0;
-              let sourceWidth = photoImg.width;
-              let sourceHeight = photoImg.height;
+            ctx.restore();
+          };
 
-              if (photoAspect > slotAspect) {
-                // Photo is wider - crop sides
-                sourceWidth = photoImg.height * slotAspect;
-                sourceX = (photoImg.width - sourceWidth) / 2;
-              } else {
-                // Photo is taller - crop top/bottom
-                sourceHeight = photoImg.width / slotAspect;
-                sourceY = (photoImg.height - sourceHeight) / 2;
-              }
-
-              const targetX = slot.x * scaleX;
-              const targetY = slot.y * scaleY;
-              const targetWidth = slot.width * scaleX;
-              const targetHeight = slot.height * scaleY;
-
-              // Draw filtered photo in slot
-              ctx.drawImage(
-                photoImg,
-                sourceX,
-                sourceY,
-                sourceWidth,
-                sourceHeight,
-                targetX,
-                targetY,
-                targetWidth,
-                targetHeight,
-              );
-
-              ctx.restore();
-
-              loadedPhotos += 1;
-              if (loadedPhotos === totalPhotos) {
-                resolve(canvas.toDataURL('image/png'));
-              }
-            };
-
-            photoImg.onerror = () => {
-              loadedPhotos += 1;
-              if (loadedPhotos === totalPhotos) {
-                resolve(canvas.toDataURL('image/png'));
-              }
-            };
-
-            photoImg.src = filteredPhotos[slotIndex];
+          // 1. Draw background slots (zIndex < 0)
+          state.selectedFrame.slots.forEach((slot, slotIndex) => {
+            if ((slot.zIndex || 0) < 0) {
+              drawSlot(slot, slotIndex);
+            }
           });
+
+          // 2. Draw frame background
+          ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+
+          // 3. Draw foreground slots (zIndex >= 0)
+          state.selectedFrame.slots.forEach((slot, slotIndex) => {
+            if ((slot.zIndex || 0) >= 0) {
+              drawSlot(slot, slotIndex);
+            }
+          });
+
+          resolve(canvas.toDataURL('image/png'));
         } catch (error) {
           reject(error);
         }

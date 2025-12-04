@@ -1,8 +1,8 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { BackButton, Countdown } from '..';
-import { FRAME_CONFIGS, FrameConfig } from '../../utils/frameConfig';
+import { FRAME_CONFIGS, FrameConfig, fetchFrameConfigs } from '../../utils/frameConfig';
 import './FrameSelection.css';
 
 interface LocationState {
@@ -17,10 +17,32 @@ export default function FrameSelection() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
+  const [frames, setFrames] = useState<FrameConfig[]>(FRAME_CONFIGS);
   const [selectedFrame, setSelectedFrame] = useState<FrameConfig>(
     FRAME_CONFIGS[0],
   );
   const [useBoomerang, setUseBoomerang] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const loadFrames = async () => {
+      try {
+        setIsLoading(true);
+        const apiFrames = await fetchFrameConfigs();
+        if (apiFrames.length > 0) {
+          setFrames(apiFrames);
+          setSelectedFrame(apiFrames[0]);
+        }
+      } catch (error) {
+        console.error('Failed to load frames:', error);
+        // Fallback to local frames is already set in initial state
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadFrames();
+  }, []);
 
   const handleBack = () => {
     navigate('/payment-qr', { state });
@@ -79,45 +101,49 @@ export default function FrameSelection() {
 
         {/* Frame Thumbnails - Horizontal Scroll */}
         <div className="frames-thumbnails">
-          {FRAME_CONFIGS.map((frame) => {
-            const thumbnailWidth =
-              frame.orientation === 'portrait' ? '120px' : '160px';
-            const thumbnailHeight =
-              frame.orientation === 'portrait' ? '160px' : '120px';
+          {isLoading ? (
+            <div className="loading-frames">Loading frames...</div>
+          ) : (
+            frames.map((frame) => {
+              const thumbnailWidth =
+                frame.orientation === 'portrait' ? '120px' : '160px';
+              const thumbnailHeight =
+                frame.orientation === 'portrait' ? '160px' : '120px';
 
-            return (
-              <div
-                key={frame.id}
-                role="button"
-                tabIndex={0}
-                className={`frame-thumbnail ${selectedFrame.id === frame.id ? 'selected' : ''}`}
-                style={{
-                  height: thumbnailHeight,
-                }}
-                onClick={() => setSelectedFrame(frame)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    setSelectedFrame(frame);
-                  }
-                }}
-              >
-                {selectedFrame.id === frame.id && (
-                  <div className="selected-badge">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M20 6L9 17l-5-5"
-                        stroke="white"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-                )}
-                <img src={frame.image} alt={frame.name} />
-              </div>
-            );
-          })}
+              return (
+                <div
+                  key={frame.id}
+                  role="button"
+                  tabIndex={0}
+                  className={`frame-thumbnail ${selectedFrame.id === frame.id ? 'selected' : ''}`}
+                  style={{
+                    height: thumbnailHeight,
+                  }}
+                  onClick={() => setSelectedFrame(frame)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      setSelectedFrame(frame);
+                    }
+                  }}
+                >
+                  {selectedFrame.id === frame.id && (
+                    <div className="selected-badge">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M20 6L9 17l-5-5"
+                          stroke="white"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                  <img src={frame.image} alt={frame.name} />
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Large Preview */}

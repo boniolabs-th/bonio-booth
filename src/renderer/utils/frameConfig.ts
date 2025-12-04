@@ -20,6 +20,7 @@ export interface FrameConfig {
     width: number;
     height: number;
     radius: number;
+    zIndex?: number;
   }[];
   previewSlots?: {
     id: string;
@@ -28,6 +29,7 @@ export interface FrameConfig {
     width: number;
     height: number;
     radius: number;
+    zIndex?: number;
   }[];
 }
 
@@ -137,6 +139,81 @@ export const FRAME_CONFIGS: FrameConfig[] = [
     ],
   },
 ];
+
+// API Response Interface
+export interface FrameApiResponse {
+  _id: string;
+  name: string;
+  code: string;
+  imageUrl: string;
+  imageSize: string;
+  grid: {
+    rows: number;
+    columns: number;
+    slots: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      radius: number;
+      zIndex: number;
+    }[];
+  };
+  isActive: boolean;
+}
+
+// Helper to map API response to FrameConfig
+export function mapFrameApiResponseToConfig(frame: FrameApiResponse): FrameConfig {
+  const [widthStr, heightStr] = frame.imageSize.split('x');
+  const width = parseInt(widthStr, 10);
+  const height = parseInt(heightStr, 10);
+
+  return {
+    id: frame.code,
+    name: frame.name,
+    image: frame.imageUrl,
+    width: width,
+    height: height,
+    orientation: width > height ? 'landscape' : 'portrait',
+    slots: frame.grid.slots.map((slot, index) => ({
+      id: `${frame.code}_slot_${index + 1}`,
+      x: slot.x,
+      y: slot.y,
+      width: slot.width,
+      height: slot.height,
+      radius: slot.radius || 0,
+      zIndex: slot.zIndex
+    })),
+    // Use same slots for preview if not specified differently
+    previewSlots: frame.grid.slots.map((slot, index) => ({
+      id: `${frame.code}_slot_${index + 1}`,
+      x: slot.x,
+      y: slot.y,
+      width: slot.width,
+      height: slot.height,
+      radius: slot.radius || 0,
+      zIndex: slot.zIndex
+    }))
+  };
+}
+
+// Function to fetch frames from API
+export async function fetchFrameConfigs(apiUrl: string = 'http://localhost:3000/api/frames'): Promise<FrameConfig[]> {
+  try {
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch frames: ${response.statusText}`);
+    }
+    const data: FrameApiResponse[] = await response.json();
+
+    return data
+      .filter(frame => frame.isActive)
+      .map(frame => mapFrameApiResponseToConfig(frame));
+  } catch (error) {
+    console.error('Error fetching frames:', error);
+    return FRAME_CONFIGS; // Fallback to local configs
+  }
+}
 
 export interface FilterConfig {
   id: string;
