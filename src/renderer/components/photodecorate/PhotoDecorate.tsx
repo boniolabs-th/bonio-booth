@@ -2,7 +2,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { FRAME_CONFIGS, FrameConfig } from '../../utils/frameConfig';
+import { FrameConfig } from '../../utils/frameConfig';
 import { drawPhotoInSlot } from '../../utils/canvasUtils';
 import './PhotoDecorate.css';
 import { Countdown } from '..';
@@ -26,7 +26,7 @@ export default function PhotoDecorate() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
-  const selectedFrame = state.selectedFrame || FRAME_CONFIGS[0];
+  const selectedFrame = state.selectedFrame;
   const [photoAssignments, setPhotoAssignments] = useState<{
     [slotIndex: number]: number;
   }>({});
@@ -37,30 +37,39 @@ export default function PhotoDecorate() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameImgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const previewSlots = selectedFrame.previewSlots || selectedFrame.slots;
-  const frameAspectRatio = selectedFrame.height
+  const previewSlots = selectedFrame?.previewSlots || selectedFrame?.slots || [];
+  const frameAspectRatio = selectedFrame?.height
     ? selectedFrame.width / selectedFrame.height
     : 1;
 
   const calculateScaleFactor = useCallback(() => {
     const container = containerRef.current;
-    if (container) {
+    if (container && selectedFrame) {
       const actualWidth = container.offsetWidth || container.clientWidth;
       const actualHeight = container.offsetHeight || container.clientHeight;
       const scaleX = actualWidth / selectedFrame.width;
       const scaleY = actualHeight / selectedFrame.height;
       setScaleFactor({ x: scaleX, y: scaleY });
     }
-  }, [selectedFrame.height, selectedFrame.width]);
+  }, [selectedFrame?.height, selectedFrame?.width]);
+
+  // Redirect if no frame selected
+  useEffect(() => {
+    if (!selectedFrame) {
+      console.error('No frame selected, redirecting to frame selection');
+      navigate('/frame-selection');
+    }
+  }, [selectedFrame, navigate]);
 
   // Calculate scale factor on mount and when frame changes
   useEffect(() => {
+    if (!selectedFrame) return;
     // Give a small delay to ensure layout is computed
     const timer = setTimeout(() => {
       calculateScaleFactor();
     }, 100);
     return () => clearTimeout(timer);
-  }, [calculateScaleFactor, selectedFrame.height, selectedFrame.width]);
+  }, [calculateScaleFactor, selectedFrame?.height, selectedFrame?.width]);
 
   // Recalculate scale factor on window resize
   useEffect(() => {
@@ -98,6 +107,7 @@ export default function PhotoDecorate() {
   };
 
   const generateFinalImage = () => {
+    if (!selectedFrame) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -272,7 +282,7 @@ export default function PhotoDecorate() {
       })();
     };
 
-    frameImg.src = selectedFrame.image;
+    frameImg.src = selectedFrame?.image;
   };
 
   const handleConfirm = () => {
@@ -281,6 +291,8 @@ export default function PhotoDecorate() {
   };
 
   const handlePhotoClick = (photoIndex: number) => {
+    if (!selectedFrame) return;
+
     // Check if photo is already selected
     if (selectedPhotos.includes(photoIndex)) {
       // Remove photo from selection
@@ -333,7 +345,7 @@ export default function PhotoDecorate() {
           >
             <img
               ref={frameImgRef}
-              src={selectedFrame.image}
+              src={selectedFrame?.image}
               alt="Frame"
               crossOrigin="anonymous"
               style={{
@@ -421,7 +433,7 @@ export default function PhotoDecorate() {
           type="button"
           className="next-button"
           onClick={handleConfirm}
-          disabled={selectedPhotos.length !== selectedFrame.slots.length}
+          disabled={selectedPhotos.length !== selectedFrame?.slots.length}
         >
           ต่อไป
         </button>

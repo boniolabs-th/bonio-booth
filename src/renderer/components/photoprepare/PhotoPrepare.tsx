@@ -2,7 +2,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCallback, useState } from 'react';
 import { BackButton, Countdown } from '..';
-import { FRAME_CONFIGS, FrameConfig } from '../../utils/frameConfig';
+import { FrameConfig } from '../../utils/frameConfig';
 import './PhotoPrepare.css';
 
 interface LocationState {
@@ -19,8 +19,8 @@ export default function PhotoPrepare() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
-  const [selectedFrame, setSelectedFrame] = useState<FrameConfig>(
-    state.selectedFrame || FRAME_CONFIGS[0],
+  const [selectedFrame, setSelectedFrame] = useState<FrameConfig | undefined>(
+    state.selectedFrame,
   );
 
   const handleBack = () => {

@@ -2,7 +2,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useCallback, useEffect } from 'react';
 import { BackButton, Countdown } from '..';
-import { FRAME_CONFIGS, FrameConfig, fetchFrameConfigs } from '../../utils/frameConfig';
+import { FrameConfig, fetchFrameConfigs } from '../../utils/frameConfig';
 import './FrameSelection.css';
 
 interface LocationState {
@@ -17,10 +17,8 @@ export default function FrameSelection() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
-  const [frames, setFrames] = useState<FrameConfig[]>(FRAME_CONFIGS);
-  const [selectedFrame, setSelectedFrame] = useState<FrameConfig>(
-    FRAME_CONFIGS[0],
-  );
+  const [frames, setFrames] = useState<FrameConfig[]>();
+  const [selectedFrame, setSelectedFrame] = useState<FrameConfig>();
   const [useBoomerang, setUseBoomerang] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -108,7 +106,7 @@ export default function FrameSelection() {
           {isLoading ? (
             <div className="loading-frames">Loading frames...</div>
           ) : (
-            frames.map((frame) => {
+            frames?.map((frame) => {
               const thumbnailWidth =
                 frame.orientation === 'portrait' ? '120px' : '160px';
               const thumbnailHeight =
@@ -119,7 +117,7 @@ export default function FrameSelection() {
                   key={frame.id}
                   role="button"
                   tabIndex={0}
-                  className={`frame-thumbnail ${selectedFrame.id === frame.id ? 'selected' : ''}`}
+                  className={`frame-thumbnail ${selectedFrame?.id === frame.id ? 'selected' : ''}`}
                   style={{
                     height: thumbnailHeight,
                   }}
@@ -130,7 +128,7 @@ export default function FrameSelection() {
                     }
                   }}
                 >
-                  {selectedFrame.id === frame.id && (
+                  {selectedFrame?.id === frame.id && (
                     <div className="selected-badge">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                         <path
@@ -154,7 +152,7 @@ export default function FrameSelection() {
         {/* Row 2: Large Preview (60%) */}
         <div className="row-middle">
           <div className="frame-preview-large">
-            <img src={selectedFrame.image} alt={selectedFrame.name} />
+            <img src={selectedFrame?.image} alt={selectedFrame?.name} />
           </div>
         </div>
 
