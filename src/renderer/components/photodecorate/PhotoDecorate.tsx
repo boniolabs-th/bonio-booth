@@ -38,6 +38,9 @@ export default function PhotoDecorate() {
   const frameImgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const previewSlots = selectedFrame.previewSlots || selectedFrame.slots;
+  const frameAspectRatio = selectedFrame.height
+    ? selectedFrame.width / selectedFrame.height
+    : 1;
 
   const calculateScaleFactor = useCallback(() => {
     const container = containerRef.current;
@@ -67,7 +70,6 @@ export default function PhotoDecorate() {
 
     window.addEventListener('resize', handleResize);
     return () => {
-      clearTimeout(timer);
       window.removeEventListener('resize', calculateScaleFactor);
     };
   }, [calculateScaleFactor]);
@@ -388,6 +390,41 @@ export default function PhotoDecorate() {
             })}
           </div>
         </div>
+        {/* Right - Photo Grid */}
+        <div className="photo-grid-section">
+          <div className="photo-grid">
+            {state.captures.map((capture, index) => {
+              const sequenceNumber = selectedPhotos.indexOf(index);
+              const isSelected = sequenceNumber !== -1;
+
+              return (
+                <button
+                  key={capture.video || capture.photo}
+                  type="button"
+                  className={`photo-card ${isSelected ? 'selected' : ''}`}
+                  onClick={() => handlePhotoClick(index)}
+                >
+                  <img src={capture.photo} alt={`Capture ${index + 1}`} />
+                  {isSelected && (
+                    <div className="sequence-badge">{sequenceNumber + 1}</div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Button */}
+      <div className="decorate-footer">
+        <button
+          type="button"
+          className="next-button"
+          onClick={handleConfirm}
+          disabled={selectedPhotos.length !== selectedFrame.slots.length}
+        >
+          ต่อไป
+        </button>
       </div>
 
       {/* Hidden canvas for image generation */}
