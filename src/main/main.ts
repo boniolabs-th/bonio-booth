@@ -65,6 +65,7 @@ async function initializeApp() {
     cachedInitData = {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
+      theme: initResponse.theme,
     };
 
     // Send machine data (including prices) to renderer process
@@ -239,7 +240,7 @@ async function generateImageWithPadding(
 }
 
 let mainWindow: BrowserWindow | null = null;
-let cachedInitData: { machine?: { prices?: unknown[] }; prices?: unknown[] } | null = null;
+let cachedInitData: { machine?: { prices?: unknown[] }; prices?: unknown[]; theme?: any } | null = null;
 
 const installExtensions = async () => {
   const installer = require('electron-devtools-installer');
@@ -588,6 +589,7 @@ ipcMain.handle('get-machine-prices', async () => {
     cachedInitData = {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
+      theme: initResponse.theme,
     };
     return { success: true, prices: initResponse.machine.prices || [] };
   } catch (error) {
@@ -609,6 +611,7 @@ ipcMain.handle('get-machine-data', async () => {
     cachedInitData = {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
+      theme: initResponse.theme,
     };
     return { success: true, machine: initResponse.machine };
   } catch (error) {
@@ -628,12 +631,12 @@ ipcMain.handle('save-temp-video', async (event, arrayBuffer: ArrayBuffer) => {
 
     // Convert ArrayBuffer to Buffer
     const buffer = Buffer.from(arrayBuffer);
-    
+
     // Write file
     await fs.writeFile(filePath, buffer);
-    
+
     console.log('✅ [Main] Temp video saved:', filePath);
-    
+
     return {
       success: true,
       path: filePath,
@@ -706,6 +709,28 @@ ipcMain.handle('read-video-file', async (event, filePath: string) => {
       success: false,
       error: errorMessage,
     };
+  }
+});
+
+// Handler สำหรับ request theme data
+ipcMain.handle('get-theme-data', async () => {
+  try {
+    if (cachedInitData?.theme) {
+      return { success: true, theme: cachedInitData.theme };
+    }
+    // ถ้ายังไม่มี cache ให้เรียก API ใหม่
+    const initResponse = await machineService.init();
+    cachedInitData = {
+      machine: initResponse.machine,
+      prices: initResponse.machine.prices || [],
+      theme: initResponse.theme,
+    };
+    return { success: true, theme: initResponse.theme };
+  } catch (error) {
+    console.error('Error in get-theme-data handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
   }
 });
 

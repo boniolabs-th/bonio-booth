@@ -1,4 +1,5 @@
-import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
+import { MemoryRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import {
   Home,
   SelectPrint,
@@ -16,9 +17,21 @@ import {
 } from './components';
 import './App.css';
 
+function RouteListener() {
+  const location = useLocation();
+
+  useEffect(() => {
+    // Send route change message to index.tsx
+    window.postMessage({ type: 'ROUTE_CHANGE', pathname: location.pathname }, '*');
+  }, [location]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <Router>
+      <RouteListener />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/select-print" element={<SelectPrint />} />

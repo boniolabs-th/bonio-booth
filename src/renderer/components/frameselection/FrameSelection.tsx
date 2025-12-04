@@ -71,68 +71,77 @@ export default function FrameSelection() {
 
       {/* Main Content */}
       <div className="main-content-frame">
-        {/* Title Section */}
-        <div className="title-section">
-          <h1 className="title-frame">เลือกกรอบรูป</h1>
-          <p className="subtitle-frame">SELECT YOUR FRAME</p>
-        </div>
+        {/* Row 1: Title + Thumbnails (20%) */}
+        <div className="row-top">
+          {/* Title Section */}
+          <div className="title-section">
+            <h1 className="title-frame">เลือกกรอบรูป</h1>
+            <p className="subtitle-frame">SELECT YOUR FRAME</p>
+          </div>
 
-        {/* Frame Thumbnails - Horizontal Scroll */}
-        <div className="frames-thumbnails">
-          {FRAME_CONFIGS.map((frame) => {
-            const thumbnailWidth =
-              frame.orientation === 'portrait' ? '120px' : '160px';
-            const thumbnailHeight =
-              frame.orientation === 'portrait' ? '160px' : '120px';
+          {/* Frame Thumbnails - Horizontal Scroll */}
+          <div className="frames-thumbnails-container">
+            <div className="frames-thumbnails">
+              {FRAME_CONFIGS.map((frame) => {
+                // const thumbnailWidth =
+                //   frame.orientation === 'portrait' ? '120px' : '160px';
+                const thumbnailHeight =
+                  frame.orientation === 'portrait' ? '160px' : '120px';
 
-            return (
-              <div
-                key={frame.id}
-                role="button"
-                tabIndex={0}
-                className={`frame-thumbnail ${selectedFrame.id === frame.id ? 'selected' : ''}`}
-                style={{
-                  height: thumbnailHeight,
-                }}
-                onClick={() => setSelectedFrame(frame)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    setSelectedFrame(frame);
-                  }
-                }}
-              >
-                {selectedFrame.id === frame.id && (
-                  <div className="selected-badge">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M20 6L9 17l-5-5"
-                        stroke="white"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                return (
+                  <div
+                    key={frame.id}
+                    role="button"
+                    tabIndex={0}
+                    className={`frame-thumbnail ${selectedFrame.id === frame.id ? 'selected' : ''}`}
+                    style={{
+                      height: thumbnailHeight,
+                    }}
+                    onClick={() => setSelectedFrame(frame)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        setSelectedFrame(frame);
+                      }
+                    }}
+                  >
+                    {selectedFrame.id === frame.id && (
+                      <div className="selected-badge">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M20 6L9 17l-5-5"
+                            stroke="white"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                    <img src={frame.image} alt={frame.name} />
                   </div>
-                )}
-                <img src={frame.image} alt={frame.name} />
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* Large Preview */}
-        <div className="frame-preview-large">
-          <img src={selectedFrame.image} alt={selectedFrame.name} />
+        {/* Row 2: Large Preview (60%) */}
+        <div className="row-middle">
+          <div className="frame-preview-large">
+            <img src={selectedFrame.image} alt={selectedFrame.name} />
+          </div>
         </div>
 
-        {/* Confirm Button */}
-        <button
-          type="button"
-          className="next-button-frame"
-          onClick={handleConfirm}
-        >
-          ต่อไป
-        </button>
+        {/* Row 3: Confirm Button (20%) */}
+        <div className="row-bottom">
+          <button
+            type="button"
+            className="next-button-frame"
+            onClick={handleConfirm}
+          >
+            ต่อไป
+          </button>
+        </div>
       </div>
     </div>
   );

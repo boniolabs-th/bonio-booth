@@ -1,6 +1,7 @@
 .frame-selection-container {
-  width: 100vw;
-  height: 100vh;
+  position: relative;
+  width: 100%;
+  height: 100%;
   /* background: white; */
   display: flex;
   flex-direction: column;
@@ -15,11 +16,43 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px 40px 40px;
+  padding: 40px;
   box-sizing: border-box;
-  /* overflow: hidden; */
-  gap: 10px !important;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Row 1: Title + Thumbnails (20%) */
+.row-top {
+  flex: 0 0 20%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Row 2: Preview (dynamic height - fills remaining space) */
+.row-middle {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+/* Row 3: Button (20%) */
+.row-bottom {
+  flex: 0 0 20%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .title-section {
@@ -46,18 +79,23 @@
   text-transform: uppercase;
 }
 
+.frames-thumbnails-container {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Frame Thumbnails - Horizontal Scroll */
 .frames-thumbnails {
   display: flex;
-  gap: 16px;
-  overflow-x: auto;
-  /* overflow-y: hidden; */
+  gap: 36px;
+  margin-inline: auto;
   padding: 20px;
-  width: 100%;
-  max-width: 100%;
+  width: fit-content;
   align-items: center;
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
 }
 
 .frames-thumbnails::-webkit-scrollbar {
@@ -135,24 +173,24 @@
 
 /* Large Preview */
 .frame-preview-large {
-  position: relative;
-  width: 100%;
-  max-width: 250px;
-  height:  100px;
-  background: white;
-  border-radius: 12px;
   display: flex;
-  flex-direction: column;
-  /* overflow: hidden; */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  margin: 20px 0;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  max-width: 100%;
+  border-radius: 12px;
 }
 
 .frame-preview-large img {
-  width: 100%;
+  display: block;
+  max-height: 100%;
+  max-width: 100%;
+  width: auto;
   height: auto;
   object-fit: contain;
-  display: block;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .preview-label {
@@ -293,6 +331,5 @@
   transition: all 0.3s ease;
   box-shadow: 0 6px 20px rgba(255, 165, 0, 0.4);
   min-width: 250px;
-  margin-top: 30vh;
 }
 
