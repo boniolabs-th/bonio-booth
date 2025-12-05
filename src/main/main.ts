@@ -46,14 +46,8 @@ import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 import {
-  createBoomerangVideo,
-  createBoomerangGif,
-  extractFrames,
-  framesToDataUrls,
-  cleanupTempFiles,
   applyLutToVideo,
   createBoomerangWithLut,
-  convertWebmToMp4,
 } from './services/videoService';
 import machineService from './services/machineService';
 import { getEnvConfig } from './config/env.config';
@@ -772,26 +766,6 @@ ipcMain.handle('create-boomerang-with-lut', async (event, videoPath: string, lut
     };
   } catch (error) {
     console.error('❌ [Main] Error creating boomerang with LUT:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    return {
-      success: false,
-      error: errorMessage,
-    };
-  }
-});
-
-// Handler สำหรับ convert webm to mp4
-ipcMain.handle('convert-webm-to-mp4', async (event, videoPath: string) => {
-  try {
-    console.log('🔄 [Main] Converting WebM to MP4:', videoPath);
-    const outputPath = await convertWebmToMp4(videoPath);
-    return {
-      success: true,
-      path: outputPath,
-    };
-  } catch (error) {
-    console.error('❌ [Main] Error converting WebM to MP4:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return {

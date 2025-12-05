@@ -400,63 +400,6 @@ export const createBoomerangWithLut = async (
 };
 
 /**
- * Convert WebM video to MP4 using FFmpeg
- */
-export const convertWebmToMp4 = async (
-  inputVideoPath: string,
-  outputPath?: string,
-): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const output =
-      outputPath ||
-      path.join(app.getPath('temp'), `converted-${Date.now()}.mp4`);
-
-    const args = [
-      '-i',
-      inputVideoPath,
-      '-c:v',
-      'libx264',
-      '-preset',
-      'ultrafast',
-      '-crf',
-      '23',
-      '-pix_fmt',
-      'yuv420p',
-      '-movflags',
-      '+faststart',
-      '-y',
-      output,
-    ];
-
-    const ffmpeg = spawn(ffmpegPath.path, args);
-
-    let stderrOutput = '';
-
-    ffmpeg.stderr.on('data', (data) => {
-      stderrOutput += data.toString();
-    });
-
-    ffmpeg.on('error', (error) => {
-      reject(new Error(`FFmpeg process error: ${error.message}`));
-    });
-
-    ffmpeg.on('close', (code) => {
-      if (code === 0) {
-        if (fs.existsSync(output)) {
-          resolve(output);
-        } else {
-          reject(new Error('FFmpeg completed but output file not found'));
-        }
-      } else {
-        reject(
-          new Error(`FFmpeg exited with code ${code}\nOutput: ${stderrOutput}`),
-        );
-      }
-    });
-  });
-};
-
-/**
  * Cleanup temporary files
  */
 export const cleanupTempFiles = async (filePaths: string[]): Promise<void> => {

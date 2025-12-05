@@ -34,40 +34,6 @@ interface LocationState {
   orderId?: string;
 }
 
-const processRecordedVideo = async (blob: Blob): Promise<string> => {
-  // @ts-ignore
-  if (window.electron?.video?.convertWebmToMp4) {
-    try {
-      const arrayBuffer = await blob.arrayBuffer();
-      // @ts-ignore
-      const saveResult = await window.electron.video.saveTempVideo(arrayBuffer);
-
-      if (saveResult.success && saveResult.path) {
-        console.log('Saved temp video:', saveResult.path);
-        // @ts-ignore
-        const convertResult = await window.electron.video.convertWebmToMp4(
-          saveResult.path,
-        );
-        if (convertResult.success && convertResult.path) {
-          console.log('Converted to MP4:', convertResult.path);
-          // @ts-ignore
-          const readResult = await window.electron.ipcRenderer.invoke(
-            'read-video-file',
-            convertResult.path,
-          );
-          if (readResult.success && readResult.data) {
-            const mp4Blob = new Blob([readResult.data], { type: 'video/mp4' });
-            return URL.createObjectURL(mp4Blob);
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Failed to convert to MP4:', e);
-    }
-  }
-  return URL.createObjectURL(blob);
-};
-
 const ensureBoomerangAssets = async (
   captures: Capture[],
   useBoomerang?: boolean,
@@ -237,10 +203,10 @@ const generateFramedVideo = async (
         }
       };
 
-      mediaRecorder.onstop = async () => {
+      mediaRecorder.onstop = () => {
         cleanup();
         const blob = new Blob(chunks, { type: selectedMimeType });
-        resolve(await processRecordedVideo(blob));
+        resolve(URL.createObjectURL(blob));
       };
 
       mediaRecorder.onerror = (event) => {
@@ -439,10 +405,10 @@ const generateFramedVideo = async (
       }
     };
 
-    mediaRecorder.onstop = async () => {
+    mediaRecorder.onstop = () => {
       cleanup();
       const blob = new Blob(chunks, { type: selectedMimeType });
-      const url = await processRecordedVideo(blob);
+      const url = URL.createObjectURL(blob);
       resolve(url);
     };
 
@@ -1563,7 +1529,7 @@ export default function PhotoResult() {
       const link = document.createElement('a');
       link.href = compiledVideoUrl;
       // Use .mp4 extension as we are now converting to MP4
-      link.download = `bonio-booth-video-${Date.now()}.mp4`;
+      link.download = `bonio-booth-video-${Date.now()}.webm`;
       link.click();
     }
   };
