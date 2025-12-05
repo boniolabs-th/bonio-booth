@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { BackButton, Countdown } from '..';
 import { FrameConfig, fetchFrameConfigs } from '../../utils/frameConfig';
 import './FrameSelection.css';
@@ -21,6 +21,43 @@ export default function FrameSelection() {
   const [selectedFrame, setSelectedFrame] = useState<FrameConfig>();
   const [useBoomerang, setUseBoomerang] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Drag to scroll state
+  const framesContainerRef = useRef<HTMLDivElement>(null);
+  const [isDown, setIsDown] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const isDraggingRef = useRef(false);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDown(true);
+    isDraggingRef.current = false;
+    if (framesContainerRef.current) {
+      setStartX(e.pageX - framesContainerRef.current.offsetLeft);
+      setScrollLeft(framesContainerRef.current.scrollLeft);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsDown(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDown(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDown) return;
+    e.preventDefault();
+    if (framesContainerRef.current) {
+      const x = e.pageX - framesContainerRef.current.offsetLeft;
+      const walk = (x - startX) * 2; // Scroll-fast
+      if (Math.abs(walk) > 5) {
+        isDraggingRef.current = true;
+      }
+      framesContainerRef.current.scrollLeft = scrollLeft - walk;
+    }
+  };
 
   useEffect(() => {
     const loadFrames = async () => {
@@ -86,7 +123,7 @@ export default function FrameSelection() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={30}
+        seconds={600}
         onComplete={handleCountdownComplete}
         visible={true}
       />
@@ -102,7 +139,19 @@ export default function FrameSelection() {
           </div>
 
         {/* Frame Thumbnails - Horizontal Scroll */}
-        <div className="frames-thumbnails">
+        <div
+          className="frames-thumbnails"
+          ref={framesContainerRef}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          style={{
+            cursor: isDown ? 'grabbing' : 'grab',
+            overflowX: 'auto',
+            userSelect: 'none'
+          }}
+        >
           {isLoading ? (
             <div className="loading-frames">Loading frames...</div>
           ) : (
@@ -121,7 +170,11 @@ export default function FrameSelection() {
                   style={{
                     height: thumbnailHeight,
                   }}
-                  onClick={() => setSelectedFrame(frame)}
+                  onClick={() => {
+                    if (!isDraggingRef.current) {
+                      setSelectedFrame(frame);
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       setSelectedFrame(frame);

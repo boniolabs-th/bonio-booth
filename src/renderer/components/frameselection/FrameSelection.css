@@ -90,20 +90,13 @@
   padding: 20px;
   width: fit-content;
   align-items: center;
+  /* Hide scrollbar for IE, Edge and Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
 .frames-thumbnails::-webkit-scrollbar {
-  height: 8px;
-}
-
-.frames-thumbnails::-webkit-scrollbar-track {
-  background: #f1f3f4;
-  border-radius: 4px;
-}
-
-.frames-thumbnails::-webkit-scrollbar-thumb {
-  background: #c1c8cd;
-  border-radius: 4px;
+  display: none;
 }
 
 .frame-thumbnail {
