@@ -19,7 +19,8 @@ const getEnv = (): any => {
 
 const env = getEnv();
 console.log('🔧 [MachineService] gett Environment config:', env);
-const apiBaseUrl = env.API_BASE_URL  || 'http://localhost:3000';
+// const apiBaseUrl = env.API_BASE_URL  || 'http://localhost:3000';
+const apiBaseUrl = env.API_BASE_URL  || 'https://api-booth.boniolabs.com';
 const machinePort = env.PORT || '99999';
 const machineId = env.MACHINE_ID || '693296af25719d62f695db5d';
 
@@ -773,6 +774,9 @@ export class MachineService {
         photosCount: photos.length,
       });
 
+      let photosAddedCount = 0; // นับจำนวน photos ที่เพิ่มสำเร็จ
+      const photoFilenames: string[] = []; // เก็บชื่อไฟล์รูปภาพ
+
       for (let i = 0; i < photos.length; i++) {
         try {
           const { buffer, filename, mimeType } = dataUrlToBuffer(photos[i]);
@@ -793,6 +797,8 @@ export class MachineService {
           formData.push(buffer);
           formData.push(Buffer.from('\r\n'));
 
+          photosAddedCount++;
+          photoFilenames.push(filename);
           console.log(`✅ [MachineService] Photo ${i + 1} added to form data`);
         } catch (error) {
           console.error(`❌ [MachineService] Failed to process photo ${i + 1}:`, error);
@@ -802,14 +808,19 @@ export class MachineService {
 
       if (photos.length === 0) {
         console.warn('⚠️ [MachineService] No photos to upload');
+      } else if (photosAddedCount === 0) {
+        console.error('❌ [MachineService] Failed to add any photos to form data!');
       } else {
-        console.log(`✅ [MachineService] All ${photos.length} photos added to form data`);
+        console.log(`✅ [MachineService] Successfully added ${photosAddedCount} of ${photos.length} photos to form data`);
       }
 
       // Add videos
       console.log('📤 [MachineService] Processing videos for upload:', {
         videosCount: videos.length,
       });
+
+      let videosAddedCount = 0; // นับจำนวน videos ที่เพิ่มสำเร็จ
+      const videoFilenames: string[] = []; // เก็บชื่อไฟล์วิดีโอ
 
       for (let i = 0; i < videos.length; i++) {
         try {
@@ -831,6 +842,8 @@ export class MachineService {
           formData.push(buffer);
           formData.push(Buffer.from('\r\n'));
 
+          videosAddedCount++;
+          videoFilenames.push(filename);
           console.log(`✅ [MachineService] Video ${i + 1} added to form data`);
         } catch (error) {
           console.error(`❌ [MachineService] Failed to process video ${i + 1}:`, error);
@@ -840,6 +853,10 @@ export class MachineService {
 
       if (videos.length === 0) {
         console.warn('⚠️ [MachineService] No videos to upload');
+      } else if (videosAddedCount === 0) {
+        console.error('❌ [MachineService] Failed to add any videos to form data!');
+      } else {
+        console.log(`✅ [MachineService] Successfully added ${videosAddedCount} of ${videos.length} videos to form data`);
       }
 
       // Close boundary
@@ -862,38 +879,17 @@ export class MachineService {
 
       // Log form data structure (text fields only)
       // แสดงส่วนที่เป็น text fields (ไม่รวม binary data)
-      const textParts: string[] = [];
-      let currentPos = 0;
-      const bufferStr = formBuffer.toString('utf8', 0, Math.min(5000, formBuffer.length));
+      // ใช้วิธีนับจากตัวแปรที่เก็บไว้แทนการอ่านจาก buffer เพราะ buffer อาจจะใหญ่เกินไป
+      const bufferStr = formBuffer.toString('utf8', 0, Math.min(10000, formBuffer.length));
 
       // Extract text fields from form data
       const transactionCodeMatch = bufferStr.match(/name="transactionCode"[^\r\n]*\r\n\r\n([^\r\n]+)/);
       const transactionIdMatch = bufferStr.match(/name="transactionId"[^\r\n]*\r\n\r\n([^\r\n]+)/);
 
-      // Count files in form data - นับจาก Content-Disposition headers
-      // ใช้วิธีนับ `name="photos"` แทน filename เพราะอาจมีชื่อซ้ำกัน
-      const photosPattern = /Content-Disposition:\s*form-data;\s*name="photos"/g;
-      const videosPattern = /Content-Disposition:\s*form-data;\s*name="videos"/g;
-
-      const photosMatches = bufferStr.match(photosPattern);
-      const videosMatches = bufferStr.match(videosPattern);
-
-      const photosInForm = photosMatches ? photosMatches.length : 0;
-      const videosInForm = videosMatches ? videosMatches.length : 0;
-
-      // Extract filenames for logging (อาจมีชื่อซ้ำกัน)
-      const filenamePattern = /name="photos";\s*filename="([^"]+)"/g;
-      const photoFilenames: string[] = [];
-      let match;
-      while ((match = filenamePattern.exec(bufferStr)) !== null) {
-        photoFilenames.push(match[1]);
-      }
-
-      const videoFilenamePattern = /name="videos";\s*filename="([^"]+)"/g;
-      const videoFilenames: string[] = [];
-      while ((match = videoFilenamePattern.exec(bufferStr)) !== null) {
-        videoFilenames.push(match[1]);
-      }
+      // ใช้จำนวนที่นับไว้แล้วจาก formData array แทนการอ่านจาก buffer
+      // เพราะ buffer อาจจะใหญ่เกินไปและ videos อาจจะไม่อยู่ในส่วนแรก
+      const photosInForm = photosAddedCount;
+      const videosInForm = videosAddedCount;
 
       console.log('📤 [MachineService] Files found in form data:', {
         photosCount: photosInForm,

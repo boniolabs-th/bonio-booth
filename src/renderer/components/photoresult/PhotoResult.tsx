@@ -1229,84 +1229,19 @@ export default function PhotoResult() {
 
         if (shouldWaitForVideo) {
           // รอให้วิดีโอพร้อมก่อน upload (ถ้ามีการสร้างวิดีโอ)
-          const waitForVideo = async () => {
-            const maxWaitTime = 15000; // 15 วินาที (เพิ่มจาก 10)
-            const checkInterval = 500; // ตรวจสอบทุก 0.5 วินาที
-            const startTime = Date.now();
-
-            console.log('⏳ [PhotoResult] Waiting for video to be ready...', {
+          // ไม่ต้องเรียก handleAutoPrint ที่นี่ ให้ useEffect ที่สอง (บรรทัด 1341) ทำงานแทน
+          // เพราะมันจะ trigger อัตโนมัติเมื่อ compiledVideoUrl พร้อม
+          console.log(
+            '⏳ [PhotoResult] Video not ready yet, will wait for compiledVideoUrl to be set',
+            {
               hasCompiledVideoUrl: !!compiledVideoUrl,
               hasCaptures,
-              maxWaitTime,
-            });
-
-            // ใช้ ref เพื่อ track compiledVideoUrl ที่ update
-            let currentCompiledVideoUrl = compiledVideoUrl;
-
-            while (Date.now() - startTime < maxWaitTime) {
-              // ตรวจสอบ compiledVideoUrl อีกครั้ง (อาจถูก set ในระหว่างรอ)
-              // เนื่องจาก compiledVideoUrl เป็น state, เราต้องใช้ closure ที่ถูกต้อง
-              // แต่ใน loop นี้ compiledVideoUrl จะไม่ update อัตโนมัติ
-              // ให้ break ออกไปและให้ useEffect trigger handleAutoPrint อีกครั้ง
-
-              // ถ้ามี compiledVideoUrl แล้ว
-              if (compiledVideoUrl) {
-                const elapsed = Date.now() - startTime;
-                console.log(`✅ [PhotoResult] Video ready after ${elapsed}ms`);
-                break;
-              }
-
-              // ตรวจสอบอีกครั้งหลังจาก await (อาจจะ update แล้ว)
-              // แต่เนื่องจาก closure, compiledVideoUrl จะไม่ update
-              // ให้ break ออกไปและให้ useEffect trigger อีกครั้ง
-
-              // Log progress ทุก 2 วินาที
-              const elapsed = Date.now() - startTime;
-              if (elapsed % 2000 < checkInterval) {
-                console.log(
-                  `⏳ [PhotoResult] Still waiting for video... (${Math.round(elapsed / 1000)}s / ${maxWaitTime / 1000}s)`,
-                  {
-                    isCreatingVideo,
-                    isApplyingLUT,
-                  },
-                );
-              }
-
-              await new Promise((resolve) =>
-                setTimeout(resolve, checkInterval),
-              );
-            }
-
-            const finalElapsed = Date.now() - startTime;
-            const finalCompiledVideoUrl = compiledVideoUrl;
-
-            if (!finalCompiledVideoUrl) {
-              console.warn(
-                `⚠️ [PhotoResult] Video not ready after ${finalElapsed}ms timeout, proceeding without video`,
-              );
-              console.warn(
-                '⚠️ [PhotoResult] Video creation may have failed or is still in progress',
-              );
-              console.warn(
-                '⚠️ [PhotoResult] Check logs above for video creation errors',
-              );
-            } else {
-              console.log(
-                `✅ [PhotoResult] Video became available during wait (after ${finalElapsed}ms)`,
-              );
-            }
-
-            console.log(
-              '🔄 [PhotoResult] Triggering handleAutoPrint after waiting',
-              {
-                hasCompiledVideoUrl: !!finalCompiledVideoUrl,
-                elapsed: finalElapsed,
-              },
-            );
-            handleAutoPrint();
-          };
-
-          waitForVideo();
+            },
+          );
+          console.log(
+            '⏳ [PhotoResult] Upload will be triggered automatically when compiledVideoUrl is ready',
+          );
+          // ไม่ต้องทำอะไร ให้ useEffect ที่สอง (บรรทัด 1341) ทำงานแทน
         } else {
           // วิดีโอพร้อมแล้ว หรือไม่มีวิดีโอให้รอ - upload ทันที
           console.log(

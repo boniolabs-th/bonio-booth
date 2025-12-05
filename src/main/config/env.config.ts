@@ -1,6 +1,6 @@
 /**
  * Environment Configuration
- * 
+ *
  * ไฟล์นี้ใช้สำหรับจัดการ environment variables
  * สามารถตั้งค่าได้ผ่าน:
  * 1. .env file (ใน root directory)
@@ -21,7 +21,8 @@ export interface EnvConfig {
  */
 export function getEnvConfig(): EnvConfig {
   return {
-    API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:3000',
+    // API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:3000',
+    API_BASE_URL: process.env.API_BASE_URL || 'https://api-booth.boniolabs.com',
     PORT: process.env.PORT || '99999',
     MACHINE_ID: process.env.MACHINE_ID || '693296af25719d62f695db5d',
     MACHINE_CAN_CUT: process.env.MACHINE_CAN_CUT !== 'false',
