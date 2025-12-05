@@ -184,14 +184,26 @@ export const FILTERS: FilterConfig[] = [
   //   type: 'css',
   // },
   // LUT-based filters (for high-quality color grading)
+  // Black & White filters
   { id: 'BW1', name: 'สุดหล่อ-1', lutFile: 'BW1.cube', type: 'lut' },
   { id: 'BW2', name: 'สุดหล่อ-2', lutFile: 'BW2.cube', type: 'lut' },
-  { id: 'BW3', name: 'สุดหล่อ-3', lutFile: 'BW3.cube', type: 'lut' },
-  { id: 'BW4', name: 'สุดหล่อ-4', lutFile: 'BW4.cube', type: 'lut' },
-  { id: 'BW5', name: 'สุดหล่อ-5', lutFile: 'BW5.cube', type: 'lut' },
-  { id: 'BW6', name: 'สุดสวย-1', lutFile: 'BW6.cube', type: 'lut' },
-  { id: 'BW7', name: 'สุดสวย-2', lutFile: 'BW7.cube', type: 'lut' },
-  { id: 'BW8', name: 'สุดสวย-3', lutFile: 'BW8.cube', type: 'lut' },
-  { id: 'BW9', name: 'สุดสวย-4', lutFile: 'BW9.cube', type: 'lut' },
-  { id: 'BW10', name: 'สุดสวย-5', lutFile: 'BW10.cube', type: 'lut' },
+  { id: 'SoftBlackAndWhite', name: 'Soft Black & White', lutFile: 'SoftBlackAndWhite.cube', type: 'lut' },
+  
+  // NW Series filters
+  { id: 'NW-1', name: 'NW-1', lutFile: 'NW-1.cube', type: 'lut' },
+  { id: 'NW-2', name: 'NW-2', lutFile: 'NW-2.cube', type: 'lut' },
+  { id: 'NW-6', name: 'NW-6', lutFile: 'NW-6.cube', type: 'lut' },
+  { id: 'NW-10', name: 'NW-10', lutFile: 'NW-10.cube', type: 'lut' },
+  
+  // Color filters
+  { id: 'Aqua', name: 'Aqua', lutFile: 'Aqua.cube', type: 'lut' },
+  { id: 'Blues', name: 'Blues', lutFile: 'Blues.cube', type: 'lut' },
+  { id: 'EarthToneBoost', name: 'Earth Tone Boost', lutFile: 'EarthToneBoost.cube', type: 'lut' },
+  { id: 'GreenBlues', name: 'Green Blues', lutFile: 'Green_Blues.cube', type: 'lut' },
+  { id: 'GreenYellow', name: 'Green Yellow', lutFile: 'Green_Yellow.cube', type: 'lut' },
+  { id: 'Purple', name: 'Purple', lutFile: 'Purple.cube', type: 'lut' },
+  { id: 'Reds', name: 'Reds', lutFile: 'Reds.cube', type: 'lut' },
+  { id: 'RedsOrangesYellows', name: 'Reds Oranges Yellows', lutFile: 'Reds_Oranges_Yellows.cube', type: 'lut' },
+  { id: 'TealAndOrange', name: 'Teal and Orange', lutFile: 'Teal-and-Orange.cube', type: 'lut' },
+  // { id: 'Presetpro', name: 'Presetpro', lutFile: 'Presetpro.cube', type: 'lut' },
 ];
