@@ -99,8 +99,8 @@ const electronHandler = {
     createBoomerangWithLut: (videoPath: string, lutFileName: string) => {
       return ipcRenderer.invoke('create-boomerang-with-lut', videoPath, lutFileName);
     },
-    readVideoFile: (filePath: string) => {
-      return ipcRenderer.invoke('read-video-file', filePath);
+    convertWebmToMp4: (videoPath: string) => {
+      return ipcRenderer.invoke('convert-webm-to-mp4', videoPath);
     },
   },
 };
