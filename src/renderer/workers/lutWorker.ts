@@ -9,11 +9,13 @@ interface WorkerMessage {
   type: 'APPLY_LUT';
   imageData: ImageData;
   lut: LUT3D;
+  requestId: string;
 }
 
 interface WorkerResponse {
   type: 'LUT_APPLIED';
   imageData: ImageData;
+  requestId: string;
 }
 
 // Apply LUT to ImageData (same algorithm as lutProcessor)
@@ -136,7 +138,7 @@ const applyLUTToImageData = (imageData: ImageData, lut: LUT3D): ImageData => {
 
 // Worker message handler
 self.onmessage = (e: MessageEvent<WorkerMessage>) => {
-  const { type, imageData, lut } = e.data;
+  const { type, imageData, lut, requestId } = e.data;
 
   if (type === 'APPLY_LUT') {
     const processedImageData = applyLUTToImageData(imageData, lut);
@@ -144,6 +146,7 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
     const response: WorkerResponse = {
       type: 'LUT_APPLIED',
       imageData: processedImageData,
+      requestId,
     };
 
     self.postMessage(response);

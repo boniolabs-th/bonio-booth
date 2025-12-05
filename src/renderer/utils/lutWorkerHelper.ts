@@ -35,17 +35,19 @@ export const applyLUTWithWorker = (
     }
 
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const requestId = Math.random().toString(36).substring(7);
 
     // Send to worker
     w.postMessage({
       type: 'APPLY_LUT',
       imageData,
       lut,
+      requestId,
     });
 
     // Listen for response
     const handleMessage = (e: MessageEvent) => {
-      if (e.data.type === 'LUT_APPLIED') {
+      if (e.data.type === 'LUT_APPLIED' && e.data.requestId === requestId) {
         // Create result canvas
         const resultCanvas = document.createElement('canvas');
         resultCanvas.width = canvas.width;
