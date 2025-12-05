@@ -358,7 +358,9 @@ export default function PhotoFilter() {
         const frameHeight = state.selectedFrame.height;
         const aspectRatio = frameWidth / frameHeight;
         const is2x6 = aspectRatio < 0.4;
-        const shouldDuplicate = !canCut && is2x6;
+
+        // ALWAYS duplicate if it is 2x6 frame, because backend always generates 4x6 canvas
+        const shouldDuplicate = is2x6;
 
         console.log('🖨️ [PhotoFilter] Duplication check:', { canCut, is2x6, shouldDuplicate, frameWidth, frameHeight });
 

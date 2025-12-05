@@ -143,7 +143,11 @@ export default function PhotoDecorate() {
       // 2x6 frame usually has aspect ratio around 0.33 (2/6)
       const aspectRatio = frameWidth / frameHeight;
       const is2x6 = aspectRatio < 0.4; // Threshold to detect 2x6 strip
-      const shouldDuplicate = !canCut && is2x6;
+
+      // ALWAYS duplicate if it is 2x6 frame, because backend always generates 4x6 canvas
+      // If machine can cut -> it cuts this 4x6 into two 2x6 strips
+      // If machine cannot cut -> user gets 4x6 with two 2x6 strips
+      const shouldDuplicate = is2x6;
 
       console.log('📸 [PhotoDecorate] Frame dimensions:', { width: frameWidth, height: frameHeight, aspectRatio });
       console.log('📸 [PhotoDecorate] Duplication check:', { canCut, is2x6, shouldDuplicate });
