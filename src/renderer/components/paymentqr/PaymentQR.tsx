@@ -19,6 +19,7 @@ interface LocationState {
   discountAmount?: number;
   netAmount?: number;
   couponCodeId?: string;
+  isFree?: boolean; // Flag สำหรับ free transaction (netAmount = 0)
 }
 
 // Function to calculate discount based on code
@@ -67,7 +68,7 @@ export default function PaymentQR() {
       referenceId: state?.referenceId,
       transactionId: state?.transactionId,
       paymentDetailsId: state?.paymentDetailsId,
-      qrcode: state?.qrcode ? 'present' : 'missing',
+      qrcode: state?.qrcode ? 'present' :  null,
     });
   }, []);
   const [successCountdown, setSuccessCountdown] = useState<number | null>(null);
@@ -125,9 +126,9 @@ export default function PaymentQR() {
     }
   }, [finalPrice, state.quantity]);
 
-  // Create payment when component mounts (ถ้ายังไม่มี qrcode)
+  // Create payment when component mounts (ถ้ายังไม่มี qrcode และไม่ใช่ free transaction)
   useEffect(() => {
-    if (state && !state.qrcode) {
+    if (state && !state.qrcode && !state.isFree) {
       createPayment();
     }
   }, [state, createPayment]);
@@ -153,10 +154,12 @@ export default function PaymentQR() {
   }, [timeLeft, navigate]);
 
   // Check payment status periodically using Machine API
+  // สำหรับ free transaction (isFree = true) ให้เช็ค status ทันที
   useEffect(() => {
     if (!referenceId) return;
 
-    const statusChecker = setInterval(async () => {
+    // ถ้าเป็น free transaction ให้เช็ค status ทันที (ไม่ต้องรอ polling)
+    const checkStatus = async () => {
       try {
         const result =
           await window.electron.payment.checkMachinePaymentStatus(referenceId);
@@ -171,6 +174,7 @@ export default function PaymentQR() {
           ) {
             // Payment successful, start countdown
             setSuccessCountdown(3);
+            return true; // Status is SUCCESS, stop polling
           } else if (
             ['FAIL', 'PAYERROR', 'CLOSED', 'failed'].includes(
               result.status as string,
@@ -178,17 +182,61 @@ export default function PaymentQR() {
             result.transactionStatus === 'failed'
           ) {
             setError('Payment failed. Please try again.');
+            return true; // Status is FAIL, stop polling
           }
         } else if (result.error) {
           console.error('Payment status check error:', result.error);
         }
+        return false; // Continue polling
       } catch (error) {
         console.error('Error checking payment status:', error);
+        return false; // Continue polling
+      }
+    };
+
+    // ถ้าเป็น free transaction ให้เช็ค status ทันที
+    if (state?.isFree) {
+      // eslint-disable-next-line no-console
+      console.log(
+        '💳 [PaymentQR] Free transaction detected, checking status immediately...',
+      );
+      let freeStatusChecker: ReturnType<typeof setInterval> | null = null;
+
+      checkStatus()
+        .then((shouldStop) => {
+          if (!shouldStop) {
+            // ถ้ายังไม่สำเร็จ ให้ polling ต่อไป
+            freeStatusChecker = setInterval(async () => {
+              const stop = await checkStatus();
+              if (stop && freeStatusChecker) {
+                clearInterval(freeStatusChecker);
+                freeStatusChecker = null;
+              }
+            }, 3000);
+          }
+        })
+        .catch((err) => {
+          // eslint-disable-next-line no-console
+          console.error('Error checking free transaction status:', err);
+        });
+
+      return () => {
+        if (freeStatusChecker) {
+          clearInterval(freeStatusChecker);
+        }
+      };
+    }
+
+    // สำหรับ paid transaction ให้ polling ทุก 3 วินาที
+    const statusChecker = setInterval(async () => {
+      const stop = await checkStatus();
+      if (stop) {
+        clearInterval(statusChecker);
       }
     }, 3000); // Check every 3 seconds
 
     return () => clearInterval(statusChecker);
-  }, [referenceId]);
+  }, [referenceId, state?.isFree]);
 
   // Success countdown timer
   useEffect(() => {
@@ -282,9 +330,9 @@ export default function PaymentQR() {
           <p className="title-english">SCAN TO PAY!</p>
         </div>
 
-        {/* QR Code */}
+        {/* QR Code หรือ Free Transaction Message */}
         <div className="qr-code-container">
-          {isLoading && (
+          {isLoading && !state?.isFree && (
             <div className="loading-spinner">
               <div className="spinner-ring"></div>
               <div className="spinner-ring"></div>
@@ -299,7 +347,25 @@ export default function PaymentQR() {
               </button>
             </div>
           )}
-          {!isLoading && !error && qrCode && (
+          {/* Free Transaction Message */}
+          {state?.isFree && (
+            <div className="free-transaction-message">
+              <div className="free-transaction-icon">
+                <img
+                  src={checkCircleIcon}
+                  alt="Free Transaction"
+                  className="check-circle-icon"
+                />
+              </div>
+              <p className="free-transaction-text">
+                {paymentStatus === 'SUCCESS' || successCountdown !== null
+                  ? 'ใช้งานคูปองสำเร็จ'
+                  : 'กำลังตรวจสอบคูปอง...'}
+              </p>
+            </div>
+          )}
+          {/* QR Code สำหรับ Paid Transaction */}
+          {!state?.isFree && !isLoading && !error && qrCode && (
             <>
               {paymentStatus === 'SUCCESS' || successCountdown !== null ? (
                 <div className="payment-success-container">
@@ -308,10 +374,6 @@ export default function PaymentQR() {
                     alt="Payment Success"
                     className="check-circle-icon"
                   />
-                  {/* <div className="success-text">ชำระเงินสำเร็จ</div> */}
-                  {/* {successCountdown !== null && (
-                    <div className="countdown-text">{successCountdown}</div>
-                  )} */}
                 </div>
               ) : (
                 <div
@@ -332,7 +394,7 @@ export default function PaymentQR() {
               )}
             </>
           )}
-          {!isLoading && !error && !qrCode && (
+          {!state?.isFree && !isLoading && !error && !qrCode && (
             <div className="qr-code-placeholder">
               <div className="qr-pattern">
                 <div className="qr-square corner-square top-left" />

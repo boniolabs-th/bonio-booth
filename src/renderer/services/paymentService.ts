@@ -1,6 +1,6 @@
 export interface PaymentResult {
   success: boolean;
-  qr_code?: string;
+  qr_code?: string | null;
   reference_id?: string;
   order_id?: string;
   error?: string;

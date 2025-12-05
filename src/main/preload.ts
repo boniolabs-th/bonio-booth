@@ -62,6 +62,9 @@ const electronHandler = {
     getMachineData: () => {
       return ipcRenderer.invoke('get-machine-data');
     },
+    getEnvVars: () => {
+      return ipcRenderer.invoke('get-env-vars');
+    },
     getThemeData: () => {
       return ipcRenderer.invoke('get-theme-data');
     },

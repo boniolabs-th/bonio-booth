@@ -82,7 +82,7 @@ export default function DiscountCoupon() {
 
       console.log('💳 [DiscountCoupon] Payment response:', {
         success: paymentResult.success,
-        qr_code: paymentResult.qr_code ? 'present' : 'missing',
+        qr_code: paymentResult.qr_code ? 'present' : null,
         reference_id: paymentResult.reference_id,
         order_id: paymentResult.order_id,
         transactionId: paymentResult.transactionId,
@@ -90,7 +90,10 @@ export default function DiscountCoupon() {
         fullResponse: paymentResult,
       });
 
-      if (paymentResult.success && paymentResult.qr_code) {
+      if (paymentResult.success) {
+        // เช็คว่าเป็น free transaction หรือไม่ (netAmount = 0 หรือ qr_code = null)
+        const isFree = paymentResult.netAmount === 0 || paymentResult.qr_code === null;
+        
         // Navigate to payment page with QR code and discount info
         const navigationState = {
           quantity: state.quantity,
@@ -99,12 +102,13 @@ export default function DiscountCoupon() {
           discountCode: code,
           discountAmount: paymentResult.discountAmount || 0,
           netAmount: paymentResult.netAmount || originalPrice,
-          qrcode: paymentResult.qr_code,
+          qrcode: paymentResult.qr_code !== null ? paymentResult.qr_code : null,
           referenceId: paymentResult.reference_id,
           transactionId: paymentResult.transactionId,
           paymentDetailsId: paymentResult.paymentDetailsId,
           orderId: paymentResult.order_id,
           couponCodeId: paymentResult.couponCodeId,
+          isFree: isFree || (paymentResult as any).isFree || false,
         };
 
         console.log(
@@ -135,7 +139,7 @@ export default function DiscountCoupon() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ (ซ่อนการแสดงผล) */}
       <Countdown
-        seconds={30}
+        seconds={300}
         onComplete={handleCountdownComplete}
         visible={false}
       />

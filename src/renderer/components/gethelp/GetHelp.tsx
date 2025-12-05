@@ -65,7 +65,7 @@ export default function GetHelp() {
       <BackButton onBackClick={handleBack} />
 
       <Countdown
-        seconds={30}
+        seconds={300}
         onComplete={handleCountdownComplete}
         visible={false}
       />
