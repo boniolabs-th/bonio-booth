@@ -15,6 +15,32 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
+
+// Load .env file manually if dotenv is not available
+const loadEnv = async () => {
+  try {
+    const envPath = path.join(process.cwd(), '.env');
+    const envContent = await fs.readFile(envPath, 'utf-8');
+    const envLines = envContent.split('\n');
+    envLines.forEach((line) => {
+      const match = line.match(/^([^#=]+)=(.*)$/);
+      if (match) {
+        const key = match[1].trim();
+        const value = match[2].trim();
+        if (process.env[key] === undefined) {
+          process.env[key] = value;
+        }
+      }
+    });
+    console.log('✅ Loaded .env file from', envPath);
+    console.log('🔧 MACHINE_CAN_CUT:', process.env.MACHINE_CAN_CUT);
+  } catch (error) {
+    console.log('ℹ️ No .env file found or failed to load');
+  }
+};
+
+loadEnv();
+
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
@@ -643,8 +669,16 @@ ipcMain.handle('get-machine-prices', async () => {
 // Handler สำหรับ request machine data (รวม cameraCountdown)
 ipcMain.handle('get-machine-data', async () => {
   try {
+    const canCut = process.env.MACHINE_CAN_CUT !== 'false';
+
     if (cachedInitData?.machine) {
-      return { success: true, machine: cachedInitData.machine };
+      return {
+        success: true,
+        machine: {
+          ...cachedInitData.machine,
+          canCut,
+        },
+      };
     }
     // ถ้ายังไม่มี cache ให้เรียก API ใหม่
     const initResponse = await machineService.init();
@@ -653,7 +687,13 @@ ipcMain.handle('get-machine-data', async () => {
       prices: initResponse.machine.prices || [],
       theme: initResponse.theme,
     };
-    return { success: true, machine: initResponse.machine };
+    return {
+      success: true,
+      machine: {
+        ...initResponse.machine,
+        canCut,
+      },
+    };
   } catch (error) {
     console.error('Error in get-machine-data handler:', error);
     const errorMessage =

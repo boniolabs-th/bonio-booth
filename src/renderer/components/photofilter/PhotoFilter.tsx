@@ -41,7 +41,23 @@ export default function PhotoFilter() {
   );
   const [isGeneratingThumbnails, setIsGeneratingThumbnails] =
     useState<boolean>(false);
+  const [canCut, setCanCut] = useState<boolean>(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const fetchMachineData = async () => {
+      try {
+        // @ts-ignore
+        const response = await window.electron.payment.getMachineData();
+        if (response.success && response.machine) {
+          setCanCut(response.machine.canCut !== false);
+        }
+      } catch (error) {
+        console.error('Failed to fetch machine data', error);
+      }
+    };
+    fetchMachineData();
+  }, []);
 
   const handleCountdownComplete = useCallback(() => {
     console.log(
@@ -334,6 +350,42 @@ export default function PhotoFilter() {
       const filteredFinalImage = await generateFinalImageWithFilteredPhotos();
       console.log('=== FINAL IMAGE GENERATED SUCCESSFULLY ===');
 
+      // Check duplication logic for printing
+      let printImage = filteredFinalImage;
+
+      if (state.selectedFrame) {
+        const frameWidth = state.selectedFrame.width;
+        const frameHeight = state.selectedFrame.height;
+        const aspectRatio = frameWidth / frameHeight;
+        const is2x6 = aspectRatio < 0.4;
+        const shouldDuplicate = !canCut && is2x6;
+
+        console.log('🖨️ [PhotoFilter] Duplication check:', { canCut, is2x6, shouldDuplicate, frameWidth, frameHeight });
+
+        if (shouldDuplicate) {
+          console.log('=== DUPLICATING IMAGE FOR PRINT (2x6 -> 4x6) ===');
+          const doubleCanvas = document.createElement('canvas');
+          doubleCanvas.width = frameWidth * 2;
+          doubleCanvas.height = frameHeight;
+          const dCtx = doubleCanvas.getContext('2d');
+          if (dCtx) {
+            dCtx.fillStyle = '#ffffff';
+            dCtx.fillRect(0, 0, doubleCanvas.width, doubleCanvas.height);
+
+            await new Promise<void>((resolve) => {
+              const img = new Image();
+              img.onload = () => {
+                dCtx.drawImage(img, 0, 0);
+                dCtx.drawImage(img, frameWidth, 0);
+                printImage = doubleCanvas.toDataURL('image/png');
+                resolve();
+              };
+              img.src = filteredFinalImage;
+            });
+          }
+        }
+      }
+
       // Log image for debugging
       console.log('=== GENERATED FINAL IMAGE ===');
       console.log('Image from generateFinalImageWithFilteredPhotos');
@@ -386,7 +438,7 @@ export default function PhotoFilter() {
             // Send print request with frame configuration
             try {
               window.electron.print.printPhoto({
-                imageDataUrl: filteredFinalImage,
+                imageDataUrl: printImage,
                 frameId: state.selectedFrame?.id || 'classic_2x6',
                 frameName: state.selectedFrame?.name || '2x6 Classic',
                 copies: state.quantity || 1,
@@ -417,6 +469,7 @@ export default function PhotoFilter() {
         state: {
           ...state,
           finalImage: filteredFinalImage,
+          printImage,
           selectedFilter,
           useBoomerang: state.useBoomerang || false,
           alreadyPrinted: true, // บอกว่าเพิ่งพิมพ์แล้ว ไม่ต้อง auto-print อีก

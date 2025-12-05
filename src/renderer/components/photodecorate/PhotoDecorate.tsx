@@ -33,6 +33,22 @@ export default function PhotoDecorate() {
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
   const [scaleFactor, setScaleFactor] = useState({ x: 1, y: 1 });
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
+  const [canCut, setCanCut] = useState<boolean>(true);
+
+  useEffect(() => {
+    const fetchMachineData = async () => {
+      try {
+        // @ts-ignore
+        const response = await window.electron.payment.getMachineData();
+        if (response.success && response.machine) {
+          setCanCut(response.machine.canCut !== false);
+        }
+      } catch (error) {
+        console.error('Failed to fetch machine data', error);
+      }
+    };
+    fetchMachineData();
+  }, []);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameImgRef = useRef<HTMLImageElement>(null);
@@ -94,11 +110,13 @@ export default function PhotoDecorate() {
   const proceedToResult = (
     finalImageData: string,
     selectedCaptures: Capture[],
+    printImageData?: string,
   ) => {
     navigate('/photo-filter', {
       state: {
         ...state,
         finalImage: finalImageData,
+        printImage: printImageData,
         selectedFrame,
         selectedCaptures,
         useBoomerang: state.useBoomerang || false,
@@ -121,6 +139,16 @@ export default function PhotoDecorate() {
       const frameWidth = frameImg.naturalWidth || selectedFrame.width;
       const frameHeight = frameImg.naturalHeight || selectedFrame.height;
 
+      // Check if we need to duplicate for 4x6 (when machine cannot cut and frame is 2x6)
+      // 2x6 frame usually has aspect ratio around 0.33 (2/6)
+      const aspectRatio = frameWidth / frameHeight;
+      const is2x6 = aspectRatio < 0.4; // Threshold to detect 2x6 strip
+      const shouldDuplicate = !canCut && is2x6;
+
+      console.log('📸 [PhotoDecorate] Frame dimensions:', { width: frameWidth, height: frameHeight, aspectRatio });
+      console.log('📸 [PhotoDecorate] Duplication check:', { canCut, is2x6, shouldDuplicate });
+
+      // Always start with single frame dimensions for the main canvas
       canvas.width = frameWidth;
       canvas.height = frameHeight;
 
@@ -129,22 +157,40 @@ export default function PhotoDecorate() {
 
       // Fill with white background first (paper color)
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, frameWidth, frameHeight);
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Draw photos in their assigned slots
-      let loadedPhotos = 0;
       const totalPhotos = Object.keys(photoAssignments).length;
 
       if (totalPhotos === 0) {
         // No photos assigned, draw frame only
-        // ctx.clearRect(0, 0, frameWidth, frameHeight); // Don't clear, keep white background
         ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
-        proceedToResult(canvas.toDataURL('image/png'), []);
+
+        const singleImageData = canvas.toDataURL('image/png');
+
+        if (shouldDuplicate) {
+          const doubleCanvas = document.createElement('canvas');
+          doubleCanvas.width = frameWidth * 2;
+          doubleCanvas.height = frameHeight;
+          const dCtx = doubleCanvas.getContext('2d');
+          if (dCtx) {
+            dCtx.fillStyle = '#ffffff';
+            dCtx.fillRect(0, 0, doubleCanvas.width, doubleCanvas.height);
+            const img = new Image();
+            img.onload = () => {
+              dCtx.drawImage(img, 0, 0);
+              dCtx.drawImage(img, frameWidth, 0);
+              proceedToResult(singleImageData, [], doubleCanvas.toDataURL('image/png'));
+            };
+            img.src = singleImageData;
+          } else {
+            proceedToResult(singleImageData, []);
+          }
+        } else {
+          proceedToResult(singleImageData, []);
+        }
         return;
       }
-
-      // Draw frame background before adding photos
-      // ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
 
       // Prepare slots to draw
       const slotsToDraw = Object.entries(photoAssignments).map(([slotIndex, photoIndex]) => {
@@ -160,11 +206,11 @@ export default function PhotoDecorate() {
       const backgroundSlots = slotsToDraw.filter(s => s.zIndex < 0);
       const foregroundSlots = slotsToDraw.filter(s => s.zIndex >= 0);
 
-      const drawSlot = (slotData: typeof slotsToDraw[0]) => {
+      const drawSlot = (slotData: typeof slotsToDraw[0], offsetX: number, offsetY: number) => {
         return new Promise<void>((resolve) => {
           const { slot, photoIndex } = slotData;
-          const targetX = slot.x * scaleX;
-          const targetY = slot.y * scaleY;
+          const targetX = (slot.x * scaleX) + offsetX;
+          const targetY = (slot.y * scaleY) + offsetY;
           const targetWidth = slot.width * scaleX;
           const targetHeight = slot.height * scaleY;
           const targetRadius = slot.radius * scaleX; // Scale radius with scaleX
@@ -254,18 +300,23 @@ export default function PhotoDecorate() {
 
       // Execute drawing in order: Background Slots -> Frame -> Foreground Slots
       (async () => {
-        // 1. Draw background slots
-        for (const slotData of backgroundSlots) {
-          await drawSlot(slotData);
-        }
+        const drawComposition = async (offsetX: number, offsetY: number) => {
+          // 1. Draw background slots
+          for (const slotData of backgroundSlots) {
+            await drawSlot(slotData, offsetX, offsetY);
+          }
 
-        // 2. Draw frame
-        ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+          // 2. Draw frame
+          ctx.drawImage(frameImg, offsetX, offsetY, frameWidth, frameHeight);
 
-        // 3. Draw foreground slots
-        for (const slotData of foregroundSlots) {
-          await drawSlot(slotData);
-        }
+          // 3. Draw foreground slots
+          for (const slotData of foregroundSlots) {
+            await drawSlot(slotData, offsetX, offsetY);
+          }
+        };
+
+        // Draw single frame
+        await drawComposition(0, 0);
 
         // Finish
         const selectedCaptures = selectedFrame.slots.reduce<Capture[]>(
@@ -278,7 +329,30 @@ export default function PhotoDecorate() {
           },
           [],
         );
-        proceedToResult(canvas.toDataURL('image/png'), selectedCaptures);
+
+        const singleImageData = canvas.toDataURL('image/png');
+
+        if (shouldDuplicate) {
+          const doubleCanvas = document.createElement('canvas');
+          doubleCanvas.width = frameWidth * 2;
+          doubleCanvas.height = frameHeight;
+          const dCtx = doubleCanvas.getContext('2d');
+          if (dCtx) {
+            dCtx.fillStyle = '#ffffff';
+            dCtx.fillRect(0, 0, doubleCanvas.width, doubleCanvas.height);
+            const img = new Image();
+            img.onload = () => {
+              dCtx.drawImage(img, 0, 0);
+              dCtx.drawImage(img, frameWidth, 0);
+              proceedToResult(singleImageData, selectedCaptures, doubleCanvas.toDataURL('image/png'));
+            };
+            img.src = singleImageData;
+          } else {
+            proceedToResult(singleImageData, selectedCaptures);
+          }
+        } else {
+          proceedToResult(singleImageData, selectedCaptures);
+        }
       })();
     };
 
