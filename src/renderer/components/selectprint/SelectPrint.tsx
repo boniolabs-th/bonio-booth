@@ -168,6 +168,7 @@ export default function SelectPrint() {
         fullResponse: result,
       });
 
+
       if (result.success && result.qr_code) {
         // Navigate to payment page with QR code
         const navigationState = {
@@ -204,7 +205,7 @@ export default function SelectPrint() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={30}
+        seconds={300}
         onComplete={handleCountdownComplete}
         visible={true}
       />

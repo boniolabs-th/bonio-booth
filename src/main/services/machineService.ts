@@ -6,6 +6,23 @@ import path from 'path';
 
 // ==================== Type Definitions ====================
 
+
+// ใช้ environment variables ที่ webpack inject มา
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const getEnv = (): any => {
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env;
+  }
+  // Fallback สำหรับกรณีที่ process.env ไม่มี
+  return {};
+};
+
+const env = getEnv();
+console.log('🔧 [MachineService] gett Environment config:', env);
+const apiBaseUrl = env.API_BASE_URL  || 'http://localhost:3000';
+const machinePort = env.PORT || '99999';
+const machineId = env.MACHINE_ID || '693296af25719d62f695db5d';
+
 export interface MachineInfo {
   id: string;
   machineName: string;
@@ -266,12 +283,11 @@ export class MachineService {
 
   constructor(options: MachineServiceOptions = {}) {
     // อ่าน API URL จาก environment variable หรือ options หรือ default
-    this.apiBaseUrl =  'https://api-booth.boniolabs.com';
-    // this.apiBaseUrl = 'http://localhost:3000';
-    this.machinePort = options.machinePort || Number(process.env.PORT) || 33333;
-    // this.machineId = options.machineId || process.env.MACHINE_ID ;
-    this.machineId = '69247c6b02dd728488995e27';
-    this.timeout = options.timeout || Number(process.env.API_TIMEOUT) || 10000;
+    // this.apiBaseUrl =  'https://api-booth.boniolabs.com';
+    this.apiBaseUrl = apiBaseUrl;
+    this.machinePort = options.machinePort || Number(machinePort) || 99999;
+    this.machineId = options.machineId || machineId || '';
+    this.timeout = options.timeout || Number(env.API_TIMEOUT) || 10000;
 
     console.log('🔧 [MachineService] Configuration:', {
       apiBaseUrl: this.apiBaseUrl,
@@ -617,7 +633,7 @@ export class MachineService {
       console.log('💳 [MachineService] Payment create response:', JSON.stringify(response, null, 2));
       console.log('💳 [MachineService] Payment response fields:', {
         success: response.success,
-        qr_code: response.qr_code ? 'present' : 'missing',
+        qr_code: response.qr_code ? 'present' :  null,
         reference_id: response.reference_id,
         order_id: response.order_id,
         transactionId: response.transactionId,

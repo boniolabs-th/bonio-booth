@@ -141,6 +141,9 @@ const configuration: webpack.Configuration = {
      */
     new webpack.EnvironmentPlugin({
       NODE_ENV: 'development',
+      API_BASE_URL: null,
+      PORT: null,
+      MACHINE_ID: null,
     }),
 
     new webpack.LoaderOptionsPlugin({

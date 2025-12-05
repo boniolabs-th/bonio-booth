@@ -56,6 +56,7 @@ import {
   convertWebmToMp4,
 } from './services/videoService';
 import machineService from './services/machineService';
+import { getEnvConfig } from './config/env.config';
 class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
@@ -665,6 +666,13 @@ ipcMain.handle('get-machine-prices', async () => {
       error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage, prices: [] };
   }
+});
+
+// Handler สำหรับ request environment variables
+ipcMain.handle('get-env-vars', async () => {
+  // ดึง environment variables จาก process.env โดยตรง
+  // (ไม่ต้อง import เพราะ main process มี access ถึง process.env)
+  return getEnvConfig();
 });
 
 // Handler สำหรับ request machine data (รวม cameraCountdown)

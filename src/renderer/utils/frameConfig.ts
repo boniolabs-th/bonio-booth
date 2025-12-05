@@ -5,6 +5,39 @@ import blvd2x3 from '../../../assets/frames/2x3_blvd.png';
 import burningcity2x2 from '../../../assets/frames/2x2_burningcity.png';
 import burningcity3x2 from '../../../assets/frames/3x2_burningcity.png';
 
+// ตัวแปรสำหรับเก็บ environment variables (จะถูก set จาก IPC)
+let envConfig: {
+  apiUrl: string;
+  machinePort: string;
+  machineId: string;
+} | null = null;
+
+// ฟังก์ชันสำหรับดึง environment variables จาก main process
+async function loadEnvConfig(): Promise<void> {
+  if (envConfig) return; // ถ้ามีแล้วไม่ต้องโหลดซ้ำ
+
+  try {
+    const env = await window.electron?.payment.getEnvVars();
+
+    console.log('🔧 [frameConfig] Environment config:', env);
+    if (env) {
+      envConfig = {
+        apiUrl: env.API_BASE_URL || 'http://localhost:3000',
+        machinePort: env.PORT || '99999',
+        machineId: env.MACHINE_ID || '693296af25719d62f695db5d',
+      };
+      console.log('✅ [frameConfig] Environment config loaded:', envConfig);
+    }
+  } catch (error) {
+    console.error('❌ [frameConfig] Failed to load env config:', error);
+    // ใช้ default values
+    envConfig = {
+      apiUrl: 'http://localhost:3000',
+      machinePort: '99999',
+      machineId: '693296af25719d62f695db5d',
+    };
+  }
+}
 
 export interface FrameConfig {
   id: string;
@@ -91,18 +124,35 @@ export function mapFrameApiResponseToConfig(frame: FrameApiResponse): FrameConfi
 }
 
 // Function to fetch frames from API
-export async function fetchFrameConfigs(apiUrl: string = 'http://localhost:3000/api/frames'): Promise<FrameConfig[]> {
+export async function fetchFrameConfigs(): Promise<FrameConfig[]> {
+  // โหลด environment config จาก main process
+  await loadEnvConfig();
+
+  if (!envConfig) {
+    console.error('❌ [frameConfig] Environment config not loaded');
+    return [];
+  }
+
+  const headers = new Headers();
+  headers.set('X-Machine-Port', String(envConfig.machinePort));
+  headers.set('X-Machine-Id', envConfig.machineId || '');
+  
   try {
-    const response = await fetch(apiUrl);
+    const response = await fetch(`${envConfig.apiUrl}/api/machines-public/frames`, {
+      headers,
+    });
     if (!response.ok) {
       throw new Error(`Failed to fetch frames: ${response.statusText}`);
     }
-    const data: FrameApiResponse[] = await response.json();
+    const { frames }: { frames: FrameApiResponse[] } = await response.json();
 
-    return data
-      .filter(frame => frame.isActive)
-      .map(frame => mapFrameApiResponseToConfig(frame));
-  } catch (error) {
+    console.log('Frames:', frames);
+
+  
+    return frames
+      .filter((frame: FrameApiResponse) => frame.isActive)
+      .map((frame: FrameApiResponse) => mapFrameApiResponseToConfig(frame));
+  } catch (error) { 
     console.error('Error fetching frames:', error);
     return []; // Fallback to local configs
   }
