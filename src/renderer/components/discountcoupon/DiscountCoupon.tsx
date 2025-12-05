@@ -180,7 +180,7 @@ export default function DiscountCoupon() {
                 key={key}
                 type="button"
                 className="keypad-button"
-                onClick={() => handleKeyClick(key.toLowerCase())}
+                onClick={() => handleKeyClick(key)}
               >
                 {key}
               </button>
@@ -193,7 +193,7 @@ export default function DiscountCoupon() {
                 key={key}
                 type="button"
                 className="keypad-button"
-                onClick={() => handleKeyClick(key.toLowerCase())}
+                onClick={() => handleKeyClick(key)}
               >
                 {key}
               </button>
@@ -207,7 +207,7 @@ export default function DiscountCoupon() {
                 type="button"
                 className="keypad-button"
                 style={{ visibility: key !== '' ? 'visible' : 'hidden' }}
-                onClick={() => handleKeyClick(key.toLowerCase())}
+                onClick={() => handleKeyClick(key)}
               >
                 {key}
               </button>

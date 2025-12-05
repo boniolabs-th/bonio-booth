@@ -538,9 +538,9 @@ export default function PhotoFilter() {
 
   return (
     <div className="photo-filter-container">
-      {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
+      {/* Countdown Timer - นับถอยหลัง 500 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={30}
+        seconds={500}
         onComplete={handleCountdownComplete}
         visible={true}
       />
