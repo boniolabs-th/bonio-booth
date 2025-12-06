@@ -1263,11 +1263,10 @@ export default function PhotoResult() {
           );
           // ไม่ต้องทำอะไร ให้ useEffect ที่สอง (บรรทัด 1341) ทำงานแทน
         } else {
-          // วิดีโอพร้อมแล้ว หรือไม่มีวิดีโอให้รอ - upload ทันที
+          // ไม่มี captures แสดงว่าไม่มีวิดีโอ - upload ทันที
           console.log(
-            '🔄 [PhotoResult] Video ready (or not needed), triggering handleAutoPrint immediately',
+            '🔄 [PhotoResult] No captures (no video needed), triggering handleAutoPrint immediately',
             {
-              hasCompiledVideoUrl: !!compiledVideoUrl,
               hasCaptures,
             },
           );
@@ -1289,12 +1288,21 @@ export default function PhotoResult() {
     state?.finalImage,
     state?.referenceId,
     state?.transactionId,
-    compiledVideoUrl, // เพิ่ม dependency เพื่อรอให้วิดีโอพร้อม
-    // ไม่ต้องใส่ dependencies อื่นๆ เพื่อป้องกันการเรียกซ้ำ
+    // ไม่ใส่ compiledVideoUrl ใน dependency เพราะจะทำให้เกิด race condition
+    // ให้ useEffect ที่สอง (บรรทัด 1297) เป็นตัวเดียวที่จัดการ upload เมื่อ compiledVideoUrl พร้อม
   ]);
 
-  // Trigger upload อีกครั้งเมื่อ compiledVideoUrl พร้อม (ถ้ายังไม่ได้ upload)
+  // Trigger upload เมื่อ compiledVideoUrl พร้อม (ถ้ายังไม่ได้ upload)
+  // useEffect นี้เป็นตัวหลักที่จัดการ upload เมื่อมีวิดีโอ
   useEffect(() => {
+    console.log('🔍 [PhotoResult] useEffect (compiledVideoUrl) triggered:', {
+      hasCompiledVideoUrl: !!compiledVideoUrl,
+      hasFinalImage: !!state?.finalImage,
+      hasReferenceId: !!state?.referenceId,
+      hasTransactionId: !!state?.transactionId,
+      hasUploaded: hasUploaded.current,
+    });
+
     if (
       compiledVideoUrl &&
       state?.finalImage &&
@@ -1308,9 +1316,10 @@ export default function PhotoResult() {
       // เรียก handleAutoPrint โดยตรง
       const triggerUpload = async () => {
         // รอสักครู่เพื่อให้แน่ใจว่า state อัพเดทแล้ว
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 300));
 
-        if (!hasUploaded.current) {
+        // ตรวจสอบอีกครั้งหลังจากรอ (ป้องกัน race condition)
+        if (!hasUploaded.current && compiledVideoUrl) {
           console.log(
             '🔄 [PhotoResult] Executing upload with video now available',
           );
