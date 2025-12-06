@@ -821,7 +821,27 @@ export default function PhotoResult() {
         return;
       }
 
-      // ตั้งค่า flag เพื่อป้องกันการ upload ซ้ำ
+      // ตรวจสอบว่ามีวิดีโอให้รอหรือไม่
+      const hasCaptures =
+        state?.selectedCaptures && state.selectedCaptures.length > 0;
+      const shouldWaitForVideo = hasCaptures && !compiledVideoUrl;
+
+      if (shouldWaitForVideo) {
+        console.log(
+          '⏳ [PhotoResult] Video not ready yet, skipping handleAutoPrint',
+          {
+            hasCompiledVideoUrl: !!compiledVideoUrl,
+            hasCaptures,
+          },
+        );
+        console.log(
+          '⏳ [PhotoResult] Will wait for compiledVideoUrl to be set by useEffect',
+        );
+        // ไม่ set hasUploaded.current และไม่ upload ให้ useEffect ที่สองทำงานแทน
+        return;
+      }
+
+      // ตั้งค่า flag เพื่อป้องกันการ upload ซ้ำ (ตั้งหลังจากตรวจสอบวิดีโอแล้ว)
       hasUploaded.current = true;
 
       // ข้ามการพิมพ์ - สมมติว่ากำลังพิมพ์
@@ -1374,6 +1394,35 @@ export default function PhotoResult() {
               console.log('📤 [PhotoResult] Uploading with video:', {
                 photosCount: photos.length,
                 videosCount: videos.length,
+                hasCompiledVideoUrl: !!compiledVideoUrl,
+                compiledVideoUrlPreview: compiledVideoUrl?.substring(0, 50),
+              });
+
+              if (videos.length === 0 && compiledVideoUrl) {
+                console.warn(
+                  '⚠️ [PhotoResult] compiledVideoUrl exists but videos array is empty!',
+                );
+                console.warn(
+                  '⚠️ [PhotoResult] Attempting to add video again...',
+                );
+                try {
+                  const convertedVideo =
+                    await blobUrlToDataUrl(compiledVideoUrl);
+                  videos.push(convertedVideo);
+                  console.log(
+                    '✅ [PhotoResult] Video added to array (retry)',
+                  );
+                } catch (error) {
+                  console.error(
+                    '❌ [PhotoResult] Failed to add video (retry):',
+                    error,
+                  );
+                }
+              }
+
+              console.log('📤 [PhotoResult] Final arrays before upload:', {
+                photosCount: photos.length,
+                videosCount: videos.length,
               });
 
               const uploadResult =
@@ -1383,6 +1432,13 @@ export default function PhotoResult() {
                   videos,
                   state.transactionId,
                 );
+
+              console.log('📤 [PhotoResult] Upload result (from useEffect):', {
+                success: uploadResult.success,
+                filesCount: uploadResult.files?.length || 0,
+                videosInResponse: uploadResult.files?.filter((f: { type: string }) => f.type === 'video').length || 0,
+                photosInResponse: uploadResult.files?.filter((f: { type: string }) => f.type === 'photo').length || 0,
+              });
 
               if (uploadResult.success) {
                 console.log('✅ [PhotoResult] Upload successful with video!');
