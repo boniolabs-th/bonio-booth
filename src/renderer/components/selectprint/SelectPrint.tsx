@@ -205,7 +205,7 @@ export default function SelectPrint() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={300}
+        seconds={30000}
         onComplete={handleCountdownComplete}
         visible={true}
       />

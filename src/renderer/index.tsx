@@ -31,7 +31,7 @@ window.electron?.ipcRenderer.on('theme-loaded', (...args: unknown[]) => {
   // Set initial background (home page)
   if (theme?.background) {
     document.body.style.backgroundImage = `url(${theme.background})`;
-    document.body.style.backgroundSize = 'contain';
+    document.body.style.backgroundSize = 'cover';
     document.body.style.backgroundPosition = 'center';
     document.body.style.backgroundRepeat = 'no-repeat';
     console.log('✅ Background set to:', theme.background);

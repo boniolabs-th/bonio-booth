@@ -469,6 +469,11 @@ export default function PhotoDecorate() {
       />
 
       {/* Main Layout */}
+      <div className='title-section-decorate'>
+        <h1 className='title-decorate'>เลือกรูปของคุณ</h1>
+        <p className='subtitle-decorate'>Select your photos</p>
+      </div>
+
       <div
         ref={mainRef}
         className={`decorate-main ${isScrolled ? 'scrolled' : ''} ${isDragging ? 'dragging' : ''}`}
