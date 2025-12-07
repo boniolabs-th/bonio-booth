@@ -379,7 +379,7 @@
   padding: 16px 40px;
   font-size: 24px;
   font-weight: 600;
-  color: white;
+  color: var(--text-button-color);
   background: var(--primary-color);
   border: none;
   border-radius: 16px;

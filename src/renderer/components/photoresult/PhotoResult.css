@@ -319,6 +319,7 @@
   padding: 16px 40px;
   font-size: 26px;
   font-weight: 700;
+  color: var(--text-button-color);
   background: var(--primary-color);
   border: none;
   border-radius: 50px;

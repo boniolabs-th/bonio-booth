@@ -140,18 +140,21 @@
 }
 
 .qr-button {
+  color: var(--text-button-color);
   background: var(--primary-color);
   border: 2px solid var(--primary-color);
   color: #fff;
 }
 
 .qr-button:hover {
+  color: var(--text-button-color);
   background: var(--primary-color);
   transform: translateY(-2px);
 }
 
 .confirm-button {
   background: var(--primary-color);
+  color: var(--text-button-color);
 }
 
 .button-icon {
@@ -164,6 +167,7 @@
 .coupon-icon {
   width: 100px;
   height: 100px;
+  color: var(--text-button-color);
   background-color: var(--primary-color);
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-position: center;

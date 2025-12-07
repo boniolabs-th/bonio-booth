@@ -121,6 +121,7 @@
   height: 80px;
   min-width: 80px;
   border-radius: 50%;
+  color: var(--text-button-color);
   background: var(--primary-color);
   display: flex;
   align-items: center;
@@ -167,6 +168,7 @@
   padding: 16px 40px;
   font-size: 26px;
   font-weight: 700;
+  color: var(--text-button-color);
   background: var(--primary-color);
   border: none;
   border-radius: 16px;
