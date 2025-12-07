@@ -19,8 +19,8 @@ const getEnv = (): any => {
 
 const env = getEnv();
 console.log('🔧 [MachineService] gett Environment config:', env);
-// const apiBaseUrl = env.API_BASE_URL  || 'http://localhost:3000';
-const apiBaseUrl = env.API_BASE_URL  || 'https://api-booth.boniolabs.com';
+const apiBaseUrl = env.API_BASE_URL  || 'http://localhost:3000';
+// const apiBaseUrl = env.API_BASE_URL  || 'https://api-booth.boniolabs.com';
 const machinePort = env.PORT || '99999';
 const machineId = env.MACHINE_ID || '693296af25719d62f695db5d';
 
@@ -233,6 +233,7 @@ export interface InitMachine {
   timerSchedule?: unknown;
   isMaintenanceMode?: boolean;
   prices?: Price[];
+  lineUrl?: string;
 }
 
 export interface InitTheme {
