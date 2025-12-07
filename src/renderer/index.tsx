@@ -8,6 +8,7 @@ interface ThemeData {
   background?: string;
   backgroundSecond?: string;
   primaryColor?: string;
+  textButtonColor?: string;
   fontColor?: string;
   frames?: any[];
   isActive?: boolean;
@@ -31,7 +32,7 @@ window.electron?.ipcRenderer.on('theme-loaded', (...args: unknown[]) => {
   // Set initial background (home page)
   if (theme?.background) {
     document.body.style.backgroundImage = `url(${theme.background})`;
-    document.body.style.backgroundSize = 'contain';
+    document.body.style.backgroundSize = 'cover';
     document.body.style.backgroundPosition = 'center';
     document.body.style.backgroundRepeat = 'no-repeat';
     console.log('✅ Background set to:', theme.background);
@@ -42,10 +43,22 @@ window.electron?.ipcRenderer.on('theme-loaded', (...args: unknown[]) => {
       '--primary-color',
       theme.primaryColor,
     );
+  } else {
+    document.documentElement.style.setProperty(
+      '--primary-color',
+      'transparent',
+    );
   }
 
   if (theme?.fontColor) {
     document.body.style.color = theme.fontColor;
+  }
+
+  if (theme?.textButtonColor) {
+    document.documentElement.style.setProperty(
+      '--text-button-color',
+      theme.textButtonColor,
+    );
   }
 });
 

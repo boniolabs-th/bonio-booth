@@ -293,6 +293,7 @@
 .error-message {
   text-align: center;
   padding: 20px;
+  color: var(--text-button-color);
   background: var(--primary-color);
   border-radius: 8px;
   border: 2px solid white;
@@ -312,8 +313,8 @@
 
 .error-message button {
   padding: 10px 20px;
+  color: var(--text-button-color);
   background: var(--primary-color);
-  color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;

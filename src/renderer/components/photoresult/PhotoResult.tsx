@@ -1602,7 +1602,7 @@ export default function PhotoResult() {
                   </div>
                 )}
               </div>
-              <button
+              {/* <button
                 type="button"
                 className="download-video-button"
                 onClick={handleDownloadGif}
@@ -1635,7 +1635,7 @@ export default function PhotoResult() {
                   />
                 </svg>
                 ดาวน์โหลดวิดีโอ
-              </button>
+              </button> */}
             </>
           )}
         </div>
