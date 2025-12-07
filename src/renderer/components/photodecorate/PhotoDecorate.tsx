@@ -34,6 +34,11 @@ export default function PhotoDecorate() {
   const [scaleFactor, setScaleFactor] = useState({ x: 1, y: 1 });
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
   const [canCut, setCanCut] = useState<boolean>(true);
+  const [isScrolled, setIsScrolled] = useState<boolean>(false);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startY, setStartY] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
 
   useEffect(() => {
     const fetchMachineData = async () => {
@@ -49,6 +54,65 @@ export default function PhotoDecorate() {
     };
     fetchMachineData();
   }, []);
+
+  // Handle scroll event to hide guide
+  useEffect(() => {
+    const mainElement = mainRef.current;
+    if (!mainElement) return;
+
+    const handleScroll = () => {
+      if (mainElement.scrollTop > 50) {
+        setIsScrolled(true);
+      } else {
+        setIsScrolled(false);
+      }
+    };
+
+    mainElement.addEventListener('scroll', handleScroll);
+    return () => mainElement.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Touch and Mouse drag handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!mainRef.current) return;
+    setIsDragging(true);
+    setStartY(e.pageY - mainRef.current.offsetTop);
+    setScrollTop(mainRef.current.scrollTop);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!mainRef.current) return;
+    setIsDragging(true);
+    setStartY(e.touches[0].pageY - mainRef.current.offsetTop);
+    setScrollTop(mainRef.current.scrollTop);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !mainRef.current) return;
+    e.preventDefault();
+    const y = e.pageY - mainRef.current.offsetTop;
+    const walk = (y - startY) * 2; // Scroll speed multiplier
+    mainRef.current.scrollTop = scrollTop - walk;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || !mainRef.current) return;
+    const y = e.touches[0].pageY - mainRef.current.offsetTop;
+    const walk = (y - startY) * 2; // Scroll speed multiplier
+    mainRef.current.scrollTop = scrollTop - walk;
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameImgRef = useRef<HTMLImageElement>(null);
@@ -405,7 +469,17 @@ export default function PhotoDecorate() {
       />
 
       {/* Main Layout */}
-      <div className="decorate-main">
+      <div
+        ref={mainRef}
+        className={`decorate-main ${isScrolled ? 'scrolled' : ''} ${isDragging ? 'dragging' : ''}`}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         {/* Left - Frame Preview */}
         <div className="frame-preview-section">
           <div

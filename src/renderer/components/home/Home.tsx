@@ -19,7 +19,7 @@ function Home(): React.JSX.Element {
   }, [navigate]);
 
   return (
-    <main className="home-container">
+    <main className="home-container" onClick={handleStartClick} style={{ cursor: 'pointer' }}>
       {/* <section className="logo-section">
         <img
           src={icon}
@@ -31,17 +31,10 @@ function Home(): React.JSX.Element {
       </section> */}
 
       <section className="action-section">
-        <button
-          type="button"
-          onClick={handleStartClick}
-          className="start-button"
-          aria-label="Start using Bonio Booth"
-        >
-          TAP TO START
-        </button>
+        {/* Removed TAP TO START button - click anywhere to start */}
       </section>
 
-      <footer className="footer-section">
+      <footer className="footer-section" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           onClick={handleTermsClick}
