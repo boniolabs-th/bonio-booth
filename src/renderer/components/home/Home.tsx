@@ -20,7 +20,7 @@ function Home(): React.JSX.Element {
 
   return (
     <main className="home-container">
-      <section className="logo-section">
+      {/* <section className="logo-section">
         <img
           src={icon}
           alt="Bonio Booth Logo"
@@ -28,7 +28,7 @@ function Home(): React.JSX.Element {
           width="100%"
           height="auto"
         />
-      </section>
+      </section> */}
 
       <section className="action-section">
         <button
