@@ -63,9 +63,11 @@
   font-size: x-large;
   background: none;
   border: none;
-  color: var(--font-color);
+  color: var(--text-primary-color);
   cursor: pointer;
   box-shadow: none;
+  background-color: var(--text-button-color);
+  padding: 0.5rem 2rem;
 }
 
 .terms-link {
