@@ -18,7 +18,7 @@ export default function TermsAndServices() {
     <div className="terms-container">
       <BackButton onBackClick={handleBack} />
       <Countdown
-        seconds={30}
+        seconds={300}
         onComplete={handleCountdownComplete}
         visible={false}
       />

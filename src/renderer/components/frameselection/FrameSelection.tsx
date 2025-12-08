@@ -123,7 +123,7 @@ export default function FrameSelection() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={600}
+        seconds={300}
         onComplete={handleCountdownComplete}
         visible={true}
       />

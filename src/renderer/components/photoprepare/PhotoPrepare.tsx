@@ -47,7 +47,7 @@ export default function PhotoPrepare() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={300}
+        seconds={60}
         onComplete={handleCountdownComplete}
         visible={true}
       />

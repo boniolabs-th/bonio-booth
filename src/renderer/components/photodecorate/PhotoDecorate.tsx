@@ -463,7 +463,7 @@ export default function PhotoDecorate() {
     <div className="photo-decorate-container">
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={9999999}
+        seconds={300}
         onComplete={handleCountdownComplete}
         visible={true}
       />

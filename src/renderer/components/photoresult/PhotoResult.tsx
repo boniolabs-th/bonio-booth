@@ -226,7 +226,7 @@ const generateFramedVideo = async (
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, frameWidth, frameHeight);
 
-        const drawSlot = (slot: typeof frame.slots[0], slotIndex: number) => {
+        const drawSlot = (slot: (typeof frame.slots)[0], slotIndex: number) => {
           const slotFrames = boomerangImages[slotIndex];
           if (!slotFrames || slotFrames.length === 0) {
             return;
@@ -435,7 +435,7 @@ const generateFramedVideo = async (
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, frameWidth, frameHeight);
 
-      const drawSlot = (slot: typeof frame.slots[0], index: number) => {
+      const drawSlot = (slot: (typeof frame.slots)[0], index: number) => {
         const video = videoElements[index];
         if (!video) {
           return;
@@ -629,9 +629,12 @@ export default function PhotoResult() {
         // Create video without filter first (fast)
         // ถ้าเป็น CSS Filter ให้ใส่ไปเลย แต่ถ้าเป็น LUT ให้ใส่ undefined ไปก่อน แล้วค่อยไปทำ FFmpeg
         const filter = FILTERS.find((f) => f.id === state.selectedFilter);
-        const initialFilterId = filter?.type === 'css' ? state.selectedFilter : undefined;
+        const initialFilterId =
+          filter?.type === 'css' ? state.selectedFilter : undefined;
 
-        console.log('🎬 [PhotoResult] Generating framed video...', { initialFilterId });
+        console.log('🎬 [PhotoResult] Generating framed video...', {
+          initialFilterId,
+        });
         const videoUrl = await generateFramedVideo(
           state.selectedCaptures,
           state.selectedFrame,
@@ -1408,7 +1411,9 @@ export default function PhotoResult() {
                 for (let i = 0; i < state.selectedCaptures.length; i++) {
                   const capture = state.selectedCaptures[i];
                   if (capture.photo) {
-                    const convertedPhoto = await blobUrlToDataUrl(capture.photo);
+                    const convertedPhoto = await blobUrlToDataUrl(
+                      capture.photo,
+                    );
 
                     // เปรียบเทียบว่าเป็นรูปเดียวกันหรือไม่ (เปรียบเทียบ base64 data)
                     const photoBase64 = convertedPhoto.includes('base64,')
@@ -1478,9 +1483,7 @@ export default function PhotoResult() {
                   const convertedVideo =
                     await blobUrlToDataUrl(compiledVideoUrl);
                   videos.push(convertedVideo);
-                  console.log(
-                    '✅ [PhotoResult] Video added to array (retry)',
-                  );
+                  console.log('✅ [PhotoResult] Video added to array (retry)');
                 } catch (error) {
                   console.error(
                     '❌ [PhotoResult] Failed to add video (retry):',
@@ -1505,8 +1508,14 @@ export default function PhotoResult() {
               console.log('📤 [PhotoResult] Upload result (from useEffect):', {
                 success: uploadResult.success,
                 filesCount: uploadResult.files?.length || 0,
-                videosInResponse: uploadResult.files?.filter((f: { type: string }) => f.type === 'video').length || 0,
-                photosInResponse: uploadResult.files?.filter((f: { type: string }) => f.type === 'photo').length || 0,
+                videosInResponse:
+                  uploadResult.files?.filter(
+                    (f: { type: string }) => f.type === 'video',
+                  ).length || 0,
+                photosInResponse:
+                  uploadResult.files?.filter(
+                    (f: { type: string }) => f.type === 'photo',
+                  ).length || 0,
               });
 
               if (uploadResult.success) {
