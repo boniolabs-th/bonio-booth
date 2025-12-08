@@ -1377,10 +1377,70 @@ export default function PhotoResult() {
               const photos: string[] = [];
               const videos: string[] = [];
 
-              // เพิ่ม finalImage
+              // เพิ่ม finalImage (รูปที่ print) - order 1
               if (state.finalImage) {
                 const convertedImage = await blobUrlToDataUrl(state.finalImage);
                 photos.push(convertedImage);
+                console.log(
+                  '📤 [PhotoResult] Added finalImage (order 1 - print image) to photos (useEffect)',
+                );
+              } else {
+                console.warn(
+                  '⚠️ [PhotoResult] No finalImage available, cannot upload photo (useEffect)',
+                );
+              }
+
+              // เพิ่มรูปอื่นๆ จาก selectedCaptures ที่ไม่ได้เป็น finalImage (order 2, 3, ...)
+              if (state.selectedCaptures && state.selectedCaptures.length > 0) {
+                console.log(
+                  '📤 [PhotoResult] Processing selectedCaptures (useEffect):',
+                  {
+                    capturesCount: state.selectedCaptures.length,
+                  },
+                );
+
+                // แปลง finalImage เป็น data URL เพื่อเปรียบเทียบ
+                let finalImageDataUrl: string | null = null;
+                if (state.finalImage) {
+                  finalImageDataUrl = await blobUrlToDataUrl(state.finalImage);
+                }
+
+                for (let i = 0; i < state.selectedCaptures.length; i++) {
+                  const capture = state.selectedCaptures[i];
+                  if (capture.photo) {
+                    const convertedPhoto = await blobUrlToDataUrl(capture.photo);
+
+                    // เปรียบเทียบว่าเป็นรูปเดียวกันหรือไม่ (เปรียบเทียบ base64 data)
+                    const photoBase64 = convertedPhoto.includes('base64,')
+                      ? convertedPhoto.split('base64,')[1]
+                      : convertedPhoto;
+                    const finalBase64 =
+                      finalImageDataUrl && finalImageDataUrl.includes('base64,')
+                        ? finalImageDataUrl.split('base64,')[1]
+                        : finalImageDataUrl;
+
+                    // เปรียบเทียบ 1000 ตัวอักษรแรก (เพื่อความเร็ว)
+                    const isSameAsFinalImage =
+                      finalBase64 &&
+                      photoBase64.substring(0, 1000) ===
+                        finalBase64.substring(0, 1000);
+
+                    if (!isSameAsFinalImage) {
+                      photos.push(convertedPhoto);
+                      console.log(
+                        `📤 [PhotoResult] Added capture[${i}].photo (order ${photos.length}) to photos (useEffect)`,
+                      );
+                    } else {
+                      console.log(
+                        `📤 [PhotoResult] Skipped capture[${i}].photo (same as finalImage - order 1) (useEffect)`,
+                      );
+                    }
+                  }
+                }
+              } else {
+                console.log(
+                  '📤 [PhotoResult] No selectedCaptures to add (useEffect)',
+                );
               }
 
               // เพิ่มวิดีโอ
