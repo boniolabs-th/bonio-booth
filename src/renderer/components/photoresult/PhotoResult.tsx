@@ -1603,8 +1603,20 @@ export default function PhotoResult() {
     <div className="photo-result-container">
       {/* Header */}
       <div className="result-header">
-        <h1 className="result-title">กำลังพิมพ์รูปภาพ...</h1>
-        <p className="result-subtitle">Printing your memory...</p>
+        <h1 className="result-title">
+          {printStatus === 'success'
+            ? 'พิมพ์รูปภาพเสร็จแล้ว'
+            : printStatus === 'error'
+              ? 'เกิดข้อผิดพลาดในการพิมพ์'
+              : 'กำลังพิมพ์รูปภาพ...'}
+        </h1>
+        <p className="result-subtitle">
+          {printStatus === 'success'
+            ? 'Print completed!'
+            : printStatus === 'error'
+              ? 'Print failed'
+              : 'Printing your memory...'}
+        </p>
       </div>
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
@@ -1731,7 +1743,12 @@ export default function PhotoResult() {
 
       {/* Bottom Button */}
       <div className="result-footer">
-        <button type="button" className="finish-button" onClick={handleFinish}>
+        <button
+          type="button"
+          className="finish-button"
+          onClick={handleFinish}
+          disabled={printStatus !== 'success' || !qrcodeStorageUrl}
+        >
           เสร็จสิ้น
         </button>
       </div>
