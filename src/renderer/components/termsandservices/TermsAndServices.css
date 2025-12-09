@@ -9,17 +9,27 @@
   overflow: hidden;
 }
 
-.terms-content {
+.terms-content-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex: 1;
-  overflow-y: auto;
   padding: 20px;
-  max-width: 800px;
-  margin: 0 auto;
-  width: 100%;
+  margin: auto;
+  width: 80%;
+  height: 80%;
+}
+
+.terms-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: auto;
+}
+
+ul li {
+  list-style-type: disc;
+  margin-left: 1rem;
 }
 
 .terms-title {
@@ -159,4 +169,3 @@
 .terms-content::-webkit-scrollbar-thumb:hover {
   background: #ff8c00;
 }
-
