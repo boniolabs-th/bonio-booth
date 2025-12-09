@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import BackButton from '../backbutton';
-import Countdown from '../countdown/Countdown';
-import { COUNTDOWN } from '../../utils/appConfig';
-import './GetHelp.css';
-import getHelp from '../../../../assets/images/get-help.png';
+import './SystemMaintenance.css';
+import systemMaintenance from '../../../../assets/images/system-maintenance.png';
 
-export default function GetHelp() {
+import { REFETCH_INTERVAL } from '../../utils/appConfig';
+
+export default function SystemMaintenance() {
   const navigate = useNavigate();
   const location = useLocation();
   const isMaintenanceMode = location.state?.maintenance;
@@ -15,10 +15,6 @@ export default function GetHelp() {
   const handleBack = useCallback(() => {
     navigate('/');
   }, [navigate]);
-
-  const handleCountdownComplete = useCallback(() => {
-    handleBack();
-  }, [handleBack]);
 
   // Fetch machine data to get Line URL
   useEffect(() => {
@@ -49,7 +45,7 @@ export default function GetHelp() {
         } catch (error) {
           console.error('Polling error:', error);
         }
-      }, 10000);
+      }, REFETCH_INTERVAL.SYSTEM_MAINTENANCE * 1000);
 
       return () => clearInterval(interval);
     }
@@ -66,35 +62,28 @@ export default function GetHelp() {
   };
 
   return (
-    <div className="get-help-container">
+    <div className="get-maintenance-container">
       {!isMaintenanceMode && <BackButton onBackClick={handleBack} />}
 
-      {!isMaintenanceMode && (
-        <Countdown
-          seconds={COUNTDOWN.GET_HELP.DURATION}
-          onComplete={handleCountdownComplete}
-          visible={COUNTDOWN.GET_HELP.VISIBLE}
-        />
-      )}
-
-      <div className="help-content">
-        <div className="help-illustration">
-          <img src={getHelp} alt="Get Help" width="100%" height="auto" />
+      <div className="maintenance-content">
+        <div className="maintenance-illustration">
+          <img
+            src={systemMaintenance}
+            alt="System Maintenance"
+            width="100%"
+            height="auto"
+          />
         </div>
 
-        <h1 className="help-title">ติดต่อขอความช่วยเหลือ</h1>
-        <p className="help-title-en">GET HELP</p>
+        <h1 className="maintenance-title">SYSTEM MAINTENANCE</h1>
 
-        <p className="help-instruction-thai">
-          กรุณาติดต่อเจ้าหน้าที่ใกล้เคียง หรือ สแกน Line QR
-          ด้านล่างเพื่อขอความช่วยเหลือเพิ่มเติม
-        </p>
-        <p className="help-instruction-en">
-          Please contact nearby staff or scan the Line QR code below for
-          support.
+        <p className="maintenance-instruction-thai">
+          ขออภัยในความไม่สะดวก
+          <br />
+          กรุณาติดต่อพนักงาน หรือแอดไลน์ เพื่อแจ้งแอดมิน
         </p>
 
-        <div className="help-qr-section">
+        <div className="maintenance-qr-section">
           <div className="qr-code-container">
             <img
               src={generateQRCode()}
@@ -104,24 +93,6 @@ export default function GetHelp() {
           </div>
         </div>
       </div>
-
-      {/* <div className="help-back-button">
-        <button type="button" onClick={handleBack} className="back-home-button">
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          กลับไปหน้าหลัก
-        </button>
-      </div> */}
     </div>
   );
 }

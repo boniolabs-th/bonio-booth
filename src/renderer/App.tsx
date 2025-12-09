@@ -21,6 +21,8 @@ import {
   GetHelp,
   DiscountCoupon,
   ErrorBoundary,
+  OutOfPaper,
+  SystemMaintenance,
 } from './components';
 import './App.css';
 
@@ -45,10 +47,13 @@ function MaintenanceListener() {
     // Check status on mount
     const checkStatus = async () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const res = await (window as any).electron.payment.getMachineData();
-        if (res.success && res.machine?.isMaintenanceMode) {
-          navigate('/get-help', { state: { maintenance: true } });
+        if (res.success && res.machine) {
+          if (res.machine.isMaintenanceMode) {
+            navigate('/system-maintenance', { state: { maintenance: true } });
+          } else if (res.machine.paperLevel === 0) {
+            navigate('/out-of-paper', { state: { maintenance: true } });
+          }
         }
       } catch (error) {
         console.error('Failed to check machine status:', error);
@@ -57,12 +62,13 @@ function MaintenanceListener() {
     checkStatus();
 
     // Listen for init event
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const unsubscribe = (window as any).electron.ipcRenderer.on(
       'machine-init',
       (arg: any) => {
         if (arg?.machine?.isMaintenanceMode) {
-          navigate('/get-help', { state: { maintenance: true } });
+          navigate('/system-maintenance', { state: { maintenance: true } });
+        } else if (arg?.machine?.paperLevel === 0) {
+          navigate('/out-of-paper', { state: { maintenance: true } });
         }
       },
     );
@@ -96,6 +102,8 @@ export default function App() {
           <Route path="/photo-result" element={<PhotoResult />} />
           <Route path="/terms-and-services" element={<TermsAndServices />} />
           <Route path="/get-help" element={<GetHelp />} />
+          <Route path="/system-maintenance" element={<SystemMaintenance />} />
+          <Route path="/out-of-paper" element={<OutOfPaper />} />
         </Routes>
       </ErrorBoundary>
     </Router>

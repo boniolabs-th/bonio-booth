@@ -1,10 +1,11 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { BackButton } from '..';
+import ConfirmationModal from '../confirmationmodal';
 import paymentService from '../../services/paymentService';
 import checkCircleIcon from '../../../../assets/icons/svg/check-circle.svg';
 import './PaymentQR.css';
+import { COUNTDOWN } from '../../utils/appConfig';
 
 interface LocationState {
   quantity: number;
@@ -51,7 +52,7 @@ export default function PaymentQR() {
       ? state.netAmount
       : originalPrice - discountAmount;
 
-  const [timeLeft, setTimeLeft] = useState(30000); // 5 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(COUNTDOWN.PAYMENT_QR.DURATION); // 5 minutes in seconds
   const [isTimeout, setIsTimeout] = useState(false); // Track ว่า timeout แล้วหรือยัง
   const [qrCode, setQrCode] = useState<string>(state?.qrcode || '');
   const [referenceId, setReferenceId] = useState<string>(
@@ -68,10 +69,12 @@ export default function PaymentQR() {
       referenceId: state?.referenceId,
       transactionId: state?.transactionId,
       paymentDetailsId: state?.paymentDetailsId,
-      qrcode: state?.qrcode ? 'present' :  null,
+      qrcode: state?.qrcode ? 'present' : null,
     });
   }, []);
   const [successCountdown, setSuccessCountdown] = useState<number | null>(null);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+
   const [paymentStatus, setPaymentStatus] = useState<
     | 'pending'
     | 'SUCCESS'
@@ -279,6 +282,15 @@ export default function PaymentQR() {
     }
   };
 
+  const handleCancelClick = () => {
+    setIsCancelModalOpen(true);
+  };
+
+  const handleConfirmCancel = () => {
+    setIsCancelModalOpen(false);
+    navigate('/select-print');
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -321,7 +333,7 @@ export default function PaymentQR() {
   return (
     <div className="payment-qr-container">
       {/* Back Button */}
-      <BackButton backButtonPath="/select-print" />
+      {/* <BackButton backButtonPath="/select-print" /> */}
 
       {/* Main Content */}
       <div className="main-content">
@@ -454,7 +466,27 @@ export default function PaymentQR() {
             Please complete your payment within the time limit.
           </p>
         </div>
+
+        {/* Cancel Button */}
+        {paymentStatus !== 'SUCCESS' && successCountdown === null && (
+          <button
+            type="button"
+            className="cancel-payment-button"
+            onClick={handleCancelClick}
+          >
+            ยกเลิกการชำระเงิน
+          </button>
+        )}
       </div>
+
+      <ConfirmationModal
+        isOpen={isCancelModalOpen}
+        message="ต้องการยกเลิกการชำระเงิน?"
+        onConfirm={handleConfirmCancel}
+        onCancel={() => setIsCancelModalOpen(false)}
+        confirmText="ยืนยัน"
+        cancelText="ยกเลิก"
+      />
     </div>
   );
 }

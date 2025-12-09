@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import BackButton from '../backbutton';
-import Countdown from '../countdown/Countdown';
-import { COUNTDOWN } from '../../utils/appConfig';
-import './GetHelp.css';
-import getHelp from '../../../../assets/images/get-help.png';
+import './OutOfPaper.css';
+import outofpaper from '../../../../assets/images/out-of-paper.png';
 
-export default function GetHelp() {
+import { REFETCH_INTERVAL } from '../../utils/appConfig';
+
+export default function OutOfPaper() {
   const navigate = useNavigate();
   const location = useLocation();
   const isMaintenanceMode = location.state?.maintenance;
@@ -15,10 +15,6 @@ export default function GetHelp() {
   const handleBack = useCallback(() => {
     navigate('/');
   }, [navigate]);
-
-  const handleCountdownComplete = useCallback(() => {
-    handleBack();
-  }, [handleBack]);
 
   // Fetch machine data to get Line URL
   useEffect(() => {
@@ -38,18 +34,26 @@ export default function GetHelp() {
   }, []);
 
   useEffect(() => {
+    // If it's manual navigation (not auto-redirect from App/Home), we might not want to poll?
+    // But assuming isMaintenanceMode prop here works as "Auto Redirect" flag:
     if (isMaintenanceMode) {
       const interval = setInterval(async () => {
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const res = await (window as any).electron.payment.forceInit();
-          if (res.success && !res.data.machine.isMaintenanceMode) {
-            navigate('/');
+          if (res.success && res.data?.machine) {
+            if (res.data.machine.isMaintenanceMode) {
+              // If maintenance turned on while validly out of paper, prioritize maintenance page
+              navigate('/system-maintenance', { state: { maintenance: true } });
+            } else if (res.data.machine.paperLevel !== 0) {
+              // If paper is refilled (and not in maintenance), go home
+              navigate('/');
+            }
           }
         } catch (error) {
           console.error('Polling error:', error);
         }
-      }, 10000);
+      }, REFETCH_INTERVAL.OUT_OF_PAPER * 1000);
 
       return () => clearInterval(interval);
     }
@@ -66,35 +70,23 @@ export default function GetHelp() {
   };
 
   return (
-    <div className="get-help-container">
+    <div className="get-outofpaper-container">
       {!isMaintenanceMode && <BackButton onBackClick={handleBack} />}
 
-      {!isMaintenanceMode && (
-        <Countdown
-          seconds={COUNTDOWN.GET_HELP.DURATION}
-          onComplete={handleCountdownComplete}
-          visible={COUNTDOWN.GET_HELP.VISIBLE}
-        />
-      )}
-
-      <div className="help-content">
-        <div className="help-illustration">
-          <img src={getHelp} alt="Get Help" width="100%" height="auto" />
+      <div className="outofpaper-content">
+        <div className="outofpaper-illustration">
+          <img src={outofpaper} alt="Out of Paper" width="100%" height="auto" />
         </div>
 
-        <h1 className="help-title">ติดต่อขอความช่วยเหลือ</h1>
-        <p className="help-title-en">GET HELP</p>
+        <h1 className="outofpaper-title">OUT OF PAPER</h1>
 
-        <p className="help-instruction-thai">
-          กรุณาติดต่อเจ้าหน้าที่ใกล้เคียง หรือ สแกน Line QR
-          ด้านล่างเพื่อขอความช่วยเหลือเพิ่มเติม
-        </p>
-        <p className="help-instruction-en">
-          Please contact nearby staff or scan the Line QR code below for
-          support.
+        <p className="outofpaper-instruction-thai">
+          ขออภัยในความไม่สะดวก
+          <br />
+          กรุณาติดต่อพนักงาน หรือแอดไลน์ เพื่อแจ้งแอดมิน
         </p>
 
-        <div className="help-qr-section">
+        <div className="outofpaper-qr-section">
           <div className="qr-code-container">
             <img
               src={generateQRCode()}
@@ -104,24 +96,6 @@ export default function GetHelp() {
           </div>
         </div>
       </div>
-
-      {/* <div className="help-back-button">
-        <button type="button" onClick={handleBack} className="back-home-button">
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          กลับไปหน้าหลัก
-        </button>
-      </div> */}
     </div>
   );
 }

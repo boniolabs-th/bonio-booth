@@ -1,7 +1,9 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useCallback, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { BackButton, Countdown } from '..';
+import BackButton from '../backbutton';
+import Countdown from '../countdown';
+import { COUNTDOWN } from '../../utils/appConfig';
 import './DiscountCoupon.css';
 
 interface LocationState {
@@ -92,8 +94,9 @@ export default function DiscountCoupon() {
 
       if (paymentResult.success) {
         // เช็คว่าเป็น free transaction หรือไม่ (netAmount = 0 หรือ qr_code = null)
-        const isFree = paymentResult.netAmount === 0 || paymentResult.qr_code === null;
-        
+        const isFree =
+          paymentResult.netAmount === 0 || paymentResult.qr_code === null;
+
         // Navigate to payment page with QR code and discount info
         const navigationState = {
           quantity: state.quantity,
@@ -139,9 +142,9 @@ export default function DiscountCoupon() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ (ซ่อนการแสดงผล) */}
       <Countdown
-        seconds={300}
+        seconds={COUNTDOWN.DISCOUNT_COUPON.DURATION}
         onComplete={handleCountdownComplete}
-        visible={false}
+        visible={COUNTDOWN.DISCOUNT_COUPON.VISIBLE}
       />
 
       <div className="discount-content">

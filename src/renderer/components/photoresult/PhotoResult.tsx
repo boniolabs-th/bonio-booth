@@ -8,9 +8,11 @@ import {
   applyLUTToCanvas,
   getLUTFilePath,
 } from '../../utils/lutProcessor';
+import { COUNTDOWN } from '../../utils/appConfig';
 
 import './PhotoResult.css';
-import { Countdown } from '..';
+import BackButton from '../backbutton';
+import Countdown from '../countdown';
 
 interface Capture {
   video: string;
@@ -1630,9 +1632,9 @@ export default function PhotoResult() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={300}
+        seconds={COUNTDOWN.PHOTO_RESULT.DURATION}
         onComplete={handleCountdownComplete}
-        visible={true}
+        visible={COUNTDOWN.PHOTO_RESULT.VISIBLE}
       />
 
       {/* Main Layout - Photo Strip Center */}

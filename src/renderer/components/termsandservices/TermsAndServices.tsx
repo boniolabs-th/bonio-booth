@@ -3,6 +3,7 @@ import './TermsAndServices.css';
 import { useCallback } from 'react';
 import BackButton from '../backbutton';
 import Countdown from '../countdown';
+import { COUNTDOWN } from '../../utils/appConfig';
 
 export default function TermsAndServices() {
   const navigate = useNavigate();
@@ -19,9 +20,9 @@ export default function TermsAndServices() {
     <div className="terms-container">
       <BackButton onBackClick={handleBack} />
       <Countdown
-        seconds={300}
+        seconds={COUNTDOWN.TERMS_AND_SERVICES.DURATION}
         onComplete={handleCountdownComplete}
-        visible={false}
+        visible={COUNTDOWN.TERMS_AND_SERVICES.VISIBLE}
       />
 
       <div className="terms-content-wrapper">

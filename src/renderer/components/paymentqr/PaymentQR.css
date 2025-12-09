@@ -159,8 +159,7 @@
   font-weight: 600;
 }
 
-.discount-label {
-}
+.discount-label {}
 
 .discount-amount {
   font-weight: 700;
@@ -284,6 +283,7 @@
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
@@ -378,9 +378,11 @@
     transform: scale(0);
     opacity: 0;
   }
+
   50% {
     transform: scale(1.1);
   }
+
   100% {
     transform: scale(1);
     opacity: 1;
@@ -456,10 +458,12 @@
     transform: scale(1);
     box-shadow: 0 4px 12px rgba(46, 204, 113, 0.4);
   }
+
   50% {
     transform: scale(1.05);
     box-shadow: 0 6px 16px rgba(46, 204, 113, 0.6);
   }
+
   100% {
     transform: scale(1);
     box-shadow: 0 4px 12px rgba(46, 204, 113, 0.4);
@@ -499,4 +503,13 @@
   font-size: 14px;
   color: #666;
   text-align: center;
+}
+
+.cancel-payment-button {
+  color: red;
+  background-color: white;
+  border: 2px solid red;
+  font-size: 2rem;
+  margin-top: 10%;
+  box-shadow: none;
 }
