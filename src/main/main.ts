@@ -705,6 +705,31 @@ ipcMain.handle('get-machine-data', async () => {
   }
 });
 
+// Handler สำหรับ force init (เรียก API ใหม่เสมอ)
+ipcMain.handle('force-init', async () => {
+  try {
+    console.log('🔄 [Main] Force init requested');
+    const initResponse = await machineService.init();
+
+    // Update cache
+    cachedInitData = {
+      machine: initResponse.machine,
+      prices: initResponse.machine.prices || [],
+      theme: initResponse.theme,
+    };
+
+    return {
+      success: true,
+      data: initResponse
+    };
+  } catch (error) {
+     console.error('❌ [Main] Force init failed:', error);
+     const errorMessage =
+       error instanceof Error ? error.message : 'Unknown error';
+     return { success: false, error: errorMessage };
+  }
+});
+
 // Handler สำหรับ save temp video file
 ipcMain.handle('save-temp-video', async (event, arrayBuffer: ArrayBuffer) => {
   try {

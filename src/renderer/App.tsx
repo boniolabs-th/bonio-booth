@@ -3,6 +3,7 @@ import {
   Routes,
   Route,
   useLocation,
+  useNavigate,
 } from 'react-router-dom';
 import { useEffect } from 'react';
 import {
@@ -37,10 +38,48 @@ function RouteListener() {
   return null;
 }
 
+function MaintenanceListener() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check status on mount
+    const checkStatus = async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const res = await (window as any).electron.payment.getMachineData();
+        if (res.success && res.machine?.isMaintenanceMode) {
+          navigate('/get-help', { state: { maintenance: true } });
+        }
+      } catch (error) {
+        console.error('Failed to check machine status:', error);
+      }
+    };
+    checkStatus();
+
+    // Listen for init event
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const unsubscribe = (window as any).electron.ipcRenderer.on(
+      'machine-init',
+      (arg: any) => {
+        if (arg?.machine?.isMaintenanceMode) {
+          navigate('/get-help', { state: { maintenance: true } });
+        }
+      },
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [navigate]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <Router>
       <RouteListener />
+      <MaintenanceListener />
       <ErrorBoundary>
         <Routes>
           <Route path="/" element={<Home />} />

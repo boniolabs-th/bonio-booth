@@ -62,6 +62,9 @@ const electronHandler = {
     getMachineData: () => {
       return ipcRenderer.invoke('get-machine-data');
     },
+    forceInit: () => {
+      return ipcRenderer.invoke('force-init');
+    },
     getEnvVars: () => {
       return ipcRenderer.invoke('get-env-vars');
     },

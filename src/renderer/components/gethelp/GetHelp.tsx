@@ -1,18 +1,39 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { BackButton, Countdown } from '..';
 import './GetHelp.css';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 
 export default function GetHelp() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isMaintenanceMode = location.state?.maintenance;
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     navigate('/');
-  };
+  }, [navigate]);
 
   const handleCountdownComplete = useCallback(() => {
     handleBack();
   }, [handleBack]);
+
+  useEffect(() => {
+    if (isMaintenanceMode) {
+      const interval = setInterval(async () => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const res = await (window as any).electron.payment.forceInit();
+          if (res.success && !res.data.machine.isMaintenanceMode) {
+            navigate('/');
+          }
+        } catch (error) {
+          console.error('Polling error:', error);
+        }
+      }, 10000);
+
+      return () => clearInterval(interval);
+    }
+    return undefined;
+  }, [isMaintenanceMode, navigate]);
 
   // Generate QR Code for LINE (placeholder - replace with actual LINE QR code URL)
   const generateQRCode = () => {
@@ -62,13 +83,15 @@ export default function GetHelp() {
 
   return (
     <div className="get-help-container">
-      <BackButton onBackClick={handleBack} />
+      {!isMaintenanceMode && <BackButton onBackClick={handleBack} />}
 
-      <Countdown
-        seconds={300}
-        onComplete={handleCountdownComplete}
-        visible={false}
-      />
+      {!isMaintenanceMode && (
+        <Countdown
+          seconds={300}
+          onComplete={handleCountdownComplete}
+          visible={false}
+        />
+      )}
 
       <div className="help-content">
         <div className="help-illustration">
