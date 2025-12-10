@@ -82,6 +82,7 @@ export default function DiscountCoupon() {
         checkResult.couponCodeId,
       );
 
+      console.log('checkResult', checkResult);
       console.log('💳 [DiscountCoupon] Payment response:', {
         success: paymentResult.success,
         qr_code: paymentResult.qr_code ? 'present' : null,
@@ -264,14 +265,20 @@ export default function DiscountCoupon() {
 
       {/* Error Modal */}
       {error && (
-        <div className="error-modal-overlay" onClick={() => setError(null)}>
-          <div className="error-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="error-modal-content">
-              <h2 className="error-title">เกิดข้อผิดพลาด</h2>
-              <p className="error-message">{error}</p>
+        <div
+          className="coupon-error-modal-overlay"
+          onClick={() => setError(null)}
+        >
+          <div
+            className="coupon-error-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="coupon-error-modal-content">
+              {/* <h2 className="coupon-error-title">เกิดข้อผิดพลาด</h2> */}
+              <p className="coupon-error-message">{error}</p>
               <button
                 type="button"
-                className="error-close-button"
+                className="coupon-error-close-button"
                 onClick={() => setError(null)}
               >
                 ปิด

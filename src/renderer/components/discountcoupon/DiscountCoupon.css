@@ -199,7 +199,7 @@
 }
 
 /* Error Modal */
-.error-modal-overlay {
+.coupon-error-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -212,7 +212,7 @@
   z-index: 1000;
 }
 
-.error-modal {
+.coupon-error-modal {
   background: white;
   border-radius: 20px;
   padding: 40px;
@@ -234,25 +234,25 @@
   }
 }
 
-.error-modal-content {
+.coupon-error-modal-content {
   text-align: center;
 }
 
-.error-title {
+.coupon-error-title {
   font-size: 28px;
   font-weight: 700;
   color: #e74c3c;
   margin: 0 0 20px 0;
 }
 
-.error-message {
-  font-size: 20px;
-  color: #2c2c2c;
+.coupon-error-message {
+  font-size: 1.5rem;
+  color: red;
   margin-inline: auto;
   line-height: 1.5;
 }
 
-.error-close-button {
+.coupon-error-close-button {
   padding: 12px 40px;
   font-size: 20px;
   font-weight: 600;
@@ -265,13 +265,13 @@
   box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
 }
 
-.error-close-button:hover {
+.coupon-error-close-button:hover {
   background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(231, 76, 60, 0.4);
 }
 
-.error-close-button:active {
+.coupon-error-close-button:active {
   transform: translateY(0);
   box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
 }
