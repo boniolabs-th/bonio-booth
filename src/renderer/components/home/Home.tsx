@@ -20,6 +20,10 @@ function Home(): React.JSX.Element {
     navigate('/get-help');
   }, [navigate]);
 
+  const handleTestPrintClick = React.useCallback(() => {
+    navigate('/print-test');
+  }, [navigate]);
+
   React.useEffect(() => {
     const checkStatus = async () => {
       try {
@@ -67,6 +71,21 @@ function Home(): React.JSX.Element {
       </section>
 
       <footer className="footer-section" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={handleTestPrintClick}
+          className="terms-link test-print-link"
+          aria-label="Test Print"
+          style={{
+            backgroundColor: 'rgba(255, 193, 7, 0.2)',
+            border: '2px solid rgba(255, 193, 7, 0.5)',
+            borderRadius: '8px',
+            padding: '10px 20px',
+            fontWeight: 'bold',
+          }}
+        >
+          🖨️ เทสปริ้น
+        </button>
         <button
           type="button"
           onClick={handleTermsClick}

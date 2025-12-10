@@ -23,6 +23,7 @@ import {
   ErrorBoundary,
   OutOfPaper,
   SystemMaintenance,
+  PrintTest,
 } from './components';
 import './App.css';
 
@@ -104,6 +105,7 @@ export default function App() {
           <Route path="/get-help" element={<GetHelp />} />
           <Route path="/system-maintenance" element={<SystemMaintenance />} />
           <Route path="/out-of-paper" element={<OutOfPaper />} />
+          <Route path="/print-test" element={<PrintTest />} />
         </Routes>
       </ErrorBoundary>
     </Router>
