@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import BackButton from '../backbutton';
+// import BackButton from '../backbutton';
 import Countdown from '../countdown';
 import { COUNTDOWN } from '../../utils/appConfig';
 import { FrameConfig, fetchFrameConfigs } from '../../utils/frameConfig';
@@ -81,9 +81,9 @@ export default function FrameSelection() {
     loadFrames();
   }, []);
 
-  const handleBack = () => {
-    navigate('/payment-qr', { state });
-  };
+  // const handleBack = () => {
+  //   navigate('/payment-qr', { state });
+  // };
 
   const handleConfirm = () => {
     navigate('/photo-prepare', {
@@ -121,7 +121,7 @@ export default function FrameSelection() {
   return (
     <div className="frame-selection-container">
       {/* Back Button */}
-      <BackButton onBackClick={handleBack} />
+      {/* <BackButton onBackClick={handleBack} /> */}
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
@@ -158,8 +158,8 @@ export default function FrameSelection() {
               <div className="loading-frames">Loading frames...</div>
             ) : (
               frames?.map((frame) => {
-                const thumbnailWidth =
-                  frame.orientation === 'portrait' ? '120px' : '160px';
+                // const thumbnailWidth =
+                //   frame.orientation === 'portrait' ? '120px' : '160px';
                 const thumbnailHeight =
                   frame.orientation === 'portrait' ? '160px' : '120px';
 

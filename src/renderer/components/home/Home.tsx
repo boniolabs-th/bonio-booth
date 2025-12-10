@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import icon from '../../../../assets/icons/default_full.svg';
+// import icon from '../../../../assets/icons/default_full.svg';
 import './Home.css';
 
 import { REFETCH_INTERVAL } from '../../utils/appConfig';
@@ -73,7 +73,7 @@ function Home(): React.JSX.Element {
           className="terms-link"
           aria-label="Open Terms and Services"
         >
-          Terms & Services
+          ข้อตกลงในการใช้บริการ
         </button>
         <button
           type="button"
@@ -81,7 +81,7 @@ function Home(): React.JSX.Element {
           className="terms-link"
           aria-label="Open Help"
         >
-          ช่วยเหลือ
+          ขอความช่วยเหลือ
         </button>
       </footer>
     </main>

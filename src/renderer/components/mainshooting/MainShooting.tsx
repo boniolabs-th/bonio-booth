@@ -161,12 +161,18 @@ export default function MainShooting() {
         const videoDevices = devices.filter(
           (device) => device.kind === 'videoinput',
         );
-        console.log(`📹 [Camera] Found ${videoDevices.length} camera device(s):`, 
-          videoDevices.map((d) => ({ id: d.deviceId, label: d.label || 'Unknown' }))
+        console.log(
+          `📹 [Camera] Found ${videoDevices.length} camera device(s):`,
+          videoDevices.map((d) => ({
+            id: d.deviceId,
+            label: d.label || 'Unknown',
+          })),
         );
 
         if (videoDevices.length === 0) {
-          throw new Error('ไม่พบกล้องที่เชื่อมต่ออยู่ กรุณาตรวจสอบการเชื่อมต่อกล้อง');
+          throw new Error(
+            'ไม่พบกล้องที่เชื่อมต่ออยู่ กรุณาตรวจสอบการเชื่อมต่อกล้อง',
+          );
         }
       } catch (enumError) {
         console.warn('⚠️ [Camera] Failed to enumerate devices:', enumError);
@@ -183,10 +189,13 @@ export default function MainShooting() {
         audio: false,
       };
 
-      console.log('📹 [Camera] Requesting stream with constraints:', constraints);
+      console.log(
+        '📹 [Camera] Requesting stream with constraints:',
+        constraints,
+      );
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      
+
       if (!stream) {
         throw new Error('Failed to get camera stream');
       }
@@ -208,7 +217,11 @@ export default function MainShooting() {
         // Wait for video to be ready before proceeding
         await new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => {
-            reject(new Error('Camera video timeout - video did not load within 10 seconds'));
+            reject(
+              new Error(
+                'Camera video timeout - video did not load within 10 seconds',
+              ),
+            );
           }, 10000);
 
           const onLoadedMetadata = () => {
@@ -216,13 +229,16 @@ export default function MainShooting() {
             if (videoRef.current) {
               const width = videoRef.current.videoWidth;
               const height = videoRef.current.videoHeight;
-              
+
               if (width === 0 || height === 0) {
                 reject(new Error('Camera video dimensions are invalid'));
                 return;
               }
 
-              console.log('✅ [Camera] Video metadata loaded:', { width, height });
+              console.log('✅ [Camera] Video metadata loaded:', {
+                width,
+                height,
+              });
               setVideoDimensions({ width, height });
             }
             setIsCameraLoading(false);
@@ -240,7 +256,10 @@ export default function MainShooting() {
             reject(new Error('Video element error'));
           };
 
-          videoRef.current?.addEventListener('loadedmetadata', onLoadedMetadata);
+          videoRef.current?.addEventListener(
+            'loadedmetadata',
+            onLoadedMetadata,
+          );
           videoRef.current?.addEventListener('error', onError);
         });
       } else {
@@ -250,9 +269,9 @@ export default function MainShooting() {
       console.log('✅ [Camera] Camera initialized successfully');
     } catch (error) {
       setIsCameraLoading(false);
-      
+
       let errorMessage = 'ไม่สามารถเชื่อมต่อกล้องได้';
-      
+
       if (error instanceof Error) {
         console.error('❌ [Camera] Error details:', {
           name: error.name,
@@ -261,14 +280,27 @@ export default function MainShooting() {
         });
 
         // แปลง error message เป็นภาษาไทยที่เข้าใจง่าย
-        if (error.name === 'NotAllowedError' || error.message.includes('permission')) {
-          errorMessage = 'ไม่ได้รับอนุญาตให้เข้าถึงกล้อง กรุณาอนุญาตการเข้าถึงกล้องในระบบ';
-        } else if (error.name === 'NotFoundError' || error.message.includes('not found')) {
-          errorMessage = 'ไม่พบกล้องที่เชื่อมต่ออยู่ กรุณาตรวจสอบการเชื่อมต่อกล้อง';
-        } else if (error.name === 'NotReadableError' || error.message.includes('not readable')) {
-          errorMessage = 'กล้องถูกใช้งานโดยโปรแกรมอื่นอยู่ กรุณาปิดโปรแกรมอื่นที่ใช้กล้อง';
+        if (
+          error.name === 'NotAllowedError' ||
+          error.message.includes('permission')
+        ) {
+          errorMessage =
+            'ไม่ได้รับอนุญาตให้เข้าถึงกล้อง กรุณาอนุญาตการเข้าถึงกล้องในระบบ';
+        } else if (
+          error.name === 'NotFoundError' ||
+          error.message.includes('not found')
+        ) {
+          errorMessage =
+            'ไม่พบกล้องที่เชื่อมต่ออยู่ กรุณาตรวจสอบการเชื่อมต่อกล้อง';
+        } else if (
+          error.name === 'NotReadableError' ||
+          error.message.includes('not readable')
+        ) {
+          errorMessage =
+            'กล้องถูกใช้งานโดยโปรแกรมอื่นอยู่ กรุณาปิดโปรแกรมอื่นที่ใช้กล้อง';
         } else if (error.message.includes('timeout')) {
-          errorMessage = 'การเชื่อมต่อกล้องใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง';
+          errorMessage =
+            'การเชื่อมต่อกล้องใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง';
         } else if (error.message.includes('dimensions')) {
           errorMessage = 'ไม่สามารถอ่านขนาดภาพจากกล้องได้';
         } else {
@@ -462,10 +494,16 @@ export default function MainShooting() {
               countdownValue = result.machine.cameraCountdown;
               cameraCountdownRef.current = countdownValue;
               setCameraCountdown(countdownValue);
-              console.log('📸 Camera countdown loaded in initializeCamera:', countdownValue);
+              console.log(
+                '📸 Camera countdown loaded in initializeCamera:',
+                countdownValue,
+              );
             }
           } catch (error) {
-            console.error('Failed to get machine data in initializeCamera:', error);
+            console.error(
+              'Failed to get machine data in initializeCamera:',
+              error,
+            );
           }
         }
 
@@ -573,7 +611,7 @@ export default function MainShooting() {
   return (
     <div className="main-shooting-container">
       {/* Back Button */}
-      <BackButton onBackClick={handleBack} />
+      {/* <BackButton onBackClick={handleBack} /> */}
 
       {/* Title Section */}
       <div className="title-section-shooting">

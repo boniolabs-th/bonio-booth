@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ConfirmationModal from '../confirmationmodal';
-import paymentService from '../../services/paymentService';
+// import paymentService from '../../services/paymentService';
 import checkCircleIcon from '../../../../assets/icons/svg/check-circle.svg';
 import './PaymentQR.css';
 import { COUNTDOWN } from '../../utils/appConfig';
@@ -338,7 +338,7 @@ export default function PaymentQR() {
       {/* Main Content */}
       <div className="main-content">
         <div className="title-section">
-          <h1 className="title">สแกนจ่ายได้เลย!</h1>
+          <h1 className="qr-title">สแกนจ่ายได้เลย!</h1>
           <p className="title-english">SCAN TO PAY!</p>
         </div>
 
@@ -429,7 +429,7 @@ export default function PaymentQR() {
         <div className="price-section">
           {discountAmount > 0 && (
             <div className="discount-display">
-              <span className="discount-label">Discount</span>
+              <span className="discount-label">Discount:</span>
               <span className="discount-amount">{discountAmount} THB</span>
             </div>
           )}
@@ -444,7 +444,7 @@ export default function PaymentQR() {
             role="button"
             tabIndex={0}
           >
-            <span className="price">{finalPrice}</span>
+            <span className="price-title">{finalPrice}</span>
             <span className="currency">THB</span>
           </div>
         </div>
