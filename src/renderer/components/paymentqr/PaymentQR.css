@@ -5,6 +5,13 @@
   flex-direction: column;
 }
 
+.free-transaction-message {
+  font-size: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -34,10 +41,9 @@
   margin-top: -60px;
 }
 
-.title {
+.qr-title {
   font-size: 4rem;
   font-weight: 600;
-  margin-bottom: 60px;
   text-align: center;
 }
 
@@ -160,10 +166,14 @@
 }
 
 .discount-label {
+  font-size: 2rem;
+  color: #27ae60;
 }
 
 .discount-amount {
+  font-size: 2rem;
   font-weight: 700;
+  color: #27ae60;
 }
 
 .price-container {
@@ -178,12 +188,12 @@
 
 .price-title {
   font-weight: 600;
-  font-size: 1.5rem;
+  font-size: 4rem;
 }
 
 .currency {
   margin-left: 10px;
-  font-size: 2rem;
+  font-size: 4rem;
 }
 
 .timer-container {
@@ -194,14 +204,14 @@
   justify-content: center;
 
   .title-thai {
-    font-size: 1.2rem;
+    font-size: 2rem;
     font-weight: 500;
     margin: 0;
     letter-spacing: 0.5px;
   }
 
   .title-english {
-    font-size: 1.2rem;
+    font-size: 1.5rem;
     font-weight: 500;
     margin: 0;
     letter-spacing: 0.5px;
@@ -284,6 +294,7 @@
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
@@ -378,9 +389,11 @@
     transform: scale(0);
     opacity: 0;
   }
+
   50% {
     transform: scale(1.1);
   }
+
   100% {
     transform: scale(1);
     opacity: 1;
@@ -456,10 +469,12 @@
     transform: scale(1);
     box-shadow: 0 4px 12px rgba(46, 204, 113, 0.4);
   }
+
   50% {
     transform: scale(1.05);
     box-shadow: 0 6px 16px rgba(46, 204, 113, 0.6);
   }
+
   100% {
     transform: scale(1);
     box-shadow: 0 4px 12px rgba(46, 204, 113, 0.4);
@@ -499,4 +514,13 @@
   font-size: 14px;
   color: #666;
   text-align: center;
+}
+
+.cancel-payment-button {
+  color: red;
+  background-color: white;
+  border: 2px solid red;
+  font-size: 2rem;
+  margin-top: 10%;
+  box-shadow: none;
 }

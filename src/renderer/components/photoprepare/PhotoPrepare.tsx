@@ -1,8 +1,10 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCallback, useState } from 'react';
-import { BackButton, Countdown } from '..';
+import BackButton from '../backbutton';
+import Countdown from '../countdown';
 import { FrameConfig } from '../../utils/frameConfig';
+import { COUNTDOWN } from '../../utils/appConfig';
 import './PhotoPrepare.css';
 
 interface LocationState {
@@ -47,9 +49,9 @@ export default function PhotoPrepare() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={60}
+        seconds={COUNTDOWN.PHOTO_PREPARE.DURATION}
         onComplete={handleCountdownComplete}
-        visible={true}
+        visible={COUNTDOWN.PHOTO_PREPARE.VISIBLE}
       />
 
       {/* Main Content */}

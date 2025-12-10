@@ -6,7 +6,8 @@ import { getCachedLUT, getLUTFilePath } from '../../utils/lutProcessor';
 import { applyLUTWithWorker } from '../../utils/lutWorkerHelper';
 import { drawPhotoInSlot } from '../../utils/canvasUtils';
 import './PhotoFilter.css';
-import { Countdown } from '..';
+import Countdown from '../countdown';
+import { COUNTDOWN } from '../../utils/appConfig';
 
 interface Capture {
   video: string;
@@ -163,7 +164,9 @@ export default function PhotoFilter() {
   }, [generateLutThumbnails]);
 
   // Filter รูปภาพแต่ละรูป (รองรับทั้ง CSS และ LUT)
-  const applyFilterToPhoto = async (photoUrl: string): Promise<HTMLCanvasElement> => {
+  const applyFilterToPhoto = async (
+    photoUrl: string,
+  ): Promise<HTMLCanvasElement> => {
     const filter = FILTERS.find((f) => f.id === selectedFilter);
 
     return new Promise((resolve, reject) => {
@@ -258,12 +261,15 @@ export default function PhotoFilter() {
           // Filter รูปภาพทั้งหมดแบบ Parallel
           const filteredPhotos = await Promise.all(
             state.selectedCaptures.map((capture) =>
-              applyFilterToPhoto(capture.photo)
-            )
+              applyFilterToPhoto(capture.photo),
+            ),
           );
 
           // Helper function to draw a slot
-          const drawSlot = (slot: typeof state.selectedFrame.slots[0], slotIndex: number) => {
+          const drawSlot = (
+            slot: (typeof state.selectedFrame.slots)[0],
+            slotIndex: number,
+          ) => {
             if (slotIndex >= filteredPhotos.length) return;
 
             const photoCanvas = filteredPhotos[slotIndex];
@@ -362,7 +368,13 @@ export default function PhotoFilter() {
         // ALWAYS duplicate if it is 2x6 frame, because backend always generates 4x6 canvas
         const shouldDuplicate = is2x6;
 
-        console.log('🖨️ [PhotoFilter] Duplication check:', { canCut, is2x6, shouldDuplicate, frameWidth, frameHeight });
+        console.log('🖨️ [PhotoFilter] Duplication check:', {
+          canCut,
+          is2x6,
+          shouldDuplicate,
+          frameWidth,
+          frameHeight,
+        });
 
         if (shouldDuplicate) {
           console.log('=== DUPLICATING IMAGE FOR PRINT (2x6 -> 4x6) ===');
@@ -540,9 +552,9 @@ export default function PhotoFilter() {
     <div className="photo-filter-container">
       {/* Countdown Timer - นับถอยหลัง 500 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={300}
+        seconds={COUNTDOWN.PHOTO_FILTER.DURATION}
         onComplete={handleCountdownComplete}
-        visible={true}
+        visible={COUNTDOWN.PHOTO_FILTER.VISIBLE}
       />
 
       {/* Main Content */}

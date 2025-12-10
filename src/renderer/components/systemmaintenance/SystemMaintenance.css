@@ -1,6 +1,6 @@
 /* GetHelp - Portrait Touch Screen 16" optimized */
 
-.get-help-container {
+.get-maintenance-container {
   width: 100vw;
   height: 100vh;
   display: flex;
@@ -8,7 +8,7 @@
   overflow: hidden;
 }
 
-.help-content {
+.maintenance-content {
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -21,7 +21,7 @@
   text-align: center;
 }
 
-.help-illustration {
+.maintenance-illustration {
   margin: 20px 0 30px 0;
   display: flex;
   justify-content: center;
@@ -29,34 +29,34 @@
   width: 50%;
 }
 
-.help-title {
+.maintenance-title {
   font-size: 4rem;
   font-weight: 700;
   margin: 0 0 5px 0;
 }
 
-.help-title-en {
+.maintenance-title-en {
   font-size: 2rem;
   font-weight: 600;
   margin: 0 0 30px 0;
   letter-spacing: 1px;
 }
 
-.help-instruction-thai {
+.maintenance-instruction-thai {
   font-size: 1.5rem;
   line-height: 1.6;
   margin: 0 0 10px 0;
   max-width: 600px;
 }
 
-.help-instruction-en {
+.maintenance-instruction-en {
   font-size: 16px;
   line-height: 1.6;
   margin: 0 0 40px 0;
   max-width: 600px;
 }
 
-.help-qr-section {
+.maintenance-qr-section {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -87,7 +87,7 @@
   letter-spacing: 2px;
 }
 
-.help-back-button {
+.maintenance-back-button {
   padding: 15px 20px 20px 20px;
   display: flex;
   justify-content: flex-start;
@@ -124,20 +124,20 @@
 }
 
 /* Scrollbar Styling */
-.help-content::-webkit-scrollbar {
+.maintenance-content::-webkit-scrollbar {
   width: 6px;
 }
 
-.help-content::-webkit-scrollbar-track {
+.maintenance-content::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.05);
   border-radius: 3px;
 }
 
-.help-content::-webkit-scrollbar-thumb {
+.maintenance-content::-webkit-scrollbar-thumb {
   background: #ffa500;
   border-radius: 3px;
 }
 
-.help-content::-webkit-scrollbar-thumb:hover {
+.maintenance-content::-webkit-scrollbar-thumb:hover {
   background: #ff8c00;
 }

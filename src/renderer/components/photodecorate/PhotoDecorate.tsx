@@ -5,7 +5,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { FrameConfig } from '../../utils/frameConfig';
 import { drawPhotoInSlot } from '../../utils/canvasUtils';
 import './PhotoDecorate.css';
-import { Countdown } from '..';
+import Countdown from '../countdown';
+import { COUNTDOWN } from '../../utils/appConfig';
 
 interface Capture {
   video: string;
@@ -117,7 +118,8 @@ export default function PhotoDecorate() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameImgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const previewSlots = selectedFrame?.previewSlots || selectedFrame?.slots || [];
+  const previewSlots =
+    selectedFrame?.previewSlots || selectedFrame?.slots || [];
   const frameAspectRatio = selectedFrame?.height
     ? selectedFrame.width / selectedFrame.height
     : 1;
@@ -162,7 +164,6 @@ export default function PhotoDecorate() {
       window.removeEventListener('resize', calculateScaleFactor);
     };
   }, [calculateScaleFactor]);
-
 
   const handleCountdownComplete = useCallback(() => {
     console.log(
@@ -213,8 +214,16 @@ export default function PhotoDecorate() {
       // If machine cannot cut -> user gets 4x6 with two 2x6 strips
       const shouldDuplicate = is2x6;
 
-      console.log('📸 [PhotoDecorate] Frame dimensions:', { width: frameWidth, height: frameHeight, aspectRatio });
-      console.log('📸 [PhotoDecorate] Duplication check:', { canCut, is2x6, shouldDuplicate });
+      console.log('📸 [PhotoDecorate] Frame dimensions:', {
+        width: frameWidth,
+        height: frameHeight,
+        aspectRatio,
+      });
+      console.log('📸 [PhotoDecorate] Duplication check:', {
+        canCut,
+        is2x6,
+        shouldDuplicate,
+      });
 
       // Always start with single frame dimensions for the main canvas
       canvas.width = frameWidth;
@@ -248,7 +257,11 @@ export default function PhotoDecorate() {
             img.onload = () => {
               dCtx.drawImage(img, 0, 0);
               dCtx.drawImage(img, frameWidth, 0);
-              proceedToResult(singleImageData, [], doubleCanvas.toDataURL('image/png'));
+              proceedToResult(
+                singleImageData,
+                [],
+                doubleCanvas.toDataURL('image/png'),
+              );
             };
             img.src = singleImageData;
           } else {
@@ -261,24 +274,30 @@ export default function PhotoDecorate() {
       }
 
       // Prepare slots to draw
-      const slotsToDraw = Object.entries(photoAssignments).map(([slotIndex, photoIndex]) => {
-        const slot = selectedFrame.slots[parseInt(slotIndex, 10)];
-        return {
-          slot,
-          photoIndex,
-          zIndex: slot.zIndex || 0
-        };
-      });
+      const slotsToDraw = Object.entries(photoAssignments).map(
+        ([slotIndex, photoIndex]) => {
+          const slot = selectedFrame.slots[parseInt(slotIndex, 10)];
+          return {
+            slot,
+            photoIndex,
+            zIndex: slot.zIndex || 0,
+          };
+        },
+      );
 
       // Sort slots by zIndex (if needed, but we separate them into background/foreground)
-      const backgroundSlots = slotsToDraw.filter(s => s.zIndex < 0);
-      const foregroundSlots = slotsToDraw.filter(s => s.zIndex >= 0);
+      const backgroundSlots = slotsToDraw.filter((s) => s.zIndex < 0);
+      const foregroundSlots = slotsToDraw.filter((s) => s.zIndex >= 0);
 
-      const drawSlot = (slotData: typeof slotsToDraw[0], offsetX: number, offsetY: number) => {
+      const drawSlot = (
+        slotData: (typeof slotsToDraw)[0],
+        offsetX: number,
+        offsetY: number,
+      ) => {
         return new Promise<void>((resolve) => {
           const { slot, photoIndex } = slotData;
-          const targetX = (slot.x * scaleX) + offsetX;
-          const targetY = (slot.y * scaleY) + offsetY;
+          const targetX = slot.x * scaleX + offsetX;
+          const targetY = slot.y * scaleY + offsetY;
           const targetWidth = slot.width * scaleX;
           const targetHeight = slot.height * scaleY;
           const targetRadius = slot.radius * scaleX; // Scale radius with scaleX
@@ -412,7 +431,11 @@ export default function PhotoDecorate() {
             img.onload = () => {
               dCtx.drawImage(img, 0, 0);
               dCtx.drawImage(img, frameWidth, 0);
-              proceedToResult(singleImageData, selectedCaptures, doubleCanvas.toDataURL('image/png'));
+              proceedToResult(
+                singleImageData,
+                selectedCaptures,
+                doubleCanvas.toDataURL('image/png'),
+              );
             };
             img.src = singleImageData;
           } else {
@@ -463,15 +486,15 @@ export default function PhotoDecorate() {
     <div className="photo-decorate-container">
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={300}
+        seconds={COUNTDOWN.PHOTO_DECORATE.DURATION}
         onComplete={handleCountdownComplete}
-        visible={true}
+        visible={COUNTDOWN.PHOTO_DECORATE.VISIBLE}
       />
 
       {/* Main Layout */}
-      <div className='title-section-decorate'>
-        <h1 className='title-decorate'>เลือกรูปของคุณ</h1>
-        <p className='subtitle-decorate'>Select your photos</p>
+      <div className="title-section-decorate">
+        <h1 className="title-decorate">เลือกรูปของคุณ</h1>
+        <p className="subtitle-decorate">Select your photos</p>
       </div>
 
       <div

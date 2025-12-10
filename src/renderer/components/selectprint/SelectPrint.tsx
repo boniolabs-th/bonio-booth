@@ -1,7 +1,9 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { BackButton, Countdown } from '..';
+import BackButton from '../backbutton';
+import Countdown from '../countdown';
+import { COUNTDOWN } from '../../utils/appConfig';
 import './SelectPrint.css';
 import couponIcon from '../../../../assets/icons/svg/coupon.svg';
 import qrIcon from '../../../../assets/icons/svg/qrcode.svg';
@@ -168,7 +170,6 @@ export default function SelectPrint() {
         fullResponse: result,
       });
 
-
       if (result.success && result.qr_code) {
         // Navigate to payment page with QR code
         const navigationState = {
@@ -205,9 +206,9 @@ export default function SelectPrint() {
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={300}
+        seconds={COUNTDOWN.SELECT_PRINT.DURATION}
         onComplete={handleCountdownComplete}
-        visible={true}
+        visible={COUNTDOWN.SELECT_PRINT.VISIBLE}
       />
 
       {/* Main Content */}

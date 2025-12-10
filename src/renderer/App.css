@@ -5,7 +5,8 @@
 body {
   position: relative;
   color: white;
-  height: min(100vh, calc(100vw * 16 / 9)); /* locked at 16:9 ratio */
+  height: min(100vh, calc(100vw * 16 / 9));
+  /* locked at 16:9 ratio */
   aspect-ratio: 9/16;
   padding: 0;
   margin: 0;

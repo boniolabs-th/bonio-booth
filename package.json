@@ -39,7 +39,7 @@
     "prettier": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,scss,md}\""
   },
   "browserslist": [
-    "extends browserslist-config-erb"
+    "Electron >= 34"
   ],
   "prettier": {
     "singleQuote": true,

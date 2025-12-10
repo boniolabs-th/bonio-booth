@@ -1,7 +1,9 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { BackButton, Countdown } from '..';
+// import BackButton from '../backbutton';
+import Countdown from '../countdown';
+import { COUNTDOWN } from '../../utils/appConfig';
 import { FrameConfig, fetchFrameConfigs } from '../../utils/frameConfig';
 import './FrameSelection.css';
 
@@ -79,9 +81,9 @@ export default function FrameSelection() {
     loadFrames();
   }, []);
 
-  const handleBack = () => {
-    navigate('/payment-qr', { state });
-  };
+  // const handleBack = () => {
+  //   navigate('/payment-qr', { state });
+  // };
 
   const handleConfirm = () => {
     navigate('/photo-prepare', {
@@ -119,13 +121,13 @@ export default function FrameSelection() {
   return (
     <div className="frame-selection-container">
       {/* Back Button */}
-      <BackButton onBackClick={handleBack} />
+      {/* <BackButton onBackClick={handleBack} /> */}
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
-        seconds={300}
+        seconds={COUNTDOWN.FRAME_SELECTION.DURATION}
         onComplete={handleCountdownComplete}
-        visible={true}
+        visible={COUNTDOWN.FRAME_SELECTION.VISIBLE}
       />
 
       {/* Main Content */}
@@ -138,69 +140,74 @@ export default function FrameSelection() {
             <p className="subtitle-frame">SELECT YOUR FRAME</p>
           </div>
 
-        {/* Frame Thumbnails - Horizontal Scroll */}
-        <div
-          className="frames-thumbnails"
-          ref={framesContainerRef}
-          onMouseDown={handleMouseDown}
-          onMouseLeave={handleMouseLeave}
-          onMouseUp={handleMouseUp}
-          onMouseMove={handleMouseMove}
-          style={{
-            cursor: isDown ? 'grabbing' : 'grab',
-            overflowX: 'auto',
-            userSelect: 'none'
-          }}
-        >
-          {isLoading ? (
-            <div className="loading-frames">Loading frames...</div>
-          ) : (
-            frames?.map((frame) => {
-              const thumbnailWidth =
-                frame.orientation === 'portrait' ? '120px' : '160px';
-              const thumbnailHeight =
-                frame.orientation === 'portrait' ? '160px' : '120px';
+          {/* Frame Thumbnails - Horizontal Scroll */}
+          <div
+            className="frames-thumbnails"
+            ref={framesContainerRef}
+            onMouseDown={handleMouseDown}
+            onMouseLeave={handleMouseLeave}
+            onMouseUp={handleMouseUp}
+            onMouseMove={handleMouseMove}
+            style={{
+              cursor: isDown ? 'grabbing' : 'grab',
+              overflowX: 'auto',
+              userSelect: 'none',
+            }}
+          >
+            {isLoading ? (
+              <div className="loading-frames">Loading frames...</div>
+            ) : (
+              frames?.map((frame) => {
+                // const thumbnailWidth =
+                //   frame.orientation === 'portrait' ? '120px' : '160px';
+                const thumbnailHeight =
+                  frame.orientation === 'portrait' ? '160px' : '120px';
 
-              return (
-                <div
-                  key={frame.id}
-                  role="button"
-                  tabIndex={0}
-                  className={`frame-thumbnail ${selectedFrame?.id === frame.id ? 'selected' : ''}`}
-                  style={{
-                    height: thumbnailHeight,
-                  }}
-                  onClick={() => {
-                    if (!isDraggingRef.current) {
-                      setSelectedFrame(frame);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      setSelectedFrame(frame);
-                    }
-                  }}
-                >
-                  {selectedFrame?.id === frame.id && (
-                    <div className="selected-badge">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path
-                          d="M20 6L9 17l-5-5"
-                          stroke="white"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </div>
-                  )}
-                  <img src={frame.image} alt={frame.name} />
-                </div>
-              );
-            })
-          )}
+                return (
+                  <div
+                    key={frame.id}
+                    role="button"
+                    tabIndex={0}
+                    className={`frame-thumbnail ${selectedFrame?.id === frame.id ? 'selected' : ''}`}
+                    style={{
+                      height: thumbnailHeight,
+                    }}
+                    onClick={() => {
+                      if (!isDraggingRef.current) {
+                        setSelectedFrame(frame);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        setSelectedFrame(frame);
+                      }
+                    }}
+                  >
+                    {selectedFrame?.id === frame.id && (
+                      <div className="selected-badge">
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                        >
+                          <path
+                            d="M20 6L9 17l-5-5"
+                            stroke="white"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                    <img src={frame.image} alt={frame.name} />
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
-      </div>
 
         {/* Row 2: Large Preview (60%) */}
         <div className="row-middle">

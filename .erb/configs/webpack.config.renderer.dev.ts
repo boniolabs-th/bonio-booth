@@ -46,8 +46,6 @@ const configuration: webpack.Configuration = {
   target: ['web', 'electron-renderer'],
 
   entry: [
-    `webpack-dev-server/client?http://localhost:${port}/dist`,
-    'webpack/hot/only-dev-server',
     path.join(webpackPaths.srcRendererPath, 'index.tsx'),
   ],
 
