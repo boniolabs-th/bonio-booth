@@ -53,20 +53,20 @@ export default function PrintTest(): React.JSX.Element {
 
         // ดึงค่า paperPosition จาก main process ผ่าน IPC
         // @ts-ignore
-        const paperPositionResult = await window.electron?.payment?.getPaperPosition();
-        
+        const paperPositionResult =
+          await window.electron?.payment?.getPaperPosition();
+
         if (paperPositionResult?.success && paperPositionResult.paperPosition) {
           const paperPos = paperPositionResult.paperPosition;
           console.log('🔍 [PrintTest] paperPos from IPC:', paperPos);
-          
+
           // ใช้ค่า default ถ้าเป็น undefined หรือ null เท่านั้น (ไม่ใช้ || เพราะ 0 และ -16 เป็น falsy)
           const finalScale =
             paperPos.scale !== undefined && paperPos.scale !== null
               ? paperPos.scale
               : 100;
           const finalHorizontal =
-            paperPos.horizontal !== undefined &&
-            paperPos.horizontal !== null
+            paperPos.horizontal !== undefined && paperPos.horizontal !== null
               ? paperPos.horizontal
               : 0;
           const finalVertical =
@@ -98,7 +98,10 @@ export default function PrintTest(): React.JSX.Element {
           );
         }
       } catch (error) {
-        console.error('❌ [PrintTest] Failed to load env config or paper position:', error);
+        console.error(
+          '❌ [PrintTest] Failed to load env config or paper position:',
+          error,
+        );
         setEnvConfig({
           apiUrl: 'http://localhost:3000',
           machinePort: '44444',
@@ -367,11 +370,11 @@ export default function PrintTest(): React.JSX.Element {
                 id="copies"
                 type="number"
                 min="1"
-                max="10"
+                max="3"
                 value={copies}
                 onChange={(e) => {
-                  const value = parseInt(e.target.value, 10);
-                  if (!Number.isNaN(value) && value >= 1 && value <= 10) {
+                  const value = parseInt(e.target.value, 3);
+                  if (!Number.isNaN(value) && value >= 1 && value <= 3) {
                     setCopies(value);
                   }
                 }}
@@ -381,13 +384,13 @@ export default function PrintTest(): React.JSX.Element {
               <button
                 type="button"
                 className="copies-button"
-                onClick={() => setCopies(Math.min(10, copies + 1))}
-                disabled={isPrinting || copies >= 10}
+                onClick={() => setCopies(Math.min(3, copies + 1))}
+                disabled={isPrinting || copies >= 3}
               >
                 +
               </button>
             </div>
-            <p className="setting-hint">เลือกจำนวน 1-10 แผ่น</p>
+            <p className="setting-hint">เลือกจำนวน 1-3 แผ่น</p>
           </div>
 
           <div className="setting-group">
