@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './PrintTest.css';
 
 const TEST_IMAGE_URL =
   'https://sgp1.digitaloceanspaces.com/boniolabs/transactions/69399f7d3b0aa02cd9576618/photos/05042e81-94ac-448c-9fcb-7d500034dfb0.png';
+
+interface EnvConfig {
+  apiUrl: string;
+  machinePort: string;
+  machineId: string;
+}
 
 export default function PrintTest(): React.JSX.Element {
   const navigate = useNavigate();
@@ -14,8 +20,192 @@ export default function PrintTest(): React.JSX.Element {
   >('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
+  // Position Paper Modal States
+  const [isPositionModalOpen, setIsPositionModalOpen] = useState(false);
+  const [scale, setScale] = useState<number>(100);
+  const [horizontal, setHorizontal] = useState<number>(0);
+  const [vertical, setVertical] = useState<number>(0);
+  const [originalScale, setOriginalScale] = useState<number>(100);
+  const [originalHorizontal, setOriginalHorizontal] = useState<number>(0);
+  const [originalVertical, setOriginalVertical] = useState<number>(0);
+  const [envConfig, setEnvConfig] = useState<EnvConfig | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load environment config and paper position
+  useEffect(() => {
+    const loadEnvConfigAndPaperPosition = async () => {
+      try {
+        // @ts-ignore
+        const env = await window.electron?.payment?.getEnvVars();
+        const config: EnvConfig = env
+          ? {
+              apiUrl: env.API_BASE_URL || 'http://localhost:3000',
+              machinePort: env.PORT || '44444',
+              machineId: env.MACHINE_ID || '69247c9602dd728488995e3c',
+            }
+          : {
+              apiUrl: 'http://localhost:3000',
+              machinePort: '44444',
+              machineId: '69247c9602dd728488995e3c',
+            };
+
+        setEnvConfig(config);
+
+        // ดึงค่า paperPosition จาก main process ผ่าน IPC
+        // @ts-ignore
+        const paperPositionResult = await window.electron?.payment?.getPaperPosition();
+        
+        if (paperPositionResult?.success && paperPositionResult.paperPosition) {
+          const paperPos = paperPositionResult.paperPosition;
+          console.log('🔍 [PrintTest] paperPos from IPC:', paperPos);
+          
+          // ใช้ค่า default ถ้าเป็น undefined หรือ null เท่านั้น (ไม่ใช้ || เพราะ 0 และ -16 เป็น falsy)
+          const finalScale =
+            paperPos.scale !== undefined && paperPos.scale !== null
+              ? paperPos.scale
+              : 100;
+          const finalHorizontal =
+            paperPos.horizontal !== undefined &&
+            paperPos.horizontal !== null
+              ? paperPos.horizontal
+              : 0;
+          const finalVertical =
+            paperPos.vertical !== undefined && paperPos.vertical !== null
+              ? paperPos.vertical
+              : 0;
+
+          console.log('🔍 [PrintTest] Setting values:', {
+            finalScale,
+            finalHorizontal,
+            finalVertical,
+          });
+
+          setScale(finalScale);
+          setHorizontal(finalHorizontal);
+          setVertical(finalVertical);
+          setOriginalScale(finalScale);
+          setOriginalHorizontal(finalHorizontal);
+          setOriginalVertical(finalVertical);
+
+          console.log('✅ [PrintTest] Paper position loaded from IPC:', {
+            scale: finalScale,
+            horizontal: finalHorizontal,
+            vertical: finalVertical,
+          });
+        } else {
+          console.log(
+            '⚠️ [PrintTest] No paperPosition from IPC, using defaults',
+          );
+        }
+      } catch (error) {
+        console.error('❌ [PrintTest] Failed to load env config or paper position:', error);
+        setEnvConfig({
+          apiUrl: 'http://localhost:3000',
+          machinePort: '44444',
+          machineId: '69247c9602dd728488995e3c',
+        });
+      }
+    };
+    loadEnvConfigAndPaperPosition();
+  }, []);
+
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log('🔄 [PrintTest] State updated:', {
+      scale,
+      horizontal,
+      vertical,
+      originalScale,
+      originalHorizontal,
+      originalVertical,
+    });
+  }, [
+    scale,
+    horizontal,
+    vertical,
+    originalScale,
+    originalHorizontal,
+    originalVertical,
+  ]);
+
   const handleBack = () => {
     navigate('/');
+  };
+
+  const handleOpenPositionModal = () => {
+    console.log('🔍 [PrintTest] Opening modal with current values:', {
+      scale,
+      horizontal,
+      vertical,
+    });
+    setOriginalScale(scale);
+    setOriginalHorizontal(horizontal);
+    setOriginalVertical(vertical);
+    setIsPositionModalOpen(true);
+  };
+
+  const handleClosePositionModal = () => {
+    // Reset to original values
+    setScale(originalScale);
+    setHorizontal(originalHorizontal);
+    setVertical(originalVertical);
+    setIsPositionModalOpen(false);
+  };
+
+  const handleSavePosition = async () => {
+    if (!envConfig) {
+      console.error('❌ [PrintTest] Environment config not loaded');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const headers = new Headers();
+      headers.set('Content-Type', 'application/json');
+      headers.set('X-Machine-Port', String(envConfig.machinePort));
+      headers.set('X-Machine-Id', envConfig.machineId || '');
+
+      const response = await fetch(
+        `${envConfig.apiUrl}/api/machines-public/paperPosition`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            scale,
+            horizontal,
+            vertical,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to update paper position: ${response.statusText}`,
+        );
+      }
+
+      const data = await response.json();
+      console.log('✅ [PrintTest] Paper position updated:', data);
+
+      // Update original values
+      setOriginalScale(scale);
+      setOriginalHorizontal(horizontal);
+      setOriginalVertical(vertical);
+      setIsPositionModalOpen(false);
+    } catch (error) {
+      console.error('❌ [PrintTest] Error updating paper position:', error);
+      alert('ไม่สามารถบันทึกการตั้งค่าได้ กรุณาลองอีกครั้ง');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const hasChanges = () => {
+    return (
+      scale !== originalScale ||
+      horizontal !== originalHorizontal ||
+      vertical !== originalVertical
+    );
   };
 
   const convertImageUrlToDataUrl = async (
@@ -70,7 +260,7 @@ export default function PrintTest(): React.JSX.Element {
           error?: string;
         }>((resolve) => {
           // @ts-ignore
-          const listener = window.electron.print.onPrintResponse(
+          window.electron.print.onPrintResponse(
             (result: { success: boolean; error?: string }) => {
               // @ts-ignore
               window.electron.print.removePrintResponseListener();
@@ -142,17 +332,23 @@ export default function PrintTest(): React.JSX.Element {
         <div className="print-test-image-section">
           <h2 className="section-title">รูปภาพทดสอบ</h2>
           <div className="image-preview-container">
-            <img
-              src={TEST_IMAGE_URL}
-              alt="Test print image"
-              className="test-image"
-            />
+            <img src={TEST_IMAGE_URL} alt="Test print" className="test-image" />
           </div>
         </div>
 
         {/* Print Settings */}
         <div className="print-test-settings">
-          <h2 className="section-title">ตั้งค่าการพิมพ์</h2>
+          <div className="section-header">
+            <h2 className="section-title">ตั้งค่าการพิมพ์</h2>
+            <button
+              type="button"
+              className="position-paper-button"
+              onClick={handleOpenPositionModal}
+              disabled={isPrinting}
+            >
+              Position Paper
+            </button>
+          </div>
 
           <div className="setting-group">
             <label htmlFor="copies" className="setting-label">
@@ -175,7 +371,7 @@ export default function PrintTest(): React.JSX.Element {
                 value={copies}
                 onChange={(e) => {
                   const value = parseInt(e.target.value, 10);
-                  if (!isNaN(value) && value >= 1 && value <= 10) {
+                  if (!Number.isNaN(value) && value >= 1 && value <= 10) {
                     setCopies(value);
                   }
                 }}
@@ -232,7 +428,113 @@ export default function PrintTest(): React.JSX.Element {
           </button>
         </div>
       </div>
+
+      {/* Position Paper Modal */}
+      {isPositionModalOpen && (
+        <div
+          className="modal-overlay"
+          onClick={handleClosePositionModal}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              handleClosePositionModal();
+            }
+          }}
+          role="button"
+          tabIndex={0}
+        >
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-labelledby="position-paper-title"
+            aria-describedby="position-paper-description"
+          >
+            <h2 id="position-paper-title" className="modal-title">
+              Position Paper
+            </h2>
+            <p id="position-paper-description" className="modal-description">
+              Use to center your print on paper if the print out is not
+              correctly aligned or cropped.
+            </p>
+
+            <div className="slider-group">
+              <div className="slider-item">
+                <label htmlFor="scale-slider" className="slider-label">
+                  Scale
+                </label>
+                <div className="slider-container">
+                  <input
+                    id="scale-slider"
+                    type="range"
+                    min="50"
+                    max="150"
+                    value={scale}
+                    onChange={(e) => setScale(Number(e.target.value))}
+                    className="slider slider-horizontal"
+                  />
+                  <span className="slider-value">{scale}</span>
+                </div>
+              </div>
+
+              <div className="slider-item">
+                <label htmlFor="horizontal-slider" className="slider-label">
+                  Horizontal position
+                </label>
+                <div className="slider-container">
+                  <input
+                    id="horizontal-slider"
+                    type="range"
+                    min="-50"
+                    max="50"
+                    value={horizontal}
+                    onChange={(e) => setHorizontal(Number(e.target.value))}
+                    className="slider slider-horizontal"
+                  />
+                  <span className="slider-value">{horizontal}</span>
+                </div>
+              </div>
+
+              <div className="slider-item">
+                <label htmlFor="vertical-slider" className="slider-label">
+                  Vertical position
+                </label>
+                <div className="slider-container-vertical">
+                  <input
+                    id="vertical-slider"
+                    type="range"
+                    min="-50"
+                    max="50"
+                    value={vertical}
+                    onChange={(e) => setVertical(Number(e.target.value))}
+                    className="slider slider-vertical"
+                  />
+                  <span className="slider-value">{vertical}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="modal-button modal-button-cancel"
+                onClick={handleClosePositionModal}
+                disabled={isSaving}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                className="modal-button modal-button-confirm"
+                onClick={handleSavePosition}
+                disabled={isSaving || !hasChanges()}
+              >
+                {isSaving ? 'กำลังบันทึก...' : 'ยืนยัน'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

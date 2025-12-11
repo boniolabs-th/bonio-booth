@@ -88,6 +88,7 @@ async function initializeApp() {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
       theme: initResponse.theme,
+      paperPosition: initResponse.paperPosition,
     };
 
     // Send machine data (including prices) to renderer process
@@ -262,7 +263,12 @@ async function generateImageWithPadding(
 }
 
 let mainWindow: BrowserWindow | null = null;
-let cachedInitData: { machine?: { prices?: unknown[] }; prices?: unknown[]; theme?: any } | null = null;
+let cachedInitData: {
+  machine?: { prices?: unknown[] };
+  prices?: unknown[];
+  theme?: any;
+  paperPosition?: { _id: string; scale: number; horizontal: number; vertical: number } | null;
+} | null = null;
 
 const installExtensions = async () => {
   const installer = require('electron-devtools-installer');
@@ -652,6 +658,7 @@ ipcMain.handle('get-machine-prices', async () => {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
       theme: initResponse.theme,
+      paperPosition: initResponse.paperPosition,
     };
     return { success: true, prices: initResponse.machine.prices || [] };
   } catch (error) {
@@ -689,6 +696,7 @@ ipcMain.handle('get-machine-data', async () => {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
       theme: initResponse.theme,
+      paperPosition: initResponse.paperPosition,
     };
     return {
       success: true,
@@ -716,6 +724,7 @@ ipcMain.handle('force-init', async () => {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
       theme: initResponse.theme,
+      paperPosition: initResponse.paperPosition,
     };
 
     return {
@@ -832,10 +841,37 @@ ipcMain.handle('get-theme-data', async () => {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
       theme: initResponse.theme,
+      paperPosition: initResponse.paperPosition,
     };
     return { success: true, theme: initResponse.theme };
   } catch (error) {
     console.error('Error in get-theme-data handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+// Handler สำหรับ request paper position data
+ipcMain.handle('get-paper-position', async () => {
+  try {
+    if (cachedInitData?.paperPosition) {
+      return { success: true, paperPosition: cachedInitData.paperPosition };
+    }
+    // ถ้ายังไม่มี cache ให้เรียก API ใหม่
+    const initResponse = await machineService.init();
+    cachedInitData = {
+      machine: initResponse.machine,
+      prices: initResponse.machine.prices || [],
+      theme: initResponse.theme,
+      paperPosition: initResponse.paperPosition,
+    };
+    return {
+      success: true,
+      paperPosition: initResponse.paperPosition || null,
+    };
+  } catch (error) {
+    console.error('Error in get-paper-position handler:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage };

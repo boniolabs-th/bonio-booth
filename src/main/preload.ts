@@ -71,6 +71,9 @@ const electronHandler = {
     getThemeData: () => {
       return ipcRenderer.invoke('get-theme-data');
     },
+    getPaperPosition: () => {
+      return ipcRenderer.invoke('get-paper-position');
+    },
     uploadMachineFiles: (
       transactionCode: string,
       photos: string[],
