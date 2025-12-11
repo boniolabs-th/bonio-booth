@@ -23,8 +23,11 @@ async function loadEnvConfig(): Promise<void> {
     if (env) {
       envConfig = {
         apiUrl: env.API_BASE_URL || 'http://localhost:3000',
-        machinePort: env.PORT || '99999',
-        machineId: env.MACHINE_ID || '693296af25719d62f695db5d',
+        // machinePort: env.PORT || '99999',
+        // apiUrl: env.API_BASE_URL || 'https://api-booth.boniolabs.com',
+        machinePort: env.PORT || '44444',
+        // machineId: env.MACHINE_ID || '693296af25719d62f695db5d',
+        machineId: env.MACHINE_ID || '69247c9602dd728488995e3c',
       };
       console.log('✅ [frameConfig] Environment config loaded:', envConfig);
     }
@@ -33,8 +36,11 @@ async function loadEnvConfig(): Promise<void> {
     // ใช้ default values
     envConfig = {
       apiUrl: 'http://localhost:3000',
-      machinePort: '99999',
-      machineId: '693296af25719d62f695db5d',
+      // machinePort: '99999',
+      // apiUrl: 'https://api-booth.boniolabs.com',
+      machinePort: '44444',
+      // machineId: env.MACHINE_ID || '693296af25719d62f695db5d',
+      machineId: '69247c9602dd728488995e3c',
     };
   }
 }

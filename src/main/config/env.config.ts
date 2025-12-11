@@ -21,10 +21,12 @@ export interface EnvConfig {
  */
 export function getEnvConfig(): EnvConfig {
   return {
-    // API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:3000',
-    API_BASE_URL: process.env.API_BASE_URL || 'https://api-booth.boniolabs.com',
-    PORT: process.env.PORT || '99999',
-    MACHINE_ID: process.env.MACHINE_ID || '693296af25719d62f695db5d',
+    API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:3000',
+    // API_BASE_URL: process.env.API_BASE_URL || 'https://api-booth.boniolabs.com',
+    // PORT: process.env.PORT || '99999',
+    PORT: process.env.PORT || '44444',
+    // MACHINE_ID: process.env.MACHINE_ID || '693296af25719d62f695db5d',
+    MACHINE_ID: process.env.MACHINE_ID || '69247c9602dd728488995e3c',
     MACHINE_CAN_CUT: process.env.MACHINE_CAN_CUT !== 'false',
     API_TIMEOUT: Number(process.env.API_TIMEOUT) || 10000,
   };

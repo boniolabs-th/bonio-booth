@@ -19,10 +19,11 @@ const getEnv = (): any => {
 
 const env = getEnv();
 console.log('🔧 [MachineService] gett Environment config:', env);
-// const apiBaseUrl = env.API_BASE_URL  || 'http://localhost:3000';
-const apiBaseUrl = env.API_BASE_URL  || 'https://api-booth.boniolabs.com';
-const machinePort = env.PORT || '99999';
-const machineId = env.MACHINE_ID || '693296af25719d62f695db5d';
+const apiBaseUrl = env.API_BASE_URL  || 'http://localhost:3000';
+// const apiBaseUrl = env.API_BASE_URL  || 'https://api-booth.boniolabs.com';
+const machinePort = env.PORT || '44444';
+// const machineId = env.MACHINE_ID || '693296af25719d62f695db5d';
+const machineId = env.MACHINE_ID || '69247c9602dd728488995e3c';
 
 export interface MachineInfo {
   id: string;
@@ -266,6 +267,14 @@ export interface InitResponse {
   machine: InitMachine;
   theme: InitTheme;
   frames: InitFrame[];
+  paperPosition?: PaperPosition;
+}
+
+export interface PaperPosition {
+  _id: string;
+  scale: number;
+  horizontal: number;
+  vertical: number;
 }
 
 export interface MachineServiceOptions {
@@ -287,7 +296,7 @@ export class MachineService {
     // อ่าน API URL จาก environment variable หรือ options หรือ default
     // this.apiBaseUrl =  'https://api-booth.boniolabs.com';
     this.apiBaseUrl = apiBaseUrl;
-    this.machinePort = options.machinePort || Number(machinePort) || 99999;
+    this.machinePort = options.machinePort || Number(machinePort) || 44444;
     this.machineId = options.machineId || machineId || '';
     this.timeout = options.timeout || Number(env.API_TIMEOUT) || 10000;
 
@@ -410,10 +419,21 @@ export class MachineService {
         undefined,
         machineId ? { machineId } : undefined,
       );
+      console.log('✅ [MachineService] App initialized response:', JSON.stringify(response, null, 2));
+      
+      // Access paperPosition with type assertion to handle optional property
+      const paperPosition = (response as any).paperPosition || response.paperPosition;
+      
       console.log('✅ [MachineService] App initialized:', {
-        machine: response.machine.machineName,
-        theme: response.theme.name,
-        frames: response.frames.length,
+        machine: response.machine?.machineName,
+        theme: response.theme?.name,
+        frames: response.frames?.length || 0,
+        paperPosition: paperPosition ? {
+          _id: paperPosition._id,
+          scale: paperPosition.scale,
+          horizontal: paperPosition.horizontal,
+          vertical: paperPosition.vertical,
+        } : null,
       });
       return response;
     } catch (error) {
