@@ -173,43 +173,13 @@ export interface FilterConfig {
 }
 
 export const FILTERS: FilterConfig[] = [
-  // { id: 'none', name: 'Original', filter: '', type: 'css' },
-  // { id: 'sepia', name: 'Sepia', filter: 'sepia(100%)', type: 'css' },
-  // { id: 'grayscale', name: 'B&W', filter: 'grayscale(100%)', type: 'css' },
-  // {
-  //   id: 'vintage',
-  //   name: 'Vintage',
-  //   filter: 'sepia(50%) contrast(1.2) brightness(1.1)',
-  //   type: 'css',
-  // },
-  // { id: 'cool', name: 'Cool', filter: 'hue-rotate(90deg) saturate(1.2)', type: 'css' },
-  // {
-  //   id: 'warm',
-  //   name: 'Warm',
-  //   filter: 'hue-rotate(-30deg) saturate(1.1) brightness(1.1)',
-  //   type: 'css',
-  // },
   // LUT-based filters (for high-quality color grading)
-  // Black & White filters
-  { id: 'BW1', name: 'สุดหล่อ-1', lutFile: 'BW1.cube', type: 'lut' },
-  { id: 'BW2', name: 'สุดหล่อ-2', lutFile: 'BW2.cube', type: 'lut' },
-  { id: 'SoftBlackAndWhite', name: 'Soft Black & White', lutFile: 'SoftBlackAndWhite.cube', type: 'lut' },
-  
-  // NW Series filters
-  { id: 'NW-1', name: 'NW-1', lutFile: 'NW-1.cube', type: 'lut' },
-  { id: 'NW-2', name: 'NW-2', lutFile: 'NW-2.cube', type: 'lut' },
-  { id: 'NW-6', name: 'NW-6', lutFile: 'NW-6.cube', type: 'lut' },
-  { id: 'NW-10', name: 'NW-10', lutFile: 'NW-10.cube', type: 'lut' },
-  
-  // Color filters
-  { id: 'Aqua', name: 'Aqua', lutFile: 'Aqua.cube', type: 'lut' },
-  { id: 'Blues', name: 'Blues', lutFile: 'Blues.cube', type: 'lut' },
-  { id: 'EarthToneBoost', name: 'Earth Tone Boost', lutFile: 'EarthToneBoost.cube', type: 'lut' },
-  { id: 'GreenBlues', name: 'Green Blues', lutFile: 'Green_Blues.cube', type: 'lut' },
-  { id: 'GreenYellow', name: 'Green Yellow', lutFile: 'Green_Yellow.cube', type: 'lut' },
-  { id: 'Purple', name: 'Purple', lutFile: 'Purple.cube', type: 'lut' },
-  { id: 'Reds', name: 'Reds', lutFile: 'Reds.cube', type: 'lut' },
-  { id: 'RedsOrangesYellows', name: 'Reds Oranges Yellows', lutFile: 'Reds_Oranges_Yellows.cube', type: 'lut' },
-  { id: 'TealAndOrange', name: 'Teal and Orange', lutFile: 'Teal-and-Orange.cube', type: 'lut' },
-  // { id: 'Presetpro', name: 'Presetpro', lutFile: 'Presetpro.cube', type: 'lut' },
+  { id: 'matte-brown-mono', name: 'Matte Brown Mono', lutFile: 'Matte_Brown_Mono.cube', type: 'lut' },
+  { id: 'sepia-brown', name: 'Sepia Brown', lutFile: 'Sepia_Brown.cube', type: 'lut' },
+  { id: 'timelab-1', name: 'Timelab 1', lutFile: 'Timelab 1.cube', type: 'lut' },
+  { id: 'timelab-2', name: 'Timelab 2', lutFile: 'Timelab 2.cube', type: 'lut' },
+  { id: 'timelab-3', name: 'Timelab 3', lutFile: 'Timelab 3.cube', type: 'lut' },
+  { id: 'timelab-4', name: 'Timelab 4', lutFile: 'Timelab 4.cube', type: 'lut' },
+  { id: 'timelab-5', name: 'Timelab 5', lutFile: 'Timelab 5.cube', type: 'lut' },
+  { id: 'warm-vintage', name: 'Warm Vintage', lutFile: 'Warm_Vintage.cube', type: 'lut' },
 ];
