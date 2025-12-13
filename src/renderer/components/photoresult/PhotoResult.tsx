@@ -71,6 +71,7 @@ const generateFramedVideo = async (
   frame: FrameConfig,
   selectedFilterId?: string,
   useBoomerang?: boolean,
+  isLutFilterApplied?: boolean, // Flag to indicate if LUT filter is already applied
 ): Promise<string> => {
   const loadFrameImage = () =>
     new Promise<HTMLImageElement>((resolve, reject) => {
@@ -110,6 +111,7 @@ const generateFramedVideo = async (
     frameImg: HTMLImageElement,
     enrichedCaptures: Capture[],
     selectedFilterId?: string,
+    isLutFilterApplied?: boolean, // Flag to indicate if LUT filter is already applied
   ): Promise<string> => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -259,15 +261,14 @@ const generateFramedVideo = async (
           const targetHeight = slot.height * scaleY;
 
           // Apply filter to boomerang frame before drawing
+          // Only apply CSS filters here, LUT filters should be applied to source video
           ctx.save();
-          const filter = FILTERS.find((f) => f.id === selectedFilterId);
-
-          // Use CSS filter for all filter types (including LUT approximation)
-          if (filter?.filter) {
-            ctx.filter = filter.filter;
-          } else if (filter?.type === 'lut') {
-            // CSS approximation for LUT filters
-            ctx.filter = 'saturate(1.1) contrast(1.05) brightness(1.02)';
+          if (!isLutFilterApplied && selectedFilterId) {
+            const filter = FILTERS.find((f) => f.id === selectedFilterId);
+            // Only apply CSS filters, LUT filters are already applied to source
+            if (filter?.type === 'css' && filter?.filter) {
+              ctx.filter = filter.filter;
+            }
           }
 
           ctx.drawImage(
@@ -328,7 +329,12 @@ const generateFramedVideo = async (
 
   // Only use boomerang if user selected it and frames are available
   if (useBoomerang && hasBoomerangFrames) {
-    return composeBoomerangVideo(frameImg, enrichedCaptures, selectedFilterId);
+    return composeBoomerangVideo(
+      frameImg,
+      enrichedCaptures,
+      selectedFilterId,
+      isLutFilterApplied,
+    );
   }
 
   const videoElements = await Promise.all(
@@ -465,15 +471,14 @@ const generateFramedVideo = async (
         const targetHeight = slot.height * scaleY;
 
         // Apply filter to video before drawing
+        // Only apply CSS filters here, LUT filters should be applied to source video
         ctx.save();
-        const filter = FILTERS.find((f) => f.id === selectedFilterId);
-
-        // Use CSS filter for all filter types (including LUT approximation)
-        if (filter?.filter) {
-          ctx.filter = filter.filter;
-        } else if (filter?.type === 'lut') {
-          // CSS approximation for LUT filters
-          ctx.filter = 'saturate(1.1) contrast(1.05) brightness(1.02)';
+        if (!isLutFilterApplied && selectedFilterId) {
+          const filter = FILTERS.find((f) => f.id === selectedFilterId);
+          // Only apply CSS filters, LUT filters are already applied to source
+          if (filter?.type === 'css' && filter?.filter) {
+            ctx.filter = filter.filter;
+          }
         }
 
         ctx.drawImage(
@@ -628,133 +633,118 @@ export default function PhotoResult() {
       });
 
       try {
-        // Create video without filter first (fast)
-        // ถ้าเป็น CSS Filter ให้ใส่ไปเลย แต่ถ้าเป็น LUT ให้ใส่ undefined ไปก่อน แล้วค่อยไปทำ FFmpeg
         const filter = FILTERS.find((f) => f.id === state.selectedFilter);
+        
+        // Apply LUT filter to original captures BEFORE creating framed video
+        let processedCaptures = state.selectedCaptures;
+        
+        if (filter?.type === 'lut' && filter.lutFile) {
+          setIsApplyingLUT(true);
+          console.log('🎨 [PhotoResult] Applying LUT filter to original videos:', filter.lutFile);
+
+          try {
+            // Apply LUT filter to each capture video
+            processedCaptures = await Promise.all(
+              state.selectedCaptures.map(async (capture, index) => {
+                try {
+                  console.log(`🎨 [PhotoResult] Processing capture ${index + 1}...`);
+                  
+                  // Convert blob URL to ArrayBuffer
+                  const response = await fetch(capture.video);
+                  const blob = await response.blob();
+                  const arrayBuffer = await blob.arrayBuffer();
+
+                  // Save to temp file via IPC
+                  const saveResult =
+                    await window.electron.video.saveTempVideo(arrayBuffer);
+
+                  if (!saveResult.success || !saveResult.path) {
+                    throw new Error('Failed to save temp video file');
+                  }
+
+                  // Apply LUT via FFmpeg
+                  const lutResult = await window.electron.video.applyLutToVideo(
+                    saveResult.path,
+                    filter.lutFile,
+                  );
+
+                  if (lutResult.success && lutResult.path) {
+                    // Read the processed file via IPC
+                    const fileResult = await window.electron.video.readVideoFile(
+                      lutResult.path,
+                    );
+
+                    if (fileResult.success && fileResult.data) {
+                      const processedBlob = new Blob([fileResult.data], {
+                        type: 'video/mp4',
+                      });
+                      const processedUrl = URL.createObjectURL(processedBlob);
+                      console.log(
+                        `✅ [PhotoResult] Capture ${index + 1} LUT applied successfully`,
+                      );
+                      
+                      return {
+                        ...capture,
+                        video: processedUrl,
+                      };
+                    }
+                  }
+                  
+                  // Fallback to original if processing fails
+                  console.warn(
+                    `⚠️ [PhotoResult] LUT processing failed for capture ${index + 1}, using original`,
+                  );
+                  return capture;
+                } catch (error) {
+                  console.error(
+                    `❌ [PhotoResult] Failed to apply LUT to capture ${index + 1}:`,
+                    error,
+                  );
+                  // Fallback to original capture
+                  return capture;
+                }
+              }),
+            );
+            
+            console.log('✅ [PhotoResult] All captures processed with LUT filter');
+          } catch (lutError) {
+            console.error(
+              '❌ [PhotoResult] Failed to apply LUT filters:',
+              lutError,
+            );
+            // Fallback to original captures
+            processedCaptures = state.selectedCaptures;
+          } finally {
+            setIsApplyingLUT(false);
+          }
+        }
+
+        // Determine filter ID for CSS filters (LUT filters are already applied)
         const initialFilterId =
           filter?.type === 'css' ? state.selectedFilter : undefined;
+        const isLutFilterApplied = filter?.type === 'lut';
 
         console.log('🎬 [PhotoResult] Generating framed video...', {
           initialFilterId,
+          hasLUTFilter: isLutFilterApplied,
+          isLutFilterApplied,
         });
+        
+        // Generate framed video with processed captures
         const videoUrl = await generateFramedVideo(
-          state.selectedCaptures,
+          processedCaptures,
           state.selectedFrame,
           initialFilterId,
           state.useBoomerang,
+          isLutFilterApplied,
         );
+        
         console.log(
           '✅ [PhotoResult] Framed video generated:',
           videoUrl.substring(0, 50),
         );
-
-        // If LUT filter is selected, apply it via FFmpeg
-        // eslint-disable-next-line no-console
-        console.log('Filter check:', {
-          filterId: state.selectedFilter,
-          filter,
-          isLUT: filter?.type === 'lut',
-          lutFile: filter?.lutFile,
-        });
-
-        if (filter?.type === 'lut' && filter.lutFile) {
-          setIsApplyingLUT(true);
-          // eslint-disable-next-line no-console
-          console.log('Applying LUT filter:', filter.lutFile);
-
-          try {
-            // Convert blob URL to ArrayBuffer
-            const response = await fetch(videoUrl);
-            const blob = await response.blob();
-            const arrayBuffer = await blob.arrayBuffer();
-
-            // Save to temp file via IPC (send ArrayBuffer directly)
-            const saveResult =
-              await window.electron.video.saveTempVideo(arrayBuffer);
-
-            if (!saveResult.success || !saveResult.path) {
-              throw new Error('Failed to save temp video file');
-            }
-
-            // Apply LUT via FFmpeg
-            let lutResult;
-            if (state.useBoomerang) {
-              // eslint-disable-next-line no-console
-              console.log('Creating boomerang with LUT...');
-              lutResult = await window.electron.video.createBoomerangWithLut(
-                saveResult.path,
-                filter.lutFile,
-              );
-            } else {
-              // eslint-disable-next-line no-console
-              console.log('Applying LUT to video...');
-              lutResult = await window.electron.video.applyLutToVideo(
-                saveResult.path,
-                filter.lutFile,
-              );
-            }
-
-            // eslint-disable-next-line no-console
-            console.log('LUT result:', lutResult);
-
-            if (lutResult.success && lutResult.path) {
-              // Read the processed file via IPC
-              const fileResult = await window.electron.video.readVideoFile(
-                lutResult.path,
-              );
-
-              if (fileResult.success && fileResult.data) {
-                const processedBlob = new Blob([fileResult.data], {
-                  type: 'video/mp4',
-                });
-                const processedUrl = URL.createObjectURL(processedBlob);
-                console.log(
-                  '✅ [PhotoResult] Setting compiledVideoUrl (LUT processed):',
-                  processedUrl.substring(0, 50),
-                );
-                setCompiledVideoUrl(processedUrl);
-
-                // Clean up original URL
-                URL.revokeObjectURL(videoUrl);
-              } else {
-                // Fallback to original if read fails
-                console.log(
-                  '⚠️ [PhotoResult] LUT read failed, using original video:',
-                  videoUrl.substring(0, 50),
-                );
-                setCompiledVideoUrl(videoUrl);
-              }
-            } else {
-              // Fallback to original if LUT fails
-              console.log(
-                '⚠️ [PhotoResult] LUT processing failed, using original video:',
-                videoUrl.substring(0, 50),
-              );
-              setCompiledVideoUrl(videoUrl);
-            }
-          } catch (lutError) {
-            // eslint-disable-next-line no-console
-            console.error(
-              '❌ [PhotoResult] Failed to apply LUT via FFmpeg:',
-              lutError,
-            );
-            // Fallback to original video
-            console.log(
-              '⚠️ [PhotoResult] Using original video as fallback:',
-              videoUrl.substring(0, 50),
-            );
-            setCompiledVideoUrl(videoUrl);
-          } finally {
-            setIsApplyingLUT(false);
-          }
-        } else {
-          // No LUT filter or CSS filter - use video as-is
-          console.log(
-            '✅ [PhotoResult] No LUT filter, using video as-is:',
-            videoUrl.substring(0, 50),
-          );
-          setCompiledVideoUrl(videoUrl);
-        }
+        
+        setCompiledVideoUrl(videoUrl);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('❌ [PhotoResult] Error creating framed video:', error);
