@@ -37,11 +37,5 @@ export function getEnvConfig(): EnvConfig {
  */
 export function logEnvConfig(): void {
   const config = getEnvConfig();
-  console.log('🔧 [EnvConfig] Environment Configuration:');
-  console.log('  API_BASE_URL:', config.API_BASE_URL);
-  console.log('  PORT:', config.PORT);
-  console.log('  MACHINE_ID:', config.MACHINE_ID || '(not set)');
-  console.log('  MACHINE_CAN_CUT:', config.MACHINE_CAN_CUT);
-  console.log('  API_TIMEOUT:', config.API_TIMEOUT);
 }
 

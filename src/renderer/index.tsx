@@ -24,7 +24,6 @@ let cachedTheme: ThemeData | null = null;
 // รับ theme data จาก main process และตั้งค่า background
 window.electron?.ipcRenderer.on('theme-loaded', (...args: unknown[]) => {
   const theme = args[0] as ThemeData;
-  console.log('🎨 Theme received:', theme);
 
   // Cache theme data
   cachedTheme = theme;
@@ -35,7 +34,6 @@ window.electron?.ipcRenderer.on('theme-loaded', (...args: unknown[]) => {
     document.body.style.backgroundSize = 'cover';
     document.body.style.backgroundPosition = 'center';
     document.body.style.backgroundRepeat = 'no-repeat';
-    console.log('✅ Background set to:', theme.background);
   }
 
   if (theme?.primaryColor) {
@@ -66,10 +64,8 @@ window.electron?.ipcRenderer.on('theme-loaded', (...args: unknown[]) => {
 window.addEventListener('message', (event) => {
   if (event.data.type === 'ROUTE_CHANGE') {
     const pathname = event.data.pathname as string;
-    console.log('🔄 Route changed to:', pathname);
 
     if (!cachedTheme) {
-      console.log('⚠️ No cached theme data');
       return;
     }
 
@@ -81,9 +77,6 @@ window.addEventListener('message', (event) => {
 
     if (backgroundUrl) {
       document.body.style.backgroundImage = `url(${backgroundUrl})`;
-      console.log(
-        `✅ Background switched to: ${isHomePage ? 'background' : 'backgroundSecond'}`,
-      );
     }
   }
 });
@@ -91,12 +84,10 @@ window.addEventListener('message', (event) => {
 // Request theme data on load if not received yet
 setTimeout(() => {
   if (!cachedTheme) {
-    console.log('🔍 Requesting theme data...');
     window.electron?.payment
       .getThemeData()
       .then((result: any) => {
         if (result.success && result.theme) {
-          console.log('🎨 Theme data loaded from cache:', result.theme);
           cachedTheme = result.theme;
 
           // Set initial background

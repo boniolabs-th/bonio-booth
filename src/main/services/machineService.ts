@@ -18,12 +18,11 @@ const getEnv = (): any => {
 };
 
 const env = getEnv();
-console.log('🔧 [MachineService] gett Environment config:', env);
-const apiBaseUrl = env.API_BASE_URL  || 'http://localhost:3000';
-// const apiBaseUrl = env.API_BASE_URL  || 'https://api-booth.boniolabs.com';
+export const apiBaseUrl = env.API_BASE_URL  || 'http://localhost:3000';
+// export const apiBaseUrl = env.API_BASE_URL  || 'https://api-booth.boniolabs.com';
 const machinePort = env.PORT || '44444';
 // const machineId = env.MACHINE_ID || '693296af25719d62f695db5d';
-const machineId = env.MACHINE_ID || '69247c9602dd728488995e3c';
+export const machineId = env.MACHINE_ID || '69247c9602dd728488995e3c';
 
 export interface MachineInfo {
   id: string;
@@ -299,13 +298,6 @@ export class MachineService {
     this.machinePort = options.machinePort || Number(machinePort) || 44444;
     this.machineId = options.machineId || machineId || '';
     this.timeout = options.timeout || Number(env.API_TIMEOUT) || 10000;
-
-    console.log('🔧 [MachineService] Configuration:', {
-      apiBaseUrl: this.apiBaseUrl,
-      machinePort: this.machinePort,
-      machineId: this.machineId || 'not set',
-      timeout: this.timeout,
-    });
   }
 
   /**
@@ -411,7 +403,6 @@ export class MachineService {
    * ดึงข้อมูลทั้งหมดสำหรับ initialize app (machine, theme, frames)
    */
   async init(machineId?: string): Promise<InitResponse> {
-    console.log('🚀 [MachineService] Initializing app...');
     try {
       const response = await this.makeRequest<InitResponse>(
         '/api/machines-public/init',
@@ -419,22 +410,9 @@ export class MachineService {
         undefined,
         machineId ? { machineId } : undefined,
       );
-      console.log('✅ [MachineService] App initialized response:', JSON.stringify(response, null, 2));
-      
+
       // Access paperPosition with type assertion to handle optional property
       const paperPosition = (response as any).paperPosition || response.paperPosition;
-      
-      console.log('✅ [MachineService] App initialized:', {
-        machine: response.machine?.machineName,
-        theme: response.theme?.name,
-        frames: response.frames?.length || 0,
-        paperPosition: paperPosition ? {
-          _id: paperPosition._id,
-          scale: paperPosition.scale,
-          horizontal: paperPosition.horizontal,
-          vertical: paperPosition.vertical,
-        } : null,
-      });
       return response;
     } catch (error) {
       console.error('❌ [MachineService] Init failed:', error);
@@ -447,17 +425,12 @@ export class MachineService {
    * ตรวจสอบว่า machine สามารถเข้าถึง API ได้หรือไม่1
    */
   async verify(machineId?: string): Promise<VerifyResponse> {
-    console.log('🔍 [MachineService] Verifying machine...');
     try {
       const response = await this.makeRequest<VerifyResponse>(
         '/api/machines-public/verify',
         'GET',
         undefined,
         machineId ? { machineId } : undefined,
-      );
-      console.log(
-        '✅ [MachineService] Machine verified:',
-        response.machine.machineName,
       );
       return response;
     } catch (error) {
@@ -471,17 +444,12 @@ export class MachineService {
    * ดึง theme ที่ตู้ถูก assign ปัจจุบัน
    */
   async getTheme(machineId?: string): Promise<ThemeResponse> {
-    console.log('🎨 [MachineService] Fetching theme...');
     try {
       const response = await this.makeRequest<ThemeResponse>(
         '/api/machines-public/theme',
         'GET',
         undefined,
         machineId ? { machineId } : undefined,
-      );
-      console.log(
-        '✅ [MachineService] Theme loaded:',
-        JSON.stringify(response, null, 2),
       );
       return response;
     } catch (error) {
@@ -495,16 +463,12 @@ export class MachineService {
    * ดึง frames ที่ใช้ได้สำหรับ machine นี้
    */
   async getFrames(machineId?: string): Promise<FramesResponse> {
-    console.log('🖼️ [MachineService] Fetching frames...');
     try {
       const response = await this.makeRequest<FramesResponse>(
         '/api/machines-public/frames',
         'GET',
         undefined,
         machineId ? { machineId } : undefined,
-      );
-      console.log(
-        `✅ [MachineService] Frames loaded: ${response.frames.length} frames`,
       );
       return response;
     } catch (error) {
@@ -521,18 +485,12 @@ export class MachineService {
     code: string,
     machineId?: string,
   ): Promise<CouponCheckResponse> {
-    console.log('🎫 [MachineService] Checking coupon:', code);
     try {
       const response = await this.makeRequest<CouponCheckResponse>(
         '/api/machines-public/coupon/check',
         'POST',
         { code },
         machineId ? { machineId } : undefined,
-      );
-      console.log(
-        response.valid
-          ? `✅ [MachineService] Coupon valid: ${code}`
-          : `⚠️ [MachineService] Coupon invalid: ${code}`,
       );
       return response;
     } catch (error) {
@@ -550,18 +508,12 @@ export class MachineService {
     transactionId?: string,
     machineId?: string,
   ): Promise<CouponUseResponse> {
-    console.log('🎫 [MachineService] Using coupon:', code);
     try {
       const response = await this.makeRequest<CouponUseResponse>(
         '/api/machines-public/coupon/use',
         'POST',
         { code, ...(transactionId && { transactionId }) },
         machineId ? { machineId } : undefined,
-      );
-      console.log(
-        response.success
-          ? `✅ [MachineService] Coupon used: ${code}`
-          : `⚠️ [MachineService] Coupon use failed: ${code}`,
       );
       return response;
     } catch (error) {
@@ -575,17 +527,12 @@ export class MachineService {
    * ดึง config machine ทั้งหมด
    */
   async getStatus(machineId?: string): Promise<StatusResponse> {
-    console.log('📊 [MachineService] Fetching machine status...');
     try {
       const response = await this.makeRequest<StatusResponse>(
         '/api/machines-public/status',
         'GET',
         undefined,
         machineId ? { machineId } : undefined,
-      );
-      console.log(
-        '✅ [MachineService] Status loaded:',
-        response.machine.machineName,
       );
       return response;
     } catch (error) {
@@ -602,7 +549,6 @@ export class MachineService {
     paperLevel: number,
     machineId?: string,
   ): Promise<PaperLevelResponse> {
-    console.log('📄 [MachineService] Updating paper level:', paperLevel);
     try {
       const response = await this.makeRequest<PaperLevelResponse>(
         '/api/machines-public/paper-level',
@@ -610,7 +556,6 @@ export class MachineService {
         { paperLevel },
         machineId ? { machineId } : undefined,
       );
-      console.log('✅ [MachineService] Paper level updated:', paperLevel);
       return response;
     } catch (error) {
       console.error('❌ [MachineService] Update paper level failed:', error);
@@ -629,12 +574,6 @@ export class MachineService {
     couponCodeId?: string,
     machineId?: string,
   ): Promise<PaymentCreateResponse> {
-    console.log('💳 [MachineService] Creating payment:', {
-      amount,
-      numberPhoto,
-      channel,
-      couponCodeId: couponCodeId || 'none',
-    });
     try {
       const requestBody: PaymentCreateRequest = {
         amount,
@@ -643,36 +582,11 @@ export class MachineService {
         ...(couponCodeId && { couponCodeId }),
       };
 
-      console.log('💳 [MachineService] Request body:', JSON.stringify(requestBody, null, 2));
-
       const response = await this.makeRequest<PaymentCreateResponse>(
         '/api/machines-public/payment/create',
         'POST',
         requestBody,
         machineId ? { machineId } : undefined,
-      );
-
-      console.log('💳 [MachineService] Payment create response:', JSON.stringify(response, null, 2));
-      console.log('💳 [MachineService] Payment response fields:', {
-        success: response.success,
-        qr_code: response.qr_code ? 'present' :  null,
-        reference_id: response.reference_id,
-        order_id: response.order_id,
-        transactionId: response.transactionId,
-        paymentDetailsId: response.paymentDetailsId,
-        numberPhoto: response.numberPhoto,
-        discountAmount: response.discountAmount,
-        totalAmount: response.totalAmount,
-        netAmount: response.netAmount,
-        couponCodeId: response.couponCodeId,
-        message: response.message,
-        error: response.error,
-      });
-
-      console.log(
-        response.success
-          ? `✅ [MachineService] Payment created: ${response.reference_id || response.order_id || response.transactionId || 'unknown'}`
-          : `⚠️ [MachineService] Payment creation failed: ${response.error || response.message || 'Unknown error'}`,
       );
       return response;
     } catch (error) {
@@ -689,18 +603,12 @@ export class MachineService {
     mchOrderNo: string,
     machineId?: string,
   ): Promise<PaymentStatusResponse> {
-    console.log('🔍 [MachineService] Checking payment status:', mchOrderNo);
     try {
       const response = await this.makeRequest<PaymentStatusResponse>(
         `/api/machines-public/payment/status/${mchOrderNo}`,
         'GET',
         undefined,
         machineId ? { machineId } : undefined,
-      );
-      console.log(
-        response.success
-          ? `✅ [MachineService] Payment status: ${response.status}`
-          : `⚠️ [MachineService] Failed to check payment status`,
       );
       return response;
     } catch (error) {
@@ -720,12 +628,6 @@ export class MachineService {
     transactionId?: string, // transactionId จาก payment/create response
     machineId?: string,
   ): Promise<UploadFilesResponse> {
-    console.log('📤 [MachineService] Uploading files (form-data):', {
-      transactionCode,
-      transactionId,
-      photoCount: photos.length,
-      videoCount: videos.length,
-    });
 
     try {
       // Create multipart form data
@@ -733,18 +635,9 @@ export class MachineService {
       const formData: Buffer[] = [];
 
       // Add transactionCode
-      console.log('📤 [MachineService] Adding form field: transactionCode =', transactionCode);
-      formData.push(
-        Buffer.from(
-          `--${boundary}\r\nContent-Disposition: form-data; name="transactionCode"\r\n\r\n${transactionCode}\r\n`,
-        ),
-      );
 
       // Add transactionId (จาก payment/create response)
       if (transactionId) {
-        console.log('📤 [MachineService] Adding form field: transactionId =', transactionId);
-        console.log('📤 [MachineService] transactionId type:', typeof transactionId);
-        console.log('📤 [MachineService] transactionId length:', transactionId.length);
         formData.push(
           Buffer.from(
             `--${boundary}\r\nContent-Disposition: form-data; name="transactionId"\r\n\r\n${transactionId}\r\n`,
@@ -790,11 +683,6 @@ export class MachineService {
         return { buffer, filename, mimeType };
       };
 
-      // Add photos
-      console.log('📤 [MachineService] Processing photos for upload:', {
-        photosCount: photos.length,
-      });
-
       let photosAddedCount = 0; // นับจำนวน photos ที่เพิ่มสำเร็จ
       const photoFilenames: string[] = []; // เก็บชื่อไฟล์รูปภาพ
 
@@ -802,13 +690,6 @@ export class MachineService {
         try {
           const { buffer, filename, mimeType } = dataUrlToBuffer(photos[i]);
           const photoSizeMB = buffer.length / (1024 * 1024);
-
-          console.log(`📤 [MachineService] Photo ${i + 1}:`, {
-            filename,
-            mimeType,
-            sizeMB: photoSizeMB.toFixed(2),
-            bufferLength: buffer.length,
-          });
 
           formData.push(
             Buffer.from(
@@ -820,7 +701,6 @@ export class MachineService {
 
           photosAddedCount++;
           photoFilenames.push(filename);
-          console.log(`✅ [MachineService] Photo ${i + 1} added to form data`);
         } catch (error) {
           console.error(`❌ [MachineService] Failed to process photo ${i + 1}:`, error);
           // Continue with other photos
@@ -832,13 +712,8 @@ export class MachineService {
       } else if (photosAddedCount === 0) {
         console.error('❌ [MachineService] Failed to add any photos to form data!');
       } else {
-        console.log(`✅ [MachineService] Successfully added ${photosAddedCount} of ${photos.length} photos to form data`);
+        // console.log(`✅ [MachineService] Successfully added ${photosAddedCount} of ${photos.length} photos to form data`);
       }
-
-      // Add videos
-      console.log('📤 [MachineService] Processing videos for upload:', {
-        videosCount: videos.length,
-      });
 
       let videosAddedCount = 0; // นับจำนวน videos ที่เพิ่มสำเร็จ
       const videoFilenames: string[] = []; // เก็บชื่อไฟล์วิดีโอ
@@ -847,13 +722,6 @@ export class MachineService {
         try {
           const { buffer, filename, mimeType } = dataUrlToBuffer(videos[i]);
           const videoSizeMB = buffer.length / (1024 * 1024);
-
-          console.log(`📤 [MachineService] Video ${i + 1}:`, {
-            filename,
-            mimeType,
-            sizeMB: videoSizeMB.toFixed(2),
-            bufferLength: buffer.length,
-          });
 
           formData.push(
             Buffer.from(
@@ -865,7 +733,6 @@ export class MachineService {
 
           videosAddedCount++;
           videoFilenames.push(filename);
-          console.log(`✅ [MachineService] Video ${i + 1} added to form data`);
         } catch (error) {
           console.error(`❌ [MachineService] Failed to process video ${i + 1}:`, error);
           // Continue with other videos
@@ -877,26 +744,13 @@ export class MachineService {
       } else if (videosAddedCount === 0) {
         console.error('❌ [MachineService] Failed to add any videos to form data!');
       } else {
-        console.log(`✅ [MachineService] Successfully added ${videosAddedCount} of ${videos.length} videos to form data`);
+        // console.log(`✅ [MachineService] Successfully added ${videosAddedCount} of ${videos.length} videos to form data`);
       }
 
       // Close boundary
       formData.push(Buffer.from(`--${boundary}--\r\n`));
 
       const formBuffer = Buffer.concat(formData);
-
-      // Log form data fields ที่จะส่งไป
-      console.log('📤 [MachineService] ========== FORM DATA BODY ==========');
-      console.log('📤 [MachineService] Form data fields:', {
-        transactionCode: transactionCode,
-        transactionId: transactionId || 'NOT PROVIDED',
-        transactionIdType: typeof transactionId,
-        transactionIdLength: transactionId?.length || 0,
-        photosCount: photos.length,
-        videosCount: videos.length,
-        formBufferSize: formBuffer.length,
-        boundary: boundary,
-      });
 
       // Log form data structure (text fields only)
       // แสดงส่วนที่เป็น text fields (ไม่รวม binary data)
@@ -911,34 +765,16 @@ export class MachineService {
       // เพราะ buffer อาจจะใหญ่เกินไปและ videos อาจจะไม่อยู่ในส่วนแรก
       const photosInForm = photosAddedCount;
       const videosInForm = videosAddedCount;
-
-      console.log('📤 [MachineService] Files found in form data:', {
-        photosCount: photosInForm,
-        videosCount: videosInForm,
-        photoFilenames: photoFilenames.length > 0 ? photoFilenames : 'none',
-        videoFilenames: videoFilenames.length > 0 ? videoFilenames : 'none',
-      });
-
-      console.log('📤 [MachineService] Extracted form fields:');
       if (transactionCodeMatch) {
-        console.log('📤 [MachineService]   transactionCode:', transactionCodeMatch[1]);
+        // console.log('📤 [MachineService]   transactionCode:', transactionCodeMatch[1]);
       }
       if (transactionIdMatch) {
-        console.log('📤 [MachineService]   transactionId:', transactionIdMatch[1]);
-        console.log('📤 [MachineService]   transactionId (raw):', JSON.stringify(transactionIdMatch[1]));
-        console.log('📤 [MachineService]   transactionId (hex):', Buffer.from(transactionIdMatch[1]).toString('hex'));
+        // console.log('📤 [MachineService]   transactionId:', transactionIdMatch[1]);
+        // console.log('📤 [MachineService]   transactionId (raw):', JSON.stringify(transactionIdMatch[1]));
+        // console.log('📤 [MachineService]   transactionId (hex):', Buffer.from(transactionIdMatch[1]).toString('hex'));
       } else {
         console.warn('⚠️ [MachineService]   transactionId: NOT FOUND IN FORM DATA');
       }
-
-      console.log('📤 [MachineService] Files in form data:', {
-        photosInForm,
-        videosInForm,
-        expectedPhotos: photos.length,
-        expectedVideos: videos.length,
-        photosMatch: photosInForm === photos.length,
-        videosMatch: videosInForm === videos.length,
-      });
 
       if (videosInForm === 0 && videos.length > 0) {
         console.error('❌ [MachineService] Videos were NOT added to form data!');
@@ -947,9 +783,6 @@ export class MachineService {
 
       // Log first part of form data structure
       const formDataPreview = bufferStr.substring(0, Math.min(2000, bufferStr.length));
-      console.log('📤 [MachineService] Form data structure preview (first 2000 chars):');
-      console.log(formDataPreview);
-      console.log('📤 [MachineService] ============================================');
 
       // Make request
       return new Promise((resolve, reject) => {
@@ -978,22 +811,9 @@ export class MachineService {
           };
 
           const protocol = url.protocol === 'https:' ? https : http;
-          console.log('📤 [MachineService] Making HTTP request:', {
-            method: options.method,
-            url: url.toString(),
-            hostname: options.hostname,
-            port: options.port,
-            path: options.path,
-            contentLength: formBuffer.length,
-          });
 
           const req = protocol.request(options, (res) => {
             let data = '';
-
-            console.log('📤 [MachineService] Response received:', {
-              statusCode: res.statusCode,
-              headers: res.headers,
-            });
 
             res.on('data', (chunk) => {
               data += chunk;
@@ -1001,17 +821,12 @@ export class MachineService {
 
             res.on('end', () => {
               try {
-                console.log('📤 [MachineService] Response data length:', data.length);
                 if (
                   res.statusCode &&
                   res.statusCode >= 200 &&
                   res.statusCode < 300
                 ) {
                   const jsonData = data ? JSON.parse(data) : {};
-                  console.log(
-                    `✅ [MachineService] Files uploaded successfully: ${jsonData.files?.length || 0} files`,
-                  );
-                  console.log('✅ [MachineService] Full response:', JSON.stringify(jsonData, null, 2));
                   resolve(jsonData as UploadFilesResponse);
                 } else {
                   let errorMessage = `HTTP ${res.statusCode}`;
@@ -1043,12 +858,6 @@ export class MachineService {
           const calculatedTimeout = Math.max(60000, fileSizeMB * 10000); // ขั้นต่ำ 60 วินาที
           const uploadTimeout = Math.min(calculatedTimeout, 300000); // สูงสุด 5 นาที
 
-          console.log('📤 [MachineService] Upload timeout settings:', {
-            fileSizeMB: fileSizeMB.toFixed(2),
-            calculatedTimeout: `${(calculatedTimeout / 1000).toFixed(0)}s`,
-            uploadTimeout: `${(uploadTimeout / 1000).toFixed(0)}s`,
-          });
-
           req.setTimeout(uploadTimeout, () => {
             // Longer timeout for file uploads
             console.error(`❌ [MachineService] Upload timeout after ${uploadTimeout / 1000}s`);
@@ -1061,14 +870,9 @@ export class MachineService {
           let bytesWritten = 0;
           let currentChunk = 0;
 
-          console.log('📤 [MachineService] Writing form buffer to request...');
-          console.log('📤 [MachineService] Total size:', `${(formBuffer.length / (1024 * 1024)).toFixed(2)} MB`);
-          console.log('📤 [MachineService] Chunk size:', `${(chunkSize / (1024 * 1024)).toFixed(2)} MB`);
-
           const writeChunk = () => {
             if (bytesWritten >= formBuffer.length) {
               req.end();
-              console.log('✅ [MachineService] All data sent successfully');
               return;
             }
 
@@ -1080,7 +884,7 @@ export class MachineService {
 
             const progress = ((bytesWritten / formBuffer.length) * 100).toFixed(1);
             if (currentChunk % 5 === 0 || bytesWritten === formBuffer.length) {
-              console.log(`📤 [MachineService] Upload progress: ${progress}% (${(bytesWritten / (1024 * 1024)).toFixed(2)} MB / ${(formBuffer.length / (1024 * 1024)).toFixed(2)} MB)`);
+              // console.log(`📤 [MachineService] Upload progress: ${progress}% (${(bytesWritten / (1024 * 1024)).toFixed(2)} MB / ${(formBuffer.length / (1024 * 1024)).toFixed(2)} MB)`);
             }
 
             if (!canContinue) {
@@ -1094,7 +898,6 @@ export class MachineService {
 
           // Start writing chunks
           writeChunk();
-          console.log('📤 [MachineService] Request sent (chunked)');
         } catch (error) {
           reject(error instanceof Error ? error : new Error(String(error)));
         }

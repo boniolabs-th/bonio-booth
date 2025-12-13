@@ -32,10 +32,8 @@ const loadEnv = async () => {
         }
       }
     });
-    console.log('✅ Loaded .env file from', envPath);
-    console.log('🔧 MACHINE_CAN_CUT:', process.env.MACHINE_CAN_CUT);
   } catch (error) {
-    console.log('ℹ️ No .env file found or failed to load');
+    console.error('ℹ️ No .env file found or failed to load');
   }
 };
 
@@ -50,6 +48,8 @@ import {
   createBoomerangWithLut,
 } from './services/videoService';
 import machineService from './services/machineService';
+import sseClient from './services/sseClient';
+import shutdownManager, { ShutdownState } from './services/shutdownManager';
 import { getEnvConfig } from './config/env.config';
 class AppUpdater {
   constructor() {
@@ -67,20 +67,9 @@ async function initializeApp() {
     // เรียก API init เพื่อดึงข้อมูลทั้งหมดในครั้งเดียว
     const initResponse = await machineService.init();
 
-    console.log('✅ App initialized:', {
-      machine: initResponse.machine.machineName,
-      theme: initResponse.theme.name,
-      frames: initResponse.frames.length,
-      paperLevel: initResponse.machine.paperLevel,
-      cameraCountdown: initResponse.machine?.cameraCountdown || 3,
-    });
-
-    console.log('✅ Full initResponse=====:', JSON.stringify(initResponse, null, 2));
-
     // Send theme to renderer process
     if (mainWindow && initResponse.theme.background) {
       mainWindow.webContents.send('theme-loaded', initResponse.theme);
-      console.log('✅ Theme sent to renderer');
     }
 
     // เก็บข้อมูลไว้ใน cache
@@ -97,8 +86,39 @@ async function initializeApp() {
         machine: initResponse.machine,
         prices: initResponse.machine.prices || [],
       });
-      console.log('✅ Machine data sent to renderer', initResponse.machine.prices);
     }
+
+    // เชื่อมต่อ SSE หลังจาก init สำเร็จ
+    console.log('🔗 Connecting to SSE...');
+    sseClient.connect();
+
+    // Setup shutdown manager callbacks
+    shutdownManager.setCallbacks({
+      onCountdownUpdate: (state: ShutdownState) => {
+        // ส่งสถานะ countdown ไปที่ renderer
+        if (mainWindow) {
+          mainWindow.webContents.send('shutdown-countdown-update', state);
+        }
+      },
+      onShutdownStarting: () => {
+        // แจ้ง renderer ว่ากำลังจะ shutdown
+        if (mainWindow) {
+          mainWindow.webContents.send('shutdown-starting');
+        }
+      },
+      onShutdownCancelled: () => {
+        // แจ้ง renderer ว่ายกเลิก shutdown
+        if (mainWindow) {
+          mainWindow.webContents.send('shutdown-cancelled');
+        }
+      },
+      onActivityDetected: () => {
+        // แจ้ง renderer ว่า countdown ถูก reset
+        if (mainWindow) {
+          mainWindow.webContents.send('shutdown-countdown-reset');
+        }
+      },
+    });
 
     return {
       machine: initResponse.machine,
@@ -198,7 +218,6 @@ async function generateImageWithPadding(
       `.trim();
 
       await fs.writeFile(htmlPath, html, 'utf-8');
-      console.log("HTML file created:", htmlPath);
 
       const win = new BrowserWindow({
         show: false,
@@ -249,7 +268,6 @@ async function generateImageWithPadding(
 
       // ใช้ loadFile แทน loadURL เพื่อหลีกเลี่ยงปัญหา URL ยาวเกินไป
       await win.loadFile(htmlPath);
-      console.log("HTML file loaded successfully");
 
     } catch (err) {
       if (!resolved) {
@@ -304,13 +322,10 @@ const createWindow = async () => {
   // ต้องตั้งค่าก่อน loadURL เพื่อให้ permissions ทำงานได้ถูกต้อง
   session.defaultSession.setPermissionRequestHandler(
     (webContents, permission, callback) => {
-      console.log('📹 [Main] Permission requested:', permission);
       const allowedPermissions = ['camera', 'microphone', 'media'];
       if (allowedPermissions.includes(permission)) {
-        console.log('✅ [Main] Permission granted:', permission);
         callback(true); // อนุญาต
       } else {
-        console.log('❌ [Main] Permission denied:', permission);
         callback(false); // ปฏิเสธ
       }
     },
@@ -392,13 +407,10 @@ app
     // ตั้งค่า permissions สำหรับกล้องและไมโครโฟนใน default session
     session.defaultSession.setPermissionRequestHandler(
       (webContents, permission, callback) => {
-        console.log('📹 [App] Permission requested:', permission);
         const allowedPermissions = ['camera', 'microphone', 'media'];
         if (allowedPermissions.includes(permission)) {
-          console.log('✅ [App] Permission granted:', permission);
           callback(true);
         } else {
-          console.log('❌ [App] Permission denied:', permission);
           callback(false);
         }
       },
@@ -444,7 +456,6 @@ ipcMain.on("print-photo", async (event, printConfig) => {
 
   // ตรวจสอบว่ากำลังพิมพ์อยู่หรือไม่
   if (isPrinting) {
-    console.log("Print request ignored: already printing.");
     event.reply("print-response", {
       success: false,
       error: "กำลังพิมพ์อยู่ กรุณารอสักครู่"
@@ -457,9 +468,6 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     lastPrintImageHash === imageHash &&
     now - lastPrintTime < PRINT_DEBOUNCE_MS
   ) {
-    console.log(
-      `Print request ignored: same image printed ${Math.round((now - lastPrintTime) / 1000)}s ago`
-    );
     event.reply("print-response", {
       success: false,
       error: "รูปภาพนี้เพิ่งพิมพ์ไปเมื่อสักครู่"
@@ -472,23 +480,16 @@ ipcMain.on("print-photo", async (event, printConfig) => {
   lastPrintImageHash = imageHash;
   lastPrintTime = now;
 
-  console.log("=== NATIVE PRINT METHOD WITH PADDING ===");
-  console.log("Image hash:", imageHash.substring(0, 20) + "...");
-
   const copies = printConfig.copies || 1;
-  console.log(`Printing ${copies} copy/copies`);
 
   try {
     // ใช้ generateImageWithPadding เพื่อเพิ่ม padding รอบรูปภาพ (5% ทั้ง 4 ด้าน)
     const orientation = printConfig.orientation || 'landscape';
-    console.log("Generating image with padding...", { orientation });
     const paddedImageBuffer = await generateImageWithPadding(printConfig.imageDataUrl, 5, orientation);
-    console.log("Padded image generated, size:", paddedImageBuffer.length, "bytes");
 
     const tempDir = app.getPath("temp");
     const pngPath = path.join(tempDir, `photo-${Date.now()}.png`);
     await fs.writeFile(pngPath, paddedImageBuffer);
-    console.log("PNG file saved:", pngPath);
 
     let printerName = "DP-QW410";
 
@@ -511,7 +512,6 @@ ipcMain.on("print-photo", async (event, printConfig) => {
         if (hasError) {
           event.reply("print-response", { success: false, error: errorMessage });
         } else {
-          console.log(`Print success: ${completedPrints} copy/copies printed`);
           event.reply("print-response", { success: true });
         }
 
@@ -537,16 +537,12 @@ ipcMain.on("print-photo", async (event, printConfig) => {
         printCmd = `lp -d "${printerName}" "${pngPath}"`;
       }
 
-      console.log(`Executing print ${copyNumber}/${copies}:`, printCmd);
-      console.log(`Platform: ${platform}`);
-
       exec(printCmd, (err) => {
         if (err) {
           console.error(`Print error (copy ${copyNumber}):`, err);
           hasError = true;
           errorMessage = err.message;
         } else {
-          console.log(`Print success (copy ${copyNumber}/${copies})`);
           completedPrints++;
         }
 
@@ -716,7 +712,6 @@ ipcMain.handle('get-machine-data', async () => {
 // Handler สำหรับ force init (เรียก API ใหม่เสมอ)
 ipcMain.handle('force-init', async () => {
   try {
-    console.log('🔄 [Main] Force init requested');
     const initResponse = await machineService.init();
 
     // Update cache
@@ -752,8 +747,6 @@ ipcMain.handle('save-temp-video', async (event, arrayBuffer: ArrayBuffer) => {
     // Write file
     await fs.writeFile(filePath, buffer);
 
-    console.log('✅ [Main] Temp video saved:', filePath);
-
     return {
       success: true,
       path: filePath,
@@ -772,7 +765,6 @@ ipcMain.handle('save-temp-video', async (event, arrayBuffer: ArrayBuffer) => {
 // Handler สำหรับ apply LUT to video
 ipcMain.handle('apply-lut-to-video', async (event, videoPath: string, lutFileName: string) => {
   try {
-    console.log('🎨 [Main] Applying LUT to video:', { videoPath, lutFileName });
     const outputPath = await applyLutToVideo(videoPath, lutFileName);
     return {
       success: true,
@@ -792,7 +784,6 @@ ipcMain.handle('apply-lut-to-video', async (event, videoPath: string, lutFileNam
 // Handler สำหรับ create boomerang with LUT
 ipcMain.handle('create-boomerang-with-lut', async (event, videoPath: string, lutFileName: string) => {
   try {
-    console.log('🎨 [Main] Creating boomerang with LUT:', { videoPath, lutFileName });
     const outputPath = await createBoomerangWithLut(videoPath, lutFileName);
     return {
       success: true,
@@ -812,7 +803,6 @@ ipcMain.handle('create-boomerang-with-lut', async (event, videoPath: string, lut
 // Handler สำหรับ read video file
 ipcMain.handle('read-video-file', async (event, filePath: string) => {
   try {
-    console.log('📖 [Main] Reading video file:', filePath);
     const buffer = await fs.readFile(filePath);
     return {
       success: true,
@@ -888,26 +878,13 @@ ipcMain.handle(
     videos: string[] = [],
     transactionId?: string,
   ) => {
-    console.log('📤 [Main] upload-machine-files handler called', {
-      transactionCode,
-      transactionId,
-      photosCount: photos.length,
-      videosCount: videos.length,
-    });
     try {
-      console.log('📤 [Main] Calling machineService.uploadFiles...');
       const result = await machineService.uploadFiles(
         transactionCode,
         photos,
         videos,
         transactionId,
       );
-      console.log('📤 [Main] Upload result:', {
-        success: result.success,
-        filesCount: result.files?.length || 0,
-        message: result.message,
-        qrcodeStorageUrl: result.qrcodeStorageUrl || 'NOT PROVIDED',
-      });
       return result;
     } catch (error) {
       console.error('❌ [Main] Error in upload-machine-files handler:', error);
@@ -927,3 +904,32 @@ ipcMain.handle(
     }
   },
 );
+
+// ==================== SHUTDOWN MANAGEMENT ====================
+
+// Handler สำหรับแจ้งว่ามี user activity ที่หน้าตู้ (reset countdown)
+ipcMain.on('user-activity', () => {
+  shutdownManager.onUserActivity();
+});
+
+// Handler สำหรับเริ่ม transaction (pause countdown)
+ipcMain.on('transaction-start', () => {
+  shutdownManager.startTransaction();
+});
+
+// Handler สำหรับจบ transaction (reset countdown เป็น 10 นาที)
+ipcMain.on('transaction-end', () => {
+  shutdownManager.endTransaction();
+});
+
+// Handler สำหรับ request shutdown state
+ipcMain.handle('get-shutdown-state', () => {
+  return shutdownManager.getState();
+});
+
+// Handler สำหรับ request SSE connection status
+ipcMain.handle('get-sse-status', () => {
+  return {
+    isConnected: sseClient.getIsConnected(),
+  };
+});

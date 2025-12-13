@@ -239,14 +239,6 @@ const getLUTPath = (lutFileName: string): string => {
   const appPath = app.getAppPath(); // This returns the project root in development
   const lutPath = path.join(appPath, 'assets', 'filters', lutFileName);
 
-  // Debug log
-  console.log('LUT Path Debug:', {
-    appPath,
-    lutFileName,
-    fullPath: lutPath,
-    exists: fs.existsSync(lutPath),
-  });
-
   return lutPath;
 };
 
@@ -269,9 +261,6 @@ export const applyLutToVideo = async (
     const output =
       outputPath ||
       path.join(app.getPath('temp'), `lut-applied-${Date.now()}.mp4`);
-
-    console.log('LUT path:', lutPath);
-    console.log('LUT file exists:', fs.existsSync(lutPath));
 
     // Use relative path from project root - simpler for FFmpeg
     const relativeLutPath = `assets/filters/${lutFileName}`;
@@ -342,9 +331,6 @@ export const createBoomerangWithLut = async (
     const output =
       outputPath ||
       path.join(app.getPath('temp'), `boomerang-lut-${Date.now()}.mp4`);
-
-    console.log('LUT path for boomerang:', lutPath);
-    console.log('LUT file exists:', fs.existsSync(lutPath));
 
     // Use relative path from project root - simpler for FFmpeg
     const relativeLutPath = `assets/filters/${lutFileName}`;
