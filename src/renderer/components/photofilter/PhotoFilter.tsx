@@ -122,7 +122,7 @@ export default function PhotoFilter() {
           ctx.drawImage(thumbnailCanvas, 0, 0);
 
           // Apply LUT
-          const lutPath = getLUTFilePath(filter.lutFile!);
+          const lutPath = await getLUTFilePath(filter.lutFile!);
           const lut = await getCachedLUT(lutPath);
           const processedCanvas = await applyLUTWithWorker(canvas, lut);
           return {
@@ -193,7 +193,7 @@ export default function PhotoFilter() {
             ctx.drawImage(img, 0, 0);
 
             // Load and apply LUT in background thread
-            const lutPath = getLUTFilePath(filter.lutFile);
+            const lutPath = await getLUTFilePath(filter.lutFile);
             const lut = await getCachedLUT(lutPath);
             const processedCanvas = await applyLUTWithWorker(canvas, lut);
 

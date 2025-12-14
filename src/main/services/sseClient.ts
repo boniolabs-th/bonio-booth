@@ -106,13 +106,13 @@ export class SseClient {
         if (res.statusCode !== 200) {
           console.error('❌ [SseClient] Failed to connect, status:', res.statusCode);
           this.isConnectedFlag = false;
-          
+
           // ถ้าเป็น 502 ให้เรียก callback เพื่อแสดง SystemMaintenance
           if (res.statusCode === 502 && this.onStatus502Callback) {
             console.log('⚠️ [SseClient] Status 502 detected, triggering maintenance mode');
             this.onStatus502Callback();
           }
-          
+
           this.scheduleReconnect();
           return;
         }

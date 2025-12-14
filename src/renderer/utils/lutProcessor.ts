@@ -294,14 +294,33 @@ export const clearLUTCache = (): void => {
   lutCache.clear();
 };
 
+// Cache for resources path
+let cachedResourcesPath: string | null = null;
+
 /**
  * Get LUT file path for a filter
  */
-export const getLUTFilePath = (lutFileName: string): string => {
-  // In production (packaged app), assets are in resources
-  if (process.env.NODE_ENV === 'production') {
-    return `file://${window.location.origin}/assets/filters/${lutFileName}`;
+export const getLUTFilePath = async (lutFileName: string): Promise<string> => {
+  // In production (packaged app), assets are in resources folder
+  if (process.env.NODE_ENV === 'production' || (window as any).electron) {
+    try {
+      // Get resources path from main process
+      if (!cachedResourcesPath) {
+        cachedResourcesPath = await (window as any).electron.payment.getResourcesPath();
+      }
+
+      if (cachedResourcesPath) {
+        // Use file:// protocol for packaged app
+        // Join path manually (can't use Node.js path module in renderer)
+        const normalizedBase = cachedResourcesPath.replace(/\\/g, '/').replace(/\/$/, '');
+        const lutPath = `${normalizedBase}/assets/filters/${lutFileName}`;
+        return `file://${lutPath}`;
+      }
+    } catch (error) {
+      console.error('Failed to get resources path:', error);
+    }
   }
+
   // In development, use relative path
   return `/assets/filters/${lutFileName}`;
 };

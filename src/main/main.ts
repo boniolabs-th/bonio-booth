@@ -90,14 +90,14 @@ async function initializeApp() {
 
     // เชื่อมต่อ SSE หลังจาก init สำเร็จ
     console.log('🔗 Connecting to SSE...');
-    
+
     // ตั้งค่า callback สำหรับเมื่อ SSE ได้รับ status 502
     sseClient.setOnStatus502Callback(() => {
       if (mainWindow) {
         mainWindow.webContents.send('sse-status-502');
       }
     });
-    
+
     sseClient.connect();
 
     // Setup shutdown manager callbacks
@@ -1026,6 +1026,14 @@ ipcMain.handle('get-sse-status', () => {
   return {
     isConnected: sseClient.getIsConnected(),
   };
+});
+
+// Handler สำหรับ request resources path
+ipcMain.handle('get-resources-path', () => {
+  if (app.isPackaged) {
+    return process.resourcesPath;
+  }
+  return app.getAppPath();
 });
 
 // Handler สำหรับปิดแอป (ต้องผ่าน password verification แล้ว)

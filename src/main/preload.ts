@@ -74,6 +74,9 @@ const electronHandler = {
     getPaperPosition: () => {
       return ipcRenderer.invoke('get-paper-position');
     },
+    getResourcesPath: () => {
+      return ipcRenderer.invoke('get-resources-path');
+    },
     uploadMachineFiles: (
       transactionCode: string,
       photos: string[],
