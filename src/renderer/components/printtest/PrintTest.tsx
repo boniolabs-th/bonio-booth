@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { BackButton } from '../index';
 import './PrintTest.css';
 
 const TEST_IMAGE_URL =
@@ -39,12 +40,14 @@ export default function PrintTest(): React.JSX.Element {
         const env = await window.electron?.payment?.getEnvVars();
         const config: EnvConfig = env
           ? {
-              apiUrl: env.API_BASE_URL || 'http://localhost:3000',
+              // apiUrl: env.API_BASE_URL || 'http://localhost:3000',
+              apiUrl: env.API_BASE_URL || 'https://api-booth.boniolabs.com',
               machinePort: env.PORT || '44444',
               machineId: env.MACHINE_ID || '69247c9602dd728488995e3c',
             }
           : {
-              apiUrl: 'http://localhost:3000',
+              // apiUrl: 'http://localhost:3000',
+              apiUrl: 'https://api-booth.boniolabs.com',
               machinePort: '44444',
               machineId: '69247c9602dd728488995e3c',
             };
@@ -103,7 +106,8 @@ export default function PrintTest(): React.JSX.Element {
           error,
         );
         setEnvConfig({
-          apiUrl: 'http://localhost:3000',
+          // apiUrl: 'http://localhost:3000',
+          apiUrl: 'https://api-booth.boniolabs.com',
           machinePort: '44444',
           machineId: '69247c9602dd728488995e3c',
         });
@@ -318,14 +322,7 @@ export default function PrintTest(): React.JSX.Element {
     <div className="print-test-container">
       {/* Header */}
       <div className="print-test-header">
-        <button
-          type="button"
-          className="back-button"
-          onClick={handleBack}
-          disabled={isPrinting}
-        >
-          ← กลับ
-        </button>
+        <BackButton onBackClick={handleBack} disabled={isPrinting} />
         <h1 className="print-test-title">เทสปริ้น</h1>
       </div>
 

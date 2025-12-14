@@ -38,18 +38,8 @@ export default class MenuBuilder {
   }
 
   setupDevelopmentEnvironment(): void {
-    this.mainWindow.webContents.on('context-menu', (_, props) => {
-      const { x, y } = props;
-
-      Menu.buildFromTemplate([
-        {
-          label: 'Inspect element',
-          click: () => {
-            this.mainWindow.webContents.inspectElement(x, y);
-          },
-        },
-      ]).popup({ window: this.mainWindow });
-    });
+    // Context menu จะถูกจัดการใน main.ts แทน
+    // เพื่อให้รวมทั้ง inspect element และปิดแอปในที่เดียว
   }
 
   buildDarwinTemplate(): MenuItemConstructorOptions[] {
@@ -79,7 +69,8 @@ export default class MenuBuilder {
           label: 'Quit',
           accelerator: 'Command+Q',
           click: () => {
-            app.quit();
+            // ป้องกันการปิดผ่านเมนู - ให้ปิดได้เฉพาะผ่าน context menu
+            // app.quit();
           },
         },
       ],
@@ -114,7 +105,8 @@ export default class MenuBuilder {
           label: 'Toggle Full Screen',
           accelerator: 'Ctrl+Command+F',
           click: () => {
-            this.mainWindow.setFullScreen(!this.mainWindow.isFullScreen());
+            // บังคับให้เต็มหน้าจอตลอดเวลา
+            this.mainWindow.setFullScreen(true);
           },
         },
         {
@@ -133,7 +125,8 @@ export default class MenuBuilder {
           label: 'Toggle Full Screen',
           accelerator: 'Ctrl+Command+F',
           click: () => {
-            this.mainWindow.setFullScreen(!this.mainWindow.isFullScreen());
+            // บังคับให้เต็มหน้าจอตลอดเวลา
+            this.mainWindow.setFullScreen(true);
           },
         },
       ],
@@ -146,7 +139,11 @@ export default class MenuBuilder {
           accelerator: 'Command+M',
           selector: 'performMiniaturize:',
         },
-        { label: 'Close', accelerator: 'Command+W', selector: 'performClose:' },
+        {
+          label: 'Close',
+          accelerator: 'Command+W',
+          // selector: 'performClose:', // ปิดการใช้งานเพื่อป้องกันการปิดแอป
+        },
         { type: 'separator' },
         { label: 'Bring All to Front', selector: 'arrangeInFront:' },
       ],
@@ -205,7 +202,8 @@ export default class MenuBuilder {
             label: '&Close',
             accelerator: 'Ctrl+W',
             click: () => {
-              this.mainWindow.close();
+              // ป้องกันการปิดผ่านเมนู - ให้ปิดได้เฉพาะผ่าน context menu
+              // this.mainWindow.close();
             },
           },
         ],
@@ -227,9 +225,8 @@ export default class MenuBuilder {
                   label: 'Toggle &Full Screen',
                   accelerator: 'F11',
                   click: () => {
-                    this.mainWindow.setFullScreen(
-                      !this.mainWindow.isFullScreen(),
-                    );
+                    // บังคับให้เต็มหน้าจอตลอดเวลา
+                    this.mainWindow.setFullScreen(true);
                   },
                 },
                 {
@@ -245,9 +242,8 @@ export default class MenuBuilder {
                   label: 'Toggle &Full Screen',
                   accelerator: 'F11',
                   click: () => {
-                    this.mainWindow.setFullScreen(
-                      !this.mainWindow.isFullScreen(),
-                    );
+                    // บังคับให้เต็มหน้าจอตลอดเวลา
+                    this.mainWindow.setFullScreen(true);
                   },
                 },
               ],

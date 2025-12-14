@@ -21,8 +21,8 @@ export interface EnvConfig {
  */
 export function getEnvConfig(): EnvConfig {
   return {
-    API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:3000',
-    // API_BASE_URL: process.env.API_BASE_URL || 'https://api-booth.boniolabs.com',
+    // API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:3000',
+    API_BASE_URL: process.env.API_BASE_URL || 'https://api-booth.boniolabs.com',
     // PORT: process.env.PORT || '99999',
     PORT: process.env.PORT || '44444',
     // MACHINE_ID: process.env.MACHINE_ID || '693296af25719d62f695db5d',

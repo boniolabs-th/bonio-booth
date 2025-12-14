@@ -13,28 +13,7 @@
   padding: 20px 30px;
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
-}
-
-.back-button {
-  background: rgba(255, 255, 255, 0.2);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  color: white;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 16px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-right: 20px;
-}
-
-.back-button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateX(-3px);
-}
-
-.back-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  position: relative;
 }
 
 .print-test-title {

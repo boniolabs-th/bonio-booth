@@ -18,8 +18,8 @@ const getEnv = (): any => {
 };
 
 const env = getEnv();
-export const apiBaseUrl = env.API_BASE_URL  || 'http://localhost:3000';
-// export const apiBaseUrl = env.API_BASE_URL  || 'https://api-booth.boniolabs.com';
+// export const apiBaseUrl = env.API_BASE_URL  || 'http://localhost:3000';
+export const apiBaseUrl = env.API_BASE_URL  || 'https://api-booth.boniolabs.com';
 const machinePort = env.PORT || '44444';
 // const machineId = env.MACHINE_ID || '693296af25719d62f695db5d';
 export const machineId = env.MACHINE_ID || '69247c9602dd728488995e3c';

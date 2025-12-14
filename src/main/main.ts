@@ -281,6 +281,7 @@ async function generateImageWithPadding(
 }
 
 let mainWindow: BrowserWindow | null = null;
+let shouldQuit = false; // Flag สำหรับบอกว่าเราต้องการปิดแอปจริงๆ หรือไม่
 let cachedInitData: {
   machine?: { prices?: unknown[] };
   prices?: unknown[];
@@ -338,6 +339,8 @@ const createWindow = async () => {
     show: false,
     width: 1080,
     height: 1920,
+    fullscreen: true, // เปิดแบบเต็มหน้าจอตั้งแต่เริ่มต้น
+    frame: false, // ซ่อน title bar เพื่อให้เต็มหน้าจอจริงๆ
     icon: getAssetPath('icon.png'),
     webPreferences: {
       nodeIntegration: false,
@@ -360,6 +363,8 @@ const createWindow = async () => {
       mainWindow.minimize();
     } else {
       mainWindow.show();
+      // บังคับให้เต็มหน้าจอตลอดเวลา
+      mainWindow.setFullScreen(true);
     }
 
     // เรียก initializeApp หลังจาก window พร้อมแล้ว
@@ -370,8 +375,89 @@ const createWindow = async () => {
     }
   });
 
+  // ป้องกันการปิด window โดยวิธีปกติ (Alt+F4, close button, etc.)
+  mainWindow.on('close', (event) => {
+    // ถ้าไม่ได้ตั้ง flag shouldQuit ให้ป้องกันการปิด
+    if (!shouldQuit) {
+      event.preventDefault();
+      // ไม่ทำอะไร - ให้ปิดได้เฉพาะผ่าน context menu เท่านั้น
+    }
+    // ถ้า shouldQuit เป็น true จะปล่อยให้ปิดได้ตามปกติ
+  });
+
+  // ป้องกันการออกจาก fullscreen
+  mainWindow.on('leave-full-screen', () => {
+    if (mainWindow) {
+      mainWindow.setFullScreen(true);
+    }
+  });
+
+  // เพิ่ม context menu สำหรับปิดแอป (คลิกขวา)
+  mainWindow.webContents.on('context-menu', (_, props) => {
+    const { Menu } = require('electron');
+    const template: any[] = [];
+
+    // ถ้าเป็น development mode ให้เพิ่ม inspect element
+    if (
+      process.env.NODE_ENV === 'development' ||
+      process.env.DEBUG_PROD === 'true'
+    ) {
+      template.push({
+        label: 'Inspect element',
+        click: () => {
+          if (mainWindow) {
+            mainWindow.webContents.inspectElement(props.x, props.y);
+          }
+        },
+      });
+      template.push({ type: 'separator' });
+    }
+
+    // เพิ่มเมนู "Print Test" (ต้องเข้ารหัสก่อน)
+    template.push({
+      label: 'Print Test',
+      click: () => {
+        if (mainWindow) {
+          // ส่ง IPC message ไปที่ renderer เพื่อแสดง password modal
+          mainWindow.webContents.send('show-print-test-password-modal');
+        }
+      },
+    });
+
+    template.push({ type: 'separator' });
+
+    template.push({
+      label: 'ปิดแอป',
+      click: () => {
+        // ส่ง IPC message ไปที่ renderer เพื่อแสดง password modal
+        if (mainWindow) {
+          mainWindow.webContents.send('show-quit-app-password-modal');
+        }
+      },
+    });
+
+    const contextMenu = Menu.buildFromTemplate(template);
+    contextMenu.popup({ window: mainWindow });
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
+    shouldQuit = false; // Reset flag เมื่อ window ถูกปิดแล้ว
+  });
+
+  // ป้องกันการ minimize หรือ restore
+  mainWindow.on('minimize', () => {
+    if (mainWindow) {
+      // ยกเลิกการ minimize และบังคับให้เต็มหน้าจอ
+      mainWindow.restore();
+      mainWindow.setFullScreen(true);
+    }
+  });
+
+  mainWindow.on('restore', () => {
+    if (mainWindow) {
+      mainWindow.setFullScreen(true);
+    }
   });
 
   const menuBuilder = new MenuBuilder(mainWindow);
@@ -932,4 +1018,14 @@ ipcMain.handle('get-sse-status', () => {
   return {
     isConnected: sseClient.getIsConnected(),
   };
+});
+
+// Handler สำหรับปิดแอป (ต้องผ่าน password verification แล้ว)
+ipcMain.on('quit-app', () => {
+  // ตั้ง flag เพื่อบอกว่าเราต้องการปิดแอปจริงๆ
+  shouldQuit = true;
+  // ปิด window (จะไม่ถูก preventDefault เพราะ shouldQuit = true)
+  if (mainWindow) {
+    mainWindow.close();
+  }
 });

@@ -5,7 +5,7 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Home,
   SelectPrint,
@@ -24,6 +24,7 @@ import {
   OutOfPaper,
   SystemMaintenance,
   PrintTest,
+  PasswordModal,
 } from './components';
 import './App.css';
 
@@ -43,6 +44,8 @@ function RouteListener() {
 
 function MaintenanceListener() {
   const navigate = useNavigate();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showQuitPasswordModal, setShowQuitPasswordModal] = useState(false);
 
   useEffect(() => {
     // Check status on mount
@@ -74,12 +77,76 @@ function MaintenanceListener() {
       },
     );
 
+    // Listen for navigate command from context menu
+    const unsubscribeNavigate = (window as any).electron.ipcRenderer.on(
+      'navigate-to',
+      (path: string) => {
+        if (path) {
+          navigate(path);
+        }
+      },
+    );
+
+    // Listen for print test password modal request
+    const unsubscribePasswordModal = (window as any).electron.ipcRenderer.on(
+      'show-print-test-password-modal',
+      () => {
+        setShowPasswordModal(true);
+      },
+    );
+
+    // Listen for quit app password modal request
+    const unsubscribeQuitPasswordModal = (window as any).electron.ipcRenderer.on(
+      'show-quit-app-password-modal',
+      () => {
+        setShowQuitPasswordModal(true);
+      },
+    );
+
     return () => {
       unsubscribe();
+      unsubscribeNavigate();
+      unsubscribePasswordModal();
+      unsubscribeQuitPasswordModal();
     };
   }, [navigate]);
 
-  return null;
+  const handlePasswordSuccess = () => {
+    setShowPasswordModal(false);
+    navigate('/print-test');
+  };
+
+  const handlePasswordCancel = () => {
+    setShowPasswordModal(false);
+  };
+
+  const handleQuitPasswordSuccess = () => {
+    setShowQuitPasswordModal(false);
+    // ส่ง IPC message ไปที่ main process เพื่อปิดแอป
+    (window as any).electron.ipcRenderer.sendMessage('quit-app');
+  };
+
+  const handleQuitPasswordCancel = () => {
+    setShowQuitPasswordModal(false);
+  };
+
+  return (
+    <>
+      <PasswordModal
+        isOpen={showPasswordModal}
+        onSuccess={handlePasswordSuccess}
+        onCancel={handlePasswordCancel}
+        title="กรอกรหัสผ่านเพื่อเข้าสู่หน้า Print Test"
+      />
+      <PasswordModal
+        isOpen={showQuitPasswordModal}
+        onSuccess={handleQuitPasswordSuccess}
+        onCancel={handleQuitPasswordCancel}
+        title="กรอกรหัสผ่านเพื่อปิดแอป"
+        password="1212312121"
+      />
+    </>
+  );
 }
 
 export default function App() {

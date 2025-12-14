@@ -634,10 +634,10 @@ export default function PhotoResult() {
 
       try {
         const filter = FILTERS.find((f) => f.id === state.selectedFilter);
-        
+
         // Apply LUT filter to original captures BEFORE creating framed video
         let processedCaptures = state.selectedCaptures;
-        
+
         if (filter?.type === 'lut' && filter.lutFile) {
           setIsApplyingLUT(true);
           console.log('🎨 [PhotoResult] Applying LUT filter to original videos:', filter.lutFile);
@@ -648,7 +648,7 @@ export default function PhotoResult() {
               state.selectedCaptures.map(async (capture, index) => {
                 try {
                   console.log(`🎨 [PhotoResult] Processing capture ${index + 1}...`);
-                  
+
                   // Convert blob URL to ArrayBuffer
                   const response = await fetch(capture.video);
                   const blob = await response.blob();
@@ -682,14 +682,14 @@ export default function PhotoResult() {
                       console.log(
                         `✅ [PhotoResult] Capture ${index + 1} LUT applied successfully`,
                       );
-                      
+
                       return {
                         ...capture,
                         video: processedUrl,
                       };
                     }
                   }
-                  
+
                   // Fallback to original if processing fails
                   console.warn(
                     `⚠️ [PhotoResult] LUT processing failed for capture ${index + 1}, using original`,
@@ -705,7 +705,7 @@ export default function PhotoResult() {
                 }
               }),
             );
-            
+
             console.log('✅ [PhotoResult] All captures processed with LUT filter');
           } catch (lutError) {
             console.error(
@@ -729,7 +729,7 @@ export default function PhotoResult() {
           hasLUTFilter: isLutFilterApplied,
           isLutFilterApplied,
         });
-        
+
         // Generate framed video with processed captures
         const videoUrl = await generateFramedVideo(
           processedCaptures,
@@ -738,12 +738,12 @@ export default function PhotoResult() {
           state.useBoomerang,
           isLutFilterApplied,
         );
-        
+
         console.log(
           '✅ [PhotoResult] Framed video generated:',
           videoUrl.substring(0, 50),
         );
-        
+
         setCompiledVideoUrl(videoUrl);
       } catch (error) {
         // eslint-disable-next-line no-console

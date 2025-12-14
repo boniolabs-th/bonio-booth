@@ -20,8 +20,13 @@
   border-radius: 50%;
 }
 
-.back-button:active {
+.back-button:active:not(:disabled) {
   transform: translateY(1px);
+}
+
+.back-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Responsive adjustments */

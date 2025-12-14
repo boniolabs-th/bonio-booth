@@ -22,7 +22,8 @@ async function loadEnvConfig(): Promise<void> {
     console.log('🔧 [frameConfig] Environment config:', env);
     if (env) {
       envConfig = {
-        apiUrl: env.API_BASE_URL || 'http://localhost:3000',
+        // apiUrl: env.API_BASE_URL || 'http://localhost:3000',
+        apiUrl: env.API_BASE_URL || 'https://api-booth.boniolabs.com',
         // machinePort: env.PORT || '99999',
         // apiUrl: env.API_BASE_URL || 'https://api-booth.boniolabs.com',
         machinePort: env.PORT || '44444',
@@ -35,7 +36,8 @@ async function loadEnvConfig(): Promise<void> {
     console.error('❌ [frameConfig] Failed to load env config:', error);
     // ใช้ default values
     envConfig = {
-      apiUrl: 'http://localhost:3000',
+      // apiUrl: 'http://localhost:3000',
+      apiUrl: 'https://api-booth.boniolabs.com',
       // machinePort: '99999',
       // apiUrl: 'https://api-booth.boniolabs.com',
       machinePort: '44444',
@@ -142,7 +144,7 @@ export async function fetchFrameConfigs(): Promise<FrameConfig[]> {
   const headers = new Headers();
   headers.set('X-Machine-Port', String(envConfig.machinePort));
   headers.set('X-Machine-Id', envConfig.machineId || '');
-  
+
   try {
     const response = await fetch(`${envConfig.apiUrl}/api/machines-public/frames`, {
       headers,
@@ -154,11 +156,11 @@ export async function fetchFrameConfigs(): Promise<FrameConfig[]> {
 
     console.log('Frames:', frames);
 
-  
+
     return frames
       .filter((frame: FrameApiResponse) => frame.isActive)
       .map((frame: FrameApiResponse) => mapFrameApiResponseToConfig(frame));
-  } catch (error) { 
+  } catch (error) {
     console.error('Error fetching frames:', error);
     return []; // Fallback to local configs
   }
