@@ -49,6 +49,7 @@ export class SseClient {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private eventCallbacks: Map<string, SseEventCallback[]> = new Map();
   private buffer: string = '';
+  private onStatus502Callback: (() => void) | null = null;
 
   // SSE parsing state - ต้องเก็บไว้ข้าม chunks
   private currentEvent: string = '';
@@ -63,6 +64,13 @@ export class SseClient {
       apiBaseUrl: this.apiBaseUrl,
       machineId: this.machineId,
     });
+  }
+
+  /**
+   * ตั้งค่า callback สำหรับเมื่อได้รับ status 502
+   */
+  setOnStatus502Callback(callback: () => void): void {
+    this.onStatus502Callback = callback;
   }
 
   /**
@@ -98,6 +106,13 @@ export class SseClient {
         if (res.statusCode !== 200) {
           console.error('❌ [SseClient] Failed to connect, status:', res.statusCode);
           this.isConnectedFlag = false;
+          
+          // ถ้าเป็น 502 ให้เรียก callback เพื่อแสดง SystemMaintenance
+          if (res.statusCode === 502 && this.onStatus502Callback) {
+            console.log('⚠️ [SseClient] Status 502 detected, triggering maintenance mode');
+            this.onStatus502Callback();
+          }
+          
           this.scheduleReconnect();
           return;
         }

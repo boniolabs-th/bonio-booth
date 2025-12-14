@@ -90,6 +90,14 @@ async function initializeApp() {
 
     // เชื่อมต่อ SSE หลังจาก init สำเร็จ
     console.log('🔗 Connecting to SSE...');
+    
+    // ตั้งค่า callback สำหรับเมื่อ SSE ได้รับ status 502
+    sseClient.setOnStatus502Callback(() => {
+      if (mainWindow) {
+        mainWindow.webContents.send('sse-status-502');
+      }
+    });
+    
     sseClient.connect();
 
     // Setup shutdown manager callbacks

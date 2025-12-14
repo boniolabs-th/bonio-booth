@@ -103,11 +103,20 @@ function MaintenanceListener() {
       },
     );
 
+    // Listen for SSE status 502 (Bad Gateway) - navigate to SystemMaintenance
+    const unsubscribeSse502 = (window as any).electron.ipcRenderer.on(
+      'sse-status-502',
+      () => {
+        navigate('/system-maintenance', { state: { maintenance: true } });
+      },
+    );
+
     return () => {
       unsubscribe();
       unsubscribeNavigate();
       unsubscribePasswordModal();
       unsubscribeQuitPasswordModal();
+      unsubscribeSse502();
     };
   }, [navigate]);
 
