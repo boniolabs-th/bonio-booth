@@ -91,6 +91,21 @@ const electronHandler = {
         transactionId,
       );
     },
+    getMachineConfig: () => {
+      return ipcRenderer.invoke('get-machine-config');
+    },
+    saveMachineConfig: (config: { machineId: string; machinePort: string }) => {
+      return ipcRenderer.invoke('save-machine-config', config);
+    },
+    hasMachineConfig: () => {
+      return ipcRenderer.invoke('has-machine-config');
+    },
+    deleteMachineConfig: () => {
+      return ipcRenderer.invoke('delete-machine-config');
+    },
+    getConfigFilePath: () => {
+      return ipcRenderer.invoke('get-config-file-path');
+    },
   },
   video: {
     createBoomerang: (videoPath: string, format: 'video' | 'gif' = 'video') => {

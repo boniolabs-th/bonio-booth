@@ -1,0 +1,166 @@
+.machine-config-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+}
+
+.machine-config-modal-content {
+  background-color: white;
+  padding: 48px;
+  border-radius: 24px;
+  width: 90%;
+  max-width: 600px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  animation: modalFadeIn 0.3s ease;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.machine-config-modal-title {
+  font-size: 2.8rem;
+  color: #333;
+  margin-bottom: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.machine-config-modal-description {
+  font-size: 1.6rem;
+  color: #666;
+  margin-bottom: 32px;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.machine-config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.machine-config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.machine-config-label {
+  font-size: 1.6rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.machine-config-input {
+  width: 100%;
+  padding: 16px 20px;
+  font-size: 1.8rem;
+  border: 3px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #333;
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.machine-config-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.machine-config-input:disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.machine-config-input::placeholder {
+  color: #9ca3af;
+}
+
+.machine-config-error {
+  color: #ef4444;
+  font-size: 1.5rem;
+  margin-top: -8px;
+  font-weight: 500;
+  text-align: center;
+  min-height: 24px;
+}
+
+.machine-config-submit-button {
+  width: 100%;
+  padding: 18px 24px;
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  margin-top: 8px;
+}
+
+.machine-config-submit-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+  transform: translateY(-2px);
+}
+
+.machine-config-submit-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.machine-config-submit-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .machine-config-modal-content {
+    padding: 32px 24px;
+    max-width: 95%;
+  }
+
+  .machine-config-modal-title {
+    font-size: 2.4rem;
+  }
+
+  .machine-config-modal-description {
+    font-size: 1.4rem;
+  }
+
+  .machine-config-input {
+    font-size: 1.6rem;
+    padding: 14px 18px;
+  }
+
+  .machine-config-submit-button {
+    font-size: 1.8rem;
+    padding: 16px 20px;
+  }
+}
+

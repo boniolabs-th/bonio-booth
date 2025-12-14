@@ -19,3 +19,4 @@ export { default as PrintTest } from './printtest';
 export { ErrorBoundary } from './errorboundary';
 export { default as ConfirmationModal } from './confirmationmodal';
 export { default as PasswordModal } from './passwordmodal';
+export { MachineConfigModal } from './machineconfigmodal';

@@ -50,7 +50,14 @@ import {
 import machineService from './services/machineService';
 import sseClient from './services/sseClient';
 import shutdownManager, { ShutdownState } from './services/shutdownManager';
-import { getEnvConfig } from './config/env.config';
+import { getEnvConfig, clearEnvConfigCache } from './config/env.config';
+import {
+  getMachineConfig,
+  saveMachineConfig,
+  hasMachineConfig,
+  deleteMachineConfig,
+  getConfigFilePath,
+} from './services/configService';
 class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
@@ -64,8 +71,26 @@ async function initializeApp() {
   try {
     console.log('🚀 Initializing app...');
 
+    // ดึง config จาก persistent storage
+    const envConfig = await getEnvConfig();
+    const machineIdFromConfig = envConfig.MACHINE_ID;
+    const machinePortFromConfig = Number(envConfig.PORT) || 44444;
+
+    console.log('🔍 [Main] Config from storage:', {
+      machineId: machineIdFromConfig,
+      machinePort: machinePortFromConfig,
+    });
+
+    // อัปเดต config ของ machineService
+    machineService.updateConfig({
+      machineId: machineIdFromConfig,
+      machinePort: machinePortFromConfig,
+    });
+
     // เรียก API init เพื่อดึงข้อมูลทั้งหมดในครั้งเดียว
-    const initResponse = await machineService.init();
+    // ส่ง machineId จาก config ถ้ามี
+    console.log('🔍 [Main] Calling init with machineId:', machineIdFromConfig);
+    const initResponse = await machineService.init(machineIdFromConfig);
 
     // Send theme to renderer process
     if (mainWindow && initResponse.theme.background) {
@@ -761,9 +786,8 @@ ipcMain.handle('get-machine-prices', async () => {
 
 // Handler สำหรับ request environment variables
 ipcMain.handle('get-env-vars', async () => {
-  // ดึง environment variables จาก process.env โดยตรง
-  // (ไม่ต้อง import เพราะ main process มี access ถึง process.env)
-  return getEnvConfig();
+  // ดึง environment variables จาก persistent config หรือ process.env
+  return await getEnvConfig();
 });
 
 // Handler สำหรับ request machine data (รวม cameraCountdown)
@@ -891,6 +915,78 @@ ipcMain.handle('create-boomerang-with-lut', async (event, videoPath: string, lut
       success: false,
       error: errorMessage,
     };
+  }
+});
+
+// Config IPC handlers
+ipcMain.handle('get-machine-config', async () => {
+  try {
+    const config = await getMachineConfig();
+    return { success: true, config };
+  } catch (error) {
+    console.error('❌ [Main] Error getting machine config:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('save-machine-config', async (event, config: { machineId: string; machinePort: string }) => {
+  try {
+    const success = await saveMachineConfig(config);
+    if (success) {
+      // Clear cache เพื่อให้อ่าน config ใหม่
+      clearEnvConfigCache();
+      return { success: true };
+    }
+    return { success: false, error: 'Failed to save config' };
+  } catch (error) {
+    console.error('❌ [Main] Error saving machine config:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('has-machine-config', async () => {
+  try {
+    const hasConfig = await hasMachineConfig();
+    return { success: true, hasConfig };
+  } catch (error) {
+    console.error('❌ [Main] Error checking machine config:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('delete-machine-config', async () => {
+  try {
+    const success = await deleteMachineConfig();
+    if (success) {
+      // Clear cache เพื่อให้อ่าน config ใหม่
+      clearEnvConfigCache();
+      return { success: true };
+    }
+    return { success: false, error: 'Failed to delete config' };
+  } catch (error) {
+    console.error('❌ [Main] Error deleting machine config:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('get-config-file-path', async () => {
+  try {
+    const configPath = getConfigFilePath();
+    console.log('📁 [Main] Config file path:', configPath);
+    return { success: true, path: configPath };
+  } catch (error) {
+    console.error('❌ [Main] Error getting config file path:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
   }
 });
 

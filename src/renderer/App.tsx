@@ -25,6 +25,7 @@ import {
   SystemMaintenance,
   PrintTest,
   PasswordModal,
+  MachineConfigModal,
 } from './components';
 import './App.css';
 
@@ -158,11 +159,56 @@ function MaintenanceListener() {
   );
 }
 
+function ConfigChecker() {
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    const checkConfig = async () => {
+      try {
+        // @ts-ignore
+        const result = await window.electron?.payment?.hasMachineConfig();
+        if (result?.success && !result.hasConfig) {
+          // ยังไม่มี config ให้แสดง modal
+          setShowConfigModal(true);
+        }
+      } catch (error) {
+        console.error('❌ [App] Failed to check machine config:', error);
+        // ถ้าเกิด error ให้แสดง modal เพื่อให้ user กรอก config
+        setShowConfigModal(true);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    checkConfig();
+  }, []);
+
+  const handleConfigSuccess = () => {
+    setShowConfigModal(false);
+    // Reload page เพื่อให้ config ใหม่ถูกใช้
+    window.location.reload();
+  };
+
+  // ยังไม่ตรวจสอบเสร็จ ให้แสดง loading หรือไม่แสดงอะไร
+  if (isChecking) {
+    return null;
+  }
+
+  return (
+    <MachineConfigModal
+      isOpen={showConfigModal}
+      onSuccess={handleConfigSuccess}
+    />
+  );
+}
+
 export default function App() {
   return (
     <Router>
       <RouteListener />
       <MaintenanceListener />
+      <ConfigChecker />
       <ErrorBoundary>
         <Routes>
           <Route path="/" element={<Home />} />

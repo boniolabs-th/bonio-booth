@@ -301,6 +301,20 @@ export class MachineService {
   }
 
   /**
+   * อัปเดต config ของ service (ใช้เมื่อมีการเปลี่ยน config จาก persistent storage)
+   */
+  updateConfig(options: { machineId?: string; machinePort?: number }): void {
+    if (options.machineId !== undefined) {
+      this.machineId = options.machineId;
+      console.log('✅ [MachineService] Updated machineId:', this.machineId);
+    }
+    if (options.machinePort !== undefined) {
+      this.machinePort = options.machinePort;
+      console.log('✅ [MachineService] Updated machinePort:', this.machinePort);
+    }
+  }
+
+  /**
    * Make HTTP/HTTPS request
    */
   private async makeRequest<T>(
@@ -324,11 +338,22 @@ export class MachineService {
         }
 
         // Add machine identification for localhost testing
-        if (this.machineId) {
+        // เพิ่ม machineId และ port ถ้ายังไม่มีใน queryParams (เพื่อไม่ให้ซ้ำ)
+        if (this.machineId && !url.searchParams.has('machineId')) {
           url.searchParams.append('machineId', this.machineId);
         }
-        if (this.machinePort) {
+        if (this.machinePort && !url.searchParams.has('port')) {
           url.searchParams.append('port', String(this.machinePort));
+        }
+
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'X-Machine-Port': String(this.machinePort),
+        };
+
+        // เพิ่ม X-Machine-Id header ถ้ามี machineId
+        if (this.machineId && this.machineId.trim()) {
+          headers['X-Machine-Id'] = this.machineId;
         }
 
         const options = {
@@ -336,12 +361,16 @@ export class MachineService {
           port: url.port || (url.protocol === 'https:' ? 443 : 80),
           path: url.pathname + url.search,
           method,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Machine-Port': String(this.machinePort),
-            ...(this.machineId && { 'X-Machine-Id': this.machineId }),
-          },
+          headers,
         };
+
+        // Debug log
+        console.log('🔍 [MachineService] Request:', {
+          url: url.toString(),
+          machineId: this.machineId,
+          machinePort: this.machinePort,
+          headers: headers,
+        });
 
         const protocol = url.protocol === 'https:' ? https : http;
         const req = protocol.request(options, (res) => {
@@ -404,11 +433,20 @@ export class MachineService {
    */
   async init(machineId?: string): Promise<InitResponse> {
     try {
+      // ใช้ machineId จาก parameter หรือจาก this.machineId
+      const finalMachineId = machineId || this.machineId;
+      console.log('🔍 [MachineService] Init called:', {
+        paramMachineId: machineId,
+        thisMachineId: this.machineId,
+        finalMachineId,
+        thisMachinePort: this.machinePort,
+      });
+
       const response = await this.makeRequest<InitResponse>(
         '/api/machines-public/init',
         'GET',
         undefined,
-        machineId ? { machineId } : undefined,
+        finalMachineId ? { machineId: finalMachineId } : undefined,
       );
 
       // Access paperPosition with type assertion to handle optional property
