@@ -3,7 +3,7 @@ import http from 'http';
 import { URL } from 'url';
 import fs from 'fs';
 import path from 'path';
-import { getEnvConfig } from '../config/env.config';
+import { getEnvConfig, DEFAULT_MACHINE_ID, DEFAULT_PORT, DEFAULT_API_TIMEOUT } from '../config/env.config';
 
 // ==================== Type Definitions ====================
 
@@ -18,9 +18,9 @@ async function loadEnvConfig() {
   return cachedEnvConfig;
 }
 
-// Export สำหรับ backward compatibility (จะใช้ค่า default ถ้ายังไม่ได้โหลด)
-export const apiBaseUrl = 'http://localhost:3000'; // จะถูก override เมื่อสร้าง instance
-export const machineId = '69247c9602dd728488995e3c'; // จะถูก override เมื่อสร้าง instance
+// Export สำหรับ backward compatibility (ใช้ default values จาก env.config.ts)
+export const apiBaseUrl = '';
+export const machineId = DEFAULT_MACHINE_ID;
 
 export interface MachineInfo {
   id: string;
@@ -290,11 +290,11 @@ export class MachineService {
   private timeout: number;
 
   constructor(options: MachineServiceOptions = {}) {
-    // ใช้ค่า default ชั่วคราว (จะถูกอัปเดตเมื่อเรียก loadEnvConfig)
-    this.apiBaseUrl = options.apiBaseUrl || 'http://localhost:3000';
-    this.machinePort = options.machinePort || 44444;
-    this.machineId = options.machineId || '';
-    this.timeout = options.timeout || 10000;
+    // ใช้ค่า default จาก env.config.ts (จะถูกอัปเดตเมื่อเรียก loadEnvConfig)
+    this.apiBaseUrl = options.apiBaseUrl ? options.apiBaseUrl : '';
+    this.machinePort = options.machinePort ? options.machinePort : Number(DEFAULT_PORT);
+    this.machineId = options.machineId ? options.machineId : DEFAULT_MACHINE_ID;
+    this.timeout = options.timeout ? options.timeout : DEFAULT_API_TIMEOUT;
     
     // โหลด config จาก env.config.ts (async แต่ไม่ต้องรอ)
     loadEnvConfig().then((config) => {

@@ -19,6 +19,11 @@ export interface EnvConfig {
   API_TIMEOUT: number;
 }
 
+// Default values (แก้ไขได้ที่เดียว)
+export const DEFAULT_PORT = '44444';
+export const DEFAULT_MACHINE_ID = '69247c9602dd728488995e3c';
+export const DEFAULT_API_TIMEOUT = 10000;
+
 // Cache สำหรับเก็บ config (เพื่อไม่ต้องอ่านไฟล์ทุกครั้ง)
 let cachedConfig: EnvConfig | null = null;
 
@@ -35,18 +40,37 @@ export async function getEnvConfig(): Promise<EnvConfig> {
   // อ่านจาก persistent config ก่อน
   const machineConfig = await getMachineConfig();
   
-  // Default values (แก้ไขได้ที่เดียว)
-  const DEFAULT_API_BASE_URL = 'http://localhost:3000';
-  const DEFAULT_PORT = '44444';
-  const DEFAULT_MACHINE_ID = '69247c9602dd728488995e3c';
-  const DEFAULT_API_TIMEOUT = 10000;
+  // กำหนดค่า PORT (ลำดับความสำคัญ: machineConfig > process.env > default)
+  let port = DEFAULT_PORT;
+  if (machineConfig?.machinePort) {
+    port = machineConfig.machinePort;
+  } else if (process.env.PORT) {
+    port = process.env.PORT;
+  }
+  
+  // กำหนดค่า MACHINE_ID (ลำดับความสำคัญ: machineConfig > process.env > default)
+  let machineId = DEFAULT_MACHINE_ID;
+  if (machineConfig?.machineId) {
+    machineId = machineConfig.machineId;
+  } else if (process.env.MACHINE_ID) {
+    machineId = process.env.MACHINE_ID;
+  }
+  
+  // กำหนดค่า API_TIMEOUT (ลำดับความสำคัญ: process.env > default)
+  let apiTimeout = DEFAULT_API_TIMEOUT;
+  if (process.env.API_TIMEOUT) {
+    const timeoutValue = Number(process.env.API_TIMEOUT);
+    if (!Number.isNaN(timeoutValue)) {
+      apiTimeout = timeoutValue;
+    }
+  }
   
   const config: EnvConfig = {
-    API_BASE_URL: process.env.API_BASE_URL || DEFAULT_API_BASE_URL,
-    PORT: machineConfig?.machinePort || process.env.PORT || DEFAULT_PORT,
-    MACHINE_ID: machineConfig?.machineId || process.env.MACHINE_ID || DEFAULT_MACHINE_ID,
+    API_BASE_URL: process.env.API_BASE_URL ? process.env.API_BASE_URL : '',
+    PORT: port,
+    MACHINE_ID: machineId,
     MACHINE_CAN_CUT: process.env.MACHINE_CAN_CUT !== 'false',
-    API_TIMEOUT: Number(process.env.API_TIMEOUT) || DEFAULT_API_TIMEOUT,
+    API_TIMEOUT: apiTimeout,
   };
 
   // เก็บไว้ใน cache
