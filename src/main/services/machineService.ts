@@ -349,6 +349,7 @@ export class MachineService {
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
           'X-Machine-Port': String(this.machinePort),
+          'X-Client-Type': 'booth', // Priority Queue: บอก backend ว่าเป็น request จากหน้าตู้
         };
 
         // เพิ่ม X-Machine-Id header ถ้ามี machineId
