@@ -8,7 +8,7 @@
 import https from 'https';
 import http from 'http';
 import { URL } from 'url';
-import { getEnvConfig } from '../config/env.config';
+import { getEnvConfig, DEFAULT_MACHINE_ID } from '../config/env.config';
 
 // Event types จาก backend
 export enum MachineEventType {
@@ -56,9 +56,9 @@ export class SseClient {
   private currentData: string = '';
 
   constructor(options?: { apiBaseUrl?: string; machineId?: string }) {
-    // ใช้ค่า default ชั่วคราว (จะถูกอัปเดตเมื่อเรียก updateConfig)
-    this.apiBaseUrl = options?.apiBaseUrl || 'http://localhost:3000';
-    this.machineId = options?.machineId || '69247c9602dd728488995e3c';
+    // ใช้ค่า default จาก env.config.ts (จะถูกอัปเดตเมื่อเรียก updateConfig)
+    this.apiBaseUrl = options?.apiBaseUrl ? options.apiBaseUrl : '';
+    this.machineId = options?.machineId ? options.machineId : DEFAULT_MACHINE_ID;
 
     // โหลด config จาก env.config.ts (async แต่ไม่ต้องรอ)
     getEnvConfig().then((config) => {

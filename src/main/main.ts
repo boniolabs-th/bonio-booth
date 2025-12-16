@@ -50,7 +50,7 @@ import {
 import machineService from './services/machineService';
 import sseClient from './services/sseClient';
 import shutdownManager, { ShutdownState } from './services/shutdownManager';
-import { getEnvConfig, clearEnvConfigCache } from './config/env.config';
+import { getEnvConfig, clearEnvConfigCache, DEFAULT_PORT } from './config/env.config';
 import {
   getMachineConfig,
   saveMachineConfig,
@@ -74,7 +74,7 @@ async function initializeApp() {
     // ดึง config จาก persistent storage
     const envConfig = await getEnvConfig();
     const machineIdFromConfig = envConfig.MACHINE_ID;
-    const machinePortFromConfig = Number(envConfig.PORT) || 44444;
+    const machinePortFromConfig = envConfig.PORT ? Number(envConfig.PORT) : Number(DEFAULT_PORT);
 
     console.log('🔍 [Main] Config from storage:', {
       machineId: machineIdFromConfig,
