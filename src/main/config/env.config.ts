@@ -35,15 +35,18 @@ export async function getEnvConfig(): Promise<EnvConfig> {
   // อ่านจาก persistent config ก่อน
   const machineConfig = await getMachineConfig();
   
+  // Default values (แก้ไขได้ที่เดียว)
+  const DEFAULT_API_BASE_URL = 'http://localhost:3000';
+  const DEFAULT_PORT = '44444';
+  const DEFAULT_MACHINE_ID = '69247c9602dd728488995e3c';
+  const DEFAULT_API_TIMEOUT = 10000;
+  
   const config: EnvConfig = {
-    // API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:3000',
-    API_BASE_URL: process.env.API_BASE_URL || 'https://api-booth.boniolabs.com',
-    // PORT: process.env.PORT || '99999',
-    PORT: machineConfig?.machinePort || process.env.PORT || '44444',
-    // MACHINE_ID: process.env.MACHINE_ID || '693296af25719d62f695db5d',
-    MACHINE_ID: machineConfig?.machineId || process.env.MACHINE_ID || '69247c9602dd728488995e3c',
+    API_BASE_URL: process.env.API_BASE_URL || DEFAULT_API_BASE_URL,
+    PORT: machineConfig?.machinePort || process.env.PORT || DEFAULT_PORT,
+    MACHINE_ID: machineConfig?.machineId || process.env.MACHINE_ID || DEFAULT_MACHINE_ID,
     MACHINE_CAN_CUT: process.env.MACHINE_CAN_CUT !== 'false',
-    API_TIMEOUT: Number(process.env.API_TIMEOUT) || 10000,
+    API_TIMEOUT: Number(process.env.API_TIMEOUT) || DEFAULT_API_TIMEOUT,
   };
 
   // เก็บไว้ใน cache

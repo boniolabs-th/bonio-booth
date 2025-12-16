@@ -116,6 +116,12 @@ async function initializeApp() {
     // เชื่อมต่อ SSE หลังจาก init สำเร็จ
     console.log('🔗 Connecting to SSE...');
 
+    // อัปเดต config ของ sseClient
+    sseClient.updateConfig({
+      apiBaseUrl: envConfig.API_BASE_URL,
+      machineId: machineIdFromConfig,
+    });
+
     // ตั้งค่า callback สำหรับเมื่อ SSE ได้รับ status 502
     sseClient.setOnStatus502Callback(() => {
       if (mainWindow) {

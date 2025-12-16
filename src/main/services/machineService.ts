@@ -3,26 +3,24 @@ import http from 'http';
 import { URL } from 'url';
 import fs from 'fs';
 import path from 'path';
+import { getEnvConfig } from '../config/env.config';
 
 // ==================== Type Definitions ====================
 
+// ตัวแปรสำหรับเก็บ config (จะถูกโหลดเมื่อสร้าง instance)
+let cachedEnvConfig: Awaited<ReturnType<typeof getEnvConfig>> | null = null;
 
-// ใช้ environment variables ที่ webpack inject มา
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const getEnv = (): any => {
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env;
+// ฟังก์ชันสำหรับโหลด env config (ใช้ async)
+async function loadEnvConfig() {
+  if (!cachedEnvConfig) {
+    cachedEnvConfig = await getEnvConfig();
   }
-  // Fallback สำหรับกรณีที่ process.env ไม่มี
-  return {};
-};
+  return cachedEnvConfig;
+}
 
-const env = getEnv();
-// export const apiBaseUrl = env.API_BASE_URL  || 'http://localhost:3000';
-export const apiBaseUrl = env.API_BASE_URL  || 'https://api-booth.boniolabs.com';
-const machinePort = env.PORT || '44444';
-// const machineId = env.MACHINE_ID || '693296af25719d62f695db5d';
-export const machineId = env.MACHINE_ID || '69247c9602dd728488995e3c';
+// Export สำหรับ backward compatibility (จะใช้ค่า default ถ้ายังไม่ได้โหลด)
+export const apiBaseUrl = 'http://localhost:3000'; // จะถูก override เมื่อสร้าง instance
+export const machineId = '69247c9602dd728488995e3c'; // จะถูก override เมื่อสร้าง instance
 
 export interface MachineInfo {
   id: string;
@@ -292,12 +290,29 @@ export class MachineService {
   private timeout: number;
 
   constructor(options: MachineServiceOptions = {}) {
-    // อ่าน API URL จาก environment variable หรือ options หรือ default
-    // this.apiBaseUrl =  'https://api-booth.boniolabs.com';
-    this.apiBaseUrl = apiBaseUrl;
-    this.machinePort = options.machinePort || Number(machinePort) || 44444;
-    this.machineId = options.machineId || machineId || '';
-    this.timeout = options.timeout || Number(env.API_TIMEOUT) || 10000;
+    // ใช้ค่า default ชั่วคราว (จะถูกอัปเดตเมื่อเรียก loadEnvConfig)
+    this.apiBaseUrl = options.apiBaseUrl || 'http://localhost:3000';
+    this.machinePort = options.machinePort || 44444;
+    this.machineId = options.machineId || '';
+    this.timeout = options.timeout || 10000;
+    
+    // โหลด config จาก env.config.ts (async แต่ไม่ต้องรอ)
+    loadEnvConfig().then((config) => {
+      if (!options.apiBaseUrl) {
+        this.apiBaseUrl = config.API_BASE_URL;
+      }
+      if (!options.machinePort) {
+        this.machinePort = Number(config.PORT);
+      }
+      if (!options.machineId) {
+        this.machineId = config.MACHINE_ID;
+      }
+      if (!options.timeout) {
+        this.timeout = config.API_TIMEOUT;
+      }
+    }).catch((error) => {
+      console.error('❌ [MachineService] Failed to load env config:', error);
+    });
   }
 
   /**
