@@ -236,12 +236,13 @@ async function generateImageWithPadding(
         align-items: center;
       }
       img {
-        max-width: calc(100% ${orientation === 'portrait' ? '+' : '-'} ${orientation === 'portrait' ? '0' : '1'}%);
-        max-height: calc(100% ${orientation === 'portrait' ? '+' : '-'} ${orientation === 'portrait' ? '0' : '1'}%);
+        max-width: calc(100% ${orientation === 'landscape' ? '+' : '-'} ${orientation === 'landscape' ? '14' : '1'}%);
+        max-height: calc(100% ${orientation === 'landscape' ? '+' : '-'} ${orientation === 'landscape' ? '14' : '1'}%);
         width: auto;
         height: auto;
-        object-fit: contain;        display: block;
-        transform: ${orientation !== 'portrait' ? 'rotate(90deg)' : 'none'};
+        object-fit: contain;
+        display: block;
+        transform: ${orientation === 'landscape' ? 'rotate(90deg)' : 'none'};
       }
     </style>
   </head>
