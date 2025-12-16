@@ -488,6 +488,15 @@ const createWindow = async () => {
       },
     });
 
+    template.push({ type: 'separator' });
+
+    // เพิ่ม version ในเมนู
+    const appVersion = app.getVersion();
+    template.push({
+      label: `Version ${appVersion}`,
+      enabled: false, // ทำให้ไม่สามารถคลิกได้ (แสดงแค่ version)
+    });
+
     const contextMenu = Menu.buildFromTemplate(template);
     contextMenu.popup({ window: mainWindow });
   });
@@ -622,7 +631,7 @@ ipcMain.on("print-photo", async (event, printConfig) => {
 
   try {
     // ใช้ generateImageWithPadding เพื่อเพิ่ม padding รอบรูปภาพ (5% ทั้ง 4 ด้าน)
-    const orientation = printConfig.orientation || 'landscape';
+    const orientation = printConfig.orientation || 'portrait';
     const paddedImageBuffer = await generateImageWithPadding(printConfig.imageDataUrl, 5, orientation);
 
     const tempDir = app.getPath("temp");
