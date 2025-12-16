@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { BackButton } from '../index';
 import './PrintTest.css';
 
-const TEST_IMAGE_URL =
-  'https://sgp1.digitaloceanspaces.com/boniolabs/transactions/69399f7d3b0aa02cd9576618/photos/05042e81-94ac-448c-9fcb-7d500034dfb0.png';
+const TEST_IMAGE_URL = '../../../assets/images/image-print-test.png';
 
 interface EnvConfig {
   apiUrl: string;
