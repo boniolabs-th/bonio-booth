@@ -465,6 +465,19 @@ const createWindow = async () => {
 
     template.push({ type: 'separator' });
 
+    // เพิ่มเมนู "ล้างค่า Config" (ต้องเข้ารหัสก่อน)
+    template.push({
+      label: 'Format Reset',
+      click: () => {
+        if (mainWindow) {
+          // ส่ง IPC message ไปที่ renderer เพื่อแสดง password modal
+          mainWindow.webContents.send('show-clear-config-password-modal');
+        }
+      },
+    });
+
+    template.push({ type: 'separator' });
+
     template.push({
       label: 'ปิดแอป',
       click: () => {

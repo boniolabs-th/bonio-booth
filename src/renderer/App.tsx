@@ -47,6 +47,7 @@ function MaintenanceListener() {
   const navigate = useNavigate();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showQuitPasswordModal, setShowQuitPasswordModal] = useState(false);
+  const [showClearConfigPasswordModal, setShowClearConfigPasswordModal] = useState(false);
 
   useEffect(() => {
     // Check status on mount
@@ -104,6 +105,14 @@ function MaintenanceListener() {
       },
     );
 
+    // Listen for clear config password modal request
+    const unsubscribeClearConfigPasswordModal = (window as any).electron.ipcRenderer.on(
+      'show-clear-config-password-modal',
+      () => {
+        setShowClearConfigPasswordModal(true);
+      },
+    );
+
     // Listen for SSE status 502 (Bad Gateway) - navigate to SystemMaintenance
     const unsubscribeSse502 = (window as any).electron.ipcRenderer.on(
       'sse-status-502',
@@ -117,6 +126,7 @@ function MaintenanceListener() {
       unsubscribeNavigate();
       unsubscribePasswordModal();
       unsubscribeQuitPasswordModal();
+      unsubscribeClearConfigPasswordModal();
       unsubscribeSse502();
     };
   }, [navigate]);
@@ -140,6 +150,28 @@ function MaintenanceListener() {
     setShowQuitPasswordModal(false);
   };
 
+  const handleClearConfigPasswordSuccess = async () => {
+    setShowClearConfigPasswordModal(false);
+    try {
+      // @ts-ignore
+      const result = await window.electron?.payment?.deleteMachineConfig();
+      if (result?.success) {
+        alert('✅ ล้างค่า Config สำเร็จ! แอปจะรีโหลด...');
+        // Reload page เพื่อให้แสดง config modal อีกครั้ง
+        window.location.reload();
+      } else {
+        alert('❌ ไม่สามารถล้างค่า Config ได้: ' + (result?.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('❌ [App] Error clearing config:', error);
+      alert('❌ เกิดข้อผิดพลาดในการล้างค่า Config');
+    }
+  };
+
+  const handleClearConfigPasswordCancel = () => {
+    setShowClearConfigPasswordModal(false);
+  };
+
   return (
     <>
       <PasswordModal
@@ -153,6 +185,13 @@ function MaintenanceListener() {
         onSuccess={handleQuitPasswordSuccess}
         onCancel={handleQuitPasswordCancel}
         title="กรอกรหัสผ่านเพื่อปิดแอป"
+        password="1212312121"
+      />
+      <PasswordModal
+        isOpen={showClearConfigPasswordModal}
+        onSuccess={handleClearConfigPasswordSuccess}
+        onCancel={handleClearConfigPasswordCancel}
+        title="กรอกรหัสผ่านเพื่อล้างค่า Config"
         password="1212312121"
       />
     </>
