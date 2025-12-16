@@ -38,19 +38,15 @@ export default function PrintTest(): React.JSX.Element {
       try {
         // @ts-ignore
         const env = await window.electron?.payment?.getEnvVars();
-        const config: EnvConfig = env
-          ? {
-              // apiUrl: env.API_BASE_URL || 'http://localhost:3000',
-              apiUrl: env.API_BASE_URL || 'https://api-booth.boniolabs.com',
-              machinePort: env.PORT || '44444',
-              machineId: env.MACHINE_ID || '69247c9602dd728488995e3c',
-            }
-          : {
-              // apiUrl: 'http://localhost:3000',
-              apiUrl: 'https://api-booth.boniolabs.com',
-              machinePort: '44444',
-              machineId: '69247c9602dd728488995e3c',
-            };
+        if (!env) {
+          throw new Error('Failed to get environment variables');
+        }
+
+        const config: EnvConfig = {
+          apiUrl: env.API_BASE_URL,
+          machinePort: env.PORT,
+          machineId: env.MACHINE_ID,
+        };
 
         setEnvConfig(config);
 
@@ -105,12 +101,7 @@ export default function PrintTest(): React.JSX.Element {
           '❌ [PrintTest] Failed to load env config or paper position:',
           error,
         );
-        setEnvConfig({
-          // apiUrl: 'http://localhost:3000',
-          apiUrl: 'https://api-booth.boniolabs.com',
-          machinePort: '44444',
-          machineId: '69247c9602dd728488995e3c',
-        });
+        // ไม่ต้อง set fallback เพราะ env.config.ts จะมี default values อยู่แล้ว
       }
     };
     loadEnvConfigAndPaperPosition();

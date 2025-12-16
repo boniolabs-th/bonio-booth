@@ -20,30 +20,20 @@ async function loadEnvConfig(): Promise<void> {
     const env = await window.electron?.payment.getEnvVars();
 
     console.log('🔧 [frameConfig] Environment config:', env);
-    if (env) {
-      envConfig = {
-        // apiUrl: env.API_BASE_URL || 'http://localhost:3000',
-        apiUrl: env.API_BASE_URL || 'https://api-booth.boniolabs.com',
-        // machinePort: env.PORT || '99999',
-        // apiUrl: env.API_BASE_URL || 'https://api-booth.boniolabs.com',
-        machinePort: env.PORT || '44444',
-        // machineId: env.MACHINE_ID || '693296af25719d62f695db5d',
-        machineId: env.MACHINE_ID || '69247c9602dd728488995e3c',
-      };
-      console.log('✅ [frameConfig] Environment config loaded:', envConfig);
+    if (!env) {
+      throw new Error('Failed to get environment variables');
     }
+    
+    envConfig = {
+      apiUrl: env.API_BASE_URL,
+      machinePort: env.PORT,
+      machineId: env.MACHINE_ID,
+    };
+    console.log('✅ [frameConfig] Environment config loaded:', envConfig);
   } catch (error) {
     console.error('❌ [frameConfig] Failed to load env config:', error);
-    // ใช้ default values
-    envConfig = {
-      // apiUrl: 'http://localhost:3000',
-      apiUrl: 'https://api-booth.boniolabs.com',
-      // machinePort: '99999',
-      // apiUrl: 'https://api-booth.boniolabs.com',
-      machinePort: '44444',
-      // machineId: env.MACHINE_ID || '693296af25719d62f695db5d',
-      machineId: '69247c9602dd728488995e3c',
-    };
+    // ไม่ต้อง set fallback เพราะ env.config.ts จะมี default values อยู่แล้ว
+    throw error; // Throw เพื่อให้ caller จัดการ error
   }
 }
 

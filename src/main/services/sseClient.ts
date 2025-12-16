@@ -8,7 +8,7 @@
 import https from 'https';
 import http from 'http';
 import { URL } from 'url';
-import { apiBaseUrl as machineApiBaseUrl, machineId as defaultMachineId } from './machineService';
+import { getEnvConfig } from '../config/env.config';
 
 // Event types จาก backend
 export enum MachineEventType {
@@ -56,14 +56,39 @@ export class SseClient {
   private currentData: string = '';
 
   constructor(options?: { apiBaseUrl?: string; machineId?: string }) {
-    // ใช้ค่าจาก machineService ที่ได้จาก env แล้ว
-    this.apiBaseUrl = options?.apiBaseUrl || machineApiBaseUrl;
-    this.machineId = options?.machineId || defaultMachineId;
+    // ใช้ค่า default ชั่วคราว (จะถูกอัปเดตเมื่อเรียก updateConfig)
+    this.apiBaseUrl = options?.apiBaseUrl || 'http://localhost:3000';
+    this.machineId = options?.machineId || '69247c9602dd728488995e3c';
 
-    console.log('🔧 [SseClient] Configuration:', {
-      apiBaseUrl: this.apiBaseUrl,
-      machineId: this.machineId,
+    // โหลด config จาก env.config.ts (async แต่ไม่ต้องรอ)
+    getEnvConfig().then((config) => {
+      if (!options?.apiBaseUrl) {
+        this.apiBaseUrl = config.API_BASE_URL;
+      }
+      if (!options?.machineId) {
+        this.machineId = config.MACHINE_ID;
+      }
+      console.log('🔧 [SseClient] Configuration loaded:', {
+        apiBaseUrl: this.apiBaseUrl,
+        machineId: this.machineId,
+      });
+    }).catch((error) => {
+      console.error('❌ [SseClient] Failed to load env config:', error);
     });
+  }
+
+  /**
+   * อัปเดต config ของ client (ใช้เมื่อมีการเปลี่ยน config จาก persistent storage)
+   */
+  updateConfig(options: { apiBaseUrl?: string; machineId?: string }): void {
+    if (options.apiBaseUrl !== undefined) {
+      this.apiBaseUrl = options.apiBaseUrl;
+      console.log('✅ [SseClient] Updated apiBaseUrl:', this.apiBaseUrl);
+    }
+    if (options.machineId !== undefined) {
+      this.machineId = options.machineId;
+      console.log('✅ [SseClient] Updated machineId:', this.machineId);
+    }
   }
 
   /**
