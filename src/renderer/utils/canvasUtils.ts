@@ -9,6 +9,7 @@ export interface SlotConfig {
   height: number;
   radius?: number;
   id?: string;
+  rotate?: number; // Rotation in degrees (0-360)
 }
 
 export interface DrawPhotoInSlotOptions {
@@ -74,7 +75,7 @@ export function calculateCoverCrop(
 }
 
 /**
- * Draw a photo into a frame slot with rounded corners and cover crop behavior
+ * Draw a photo into a frame slot with rounded corners, rotation, and cover crop behavior
  * This is the centralized logic used by both PhotoDecorate and PhotoFilter components
  */
 export function drawPhotoInSlot({
@@ -91,6 +92,18 @@ export function drawPhotoInSlot({
   const targetWidth = slot.width * scaleX;
   const targetHeight = slot.height * scaleY;
   const targetRadius = (slot.radius || 0) * scaleX; // Scale radius with scaleX
+  const rotation = slot.rotate || 0; // Rotation in degrees
+
+  // Calculate center point for rotation
+  const centerX = targetX + targetWidth / 2;
+  const centerY = targetY + targetHeight / 2;
+
+  // Apply rotation around center if needed
+  if (rotation !== 0) {
+    ctx.translate(centerX, centerY);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-centerX, -centerY);
+  }
 
   // Create rounded rectangle clipping path if radius is specified
   if (targetRadius > 0) {

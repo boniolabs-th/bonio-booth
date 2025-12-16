@@ -301,11 +301,21 @@ export default function PhotoDecorate() {
           const targetWidth = slot.width * scaleX;
           const targetHeight = slot.height * scaleY;
           const targetRadius = slot.radius * scaleX; // Scale radius with scaleX
+          const rotation = slot.rotate || 0; // Rotation in degrees
           const photoImg = new Image();
           photoImg.crossOrigin = 'anonymous';
 
           photoImg.onload = () => {
             ctx.save();
+
+            // Apply rotation around center if needed
+            if (rotation !== 0) {
+              const centerX = targetX + targetWidth / 2;
+              const centerY = targetY + targetHeight / 2;
+              ctx.translate(centerX, centerY);
+              ctx.rotate((rotation * Math.PI) / 180);
+              ctx.translate(-centerX, -centerY);
+            }
 
             // Create rounded rectangle clipping path
             ctx.beginPath();
@@ -548,6 +558,7 @@ export default function PhotoDecorate() {
               const slotAspectRatio = slot.width / slot.height;
               const scaledRadius = slot.radius * scaleFactor.x; // Scale radius
               const zIndex = slot.zIndex || 0;
+              const rotation = slot.rotate || 0; // Rotation in degrees
 
               return (
                 <div
@@ -563,6 +574,7 @@ export default function PhotoDecorate() {
                     borderRadius: `${scaledRadius}px`,
                     overflow: 'hidden', // Ensure content is clipped
                     zIndex: zIndex < 0 ? -1 : 1, // Simple layering relative to frame
+                    transform: rotation !== 0 ? `rotate(${rotation}deg)` : undefined,
                   }}
                 >
                   {photoAssignments[slotIndex] !== undefined && (

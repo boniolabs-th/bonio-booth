@@ -299,6 +299,16 @@ export default function PhotoFilter() {
             const targetY = slot.y * scaleY;
             const targetWidth = slot.width * scaleX;
             const targetHeight = slot.height * scaleY;
+            const rotation = slot.rotate || 0; // Rotation in degrees
+
+            // Apply rotation around center if needed
+            if (rotation !== 0) {
+              const centerX = targetX + targetWidth / 2;
+              const centerY = targetY + targetHeight / 2;
+              ctx.translate(centerX, centerY);
+              ctx.rotate((rotation * Math.PI) / 180);
+              ctx.translate(-centerX, -centerY);
+            }
 
             // Draw filtered photo in slot
             ctx.drawImage(

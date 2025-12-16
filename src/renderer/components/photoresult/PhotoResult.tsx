@@ -259,10 +259,21 @@ const generateFramedVideo = async (
           const targetY = slot.y * scaleY;
           const targetWidth = slot.width * scaleX;
           const targetHeight = slot.height * scaleY;
+          const rotation = slot.rotate || 0; // Rotation in degrees
 
           // Apply filter to boomerang frame before drawing
           // Only apply CSS filters here, LUT filters should be applied to source video
           ctx.save();
+
+          // Apply rotation around center if needed
+          if (rotation !== 0) {
+            const centerX = targetX + targetWidth / 2;
+            const centerY = targetY + targetHeight / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate((rotation * Math.PI) / 180);
+            ctx.translate(-centerX, -centerY);
+          }
+
           if (!isLutFilterApplied && selectedFilterId) {
             const filter = FILTERS.find((f) => f.id === selectedFilterId);
             // Only apply CSS filters, LUT filters are already applied to source
@@ -469,10 +480,21 @@ const generateFramedVideo = async (
         const targetY = slot.y * scaleY;
         const targetWidth = slot.width * scaleX;
         const targetHeight = slot.height * scaleY;
+        const rotation = slot.rotate || 0; // Rotation in degrees
 
         // Apply filter to video before drawing
         // Only apply CSS filters here, LUT filters should be applied to source video
         ctx.save();
+
+        // Apply rotation around center if needed
+        if (rotation !== 0) {
+          const centerX = targetX + targetWidth / 2;
+          const centerY = targetY + targetHeight / 2;
+          ctx.translate(centerX, centerY);
+          ctx.rotate((rotation * Math.PI) / 180);
+          ctx.translate(-centerX, -centerY);
+        }
+
         if (!isLutFilterApplied && selectedFilterId) {
           const filter = FILTERS.find((f) => f.id === selectedFilterId);
           // Only apply CSS filters, LUT filters are already applied to source

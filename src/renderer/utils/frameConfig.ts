@@ -23,7 +23,7 @@ async function loadEnvConfig(): Promise<void> {
     if (!env) {
       throw new Error('Failed to get environment variables');
     }
-    
+
     envConfig = {
       apiUrl: env.API_BASE_URL,
       machinePort: env.PORT,
@@ -52,6 +52,7 @@ export interface FrameConfig {
     height: number;
     radius: number;
     zIndex?: number;
+    rotate?: number; // Rotation in degrees (0-360)
   }[];
   previewSlots?: {
     id: string;
@@ -61,6 +62,7 @@ export interface FrameConfig {
     height: number;
     radius: number;
     zIndex?: number;
+    rotate?: number; // Rotation in degrees (0-360)
   }[];
 }
 
@@ -81,6 +83,7 @@ export interface FrameApiResponse {
       height: number;
       radius: number;
       zIndex: number;
+      rotate?: number; // Rotation in degrees (0-360)
     }[];
   };
   isActive: boolean;
@@ -106,7 +109,8 @@ export function mapFrameApiResponseToConfig(frame: FrameApiResponse): FrameConfi
       width: slot.width,
       height: slot.height,
       radius: slot.radius || 0,
-      zIndex: slot.zIndex
+      zIndex: slot.zIndex,
+      rotate: slot.rotate || 0
     })),
     // Use same slots for preview if not specified differently
     previewSlots: frame.grid.slots.map((slot, index) => ({
@@ -116,7 +120,8 @@ export function mapFrameApiResponseToConfig(frame: FrameApiResponse): FrameConfi
       width: slot.width,
       height: slot.height,
       radius: slot.radius || 0,
-      zIndex: slot.zIndex
+      zIndex: slot.zIndex,
+      rotate: slot.rotate || 0
     }))
   };
 }
