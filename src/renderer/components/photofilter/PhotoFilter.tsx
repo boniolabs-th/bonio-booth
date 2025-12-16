@@ -461,12 +461,23 @@ export default function PhotoFilter() {
 
             // Send print request with frame configuration
             try {
+              const printOrientation = state.selectedFrame?.orientation || 'landscape';
+
+              console.log('🖨️ [PhotoFilter] Sending print request:', {
+                frameId: state.selectedFrame?.id || 'classic_2x6',
+                frameName: state.selectedFrame?.name || '2x6 Classic',
+                copies: state.quantity || 1,
+                orientation: printOrientation,
+                hasSelectedFrame: !!state.selectedFrame,
+                selectedFrameOrientation: state.selectedFrame?.orientation,
+              });
+
               window.electron.print.printPhoto({
                 imageDataUrl: printImage,
                 frameId: state.selectedFrame?.id || 'classic_2x6',
                 frameName: state.selectedFrame?.name || '2x6 Classic',
                 copies: state.quantity || 1,
-                orientation: state.selectedFrame?.orientation || 'landscape',
+                orientation: printOrientation,
               });
               console.log('Print request sent - waiting for response...');
             } catch (printError) {

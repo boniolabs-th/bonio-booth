@@ -592,6 +592,30 @@ export default function PhotoResult() {
   const [qrcodeStorageUrl, setQrcodeStorageUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const hasUploaded = useRef(false); // ป้องกันการ upload ซ้ำ
+  const [orientationLog, setOrientationLog] = useState<string>('');
+
+  // Log orientation when component mounts
+  useEffect(() => {
+    if (state?.selectedFrame) {
+      const orientation = state.selectedFrame.orientation || 'unknown';
+      const frameName = state.selectedFrame.name || state.selectedFrame.id || 'unknown';
+      const frameId = state.selectedFrame.id || 'unknown';
+      const width = state.selectedFrame.width || 0;
+      const height = state.selectedFrame.height || 0;
+
+      const logText = `🖨️ PRINT ORIENTATION: ${orientation.toUpperCase()}\nFrame: ${frameName}\nID: ${frameId}\nSize: ${width}x${height}`;
+      console.log('🖨️ [PhotoResult] Orientation Log:', {
+        orientation,
+        frameName,
+        frameId,
+        width,
+        height,
+      });
+      setOrientationLog(logText);
+    } else {
+      setOrientationLog('⚠️ No frame selected');
+    }
+  }, [state?.selectedFrame]);
 
   // Setup preview (boomerang or video based on user choice)
   useEffect(() => {
@@ -1775,6 +1799,11 @@ export default function PhotoResult() {
           เสร็จสิ้น
         </button>
       </div>
+
+      {/* Orientation Log - แสดงที่มุมล่างซ้าย */}
+      {orientationLog && (
+        <div className="orientation-log">{orientationLog}</div>
+      )}
     </div>
   );
 }

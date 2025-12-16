@@ -72,7 +72,8 @@ export interface FrameApiResponse {
   name: string;
   code: string;
   imageUrl: string;
-  imageSize: string;
+  imageSize: string; // Format: "widthxheight" เช่น "1200x1800" หรือ "1800x1200"
+  orientation?: 'portrait' | 'landscape'; // Optional: ถ้า backend ส่งมาให้ใช้ค่านี้แทนการคำนวณ
   grid: {
     rows: number;
     columns: number;
@@ -91,9 +92,35 @@ export interface FrameApiResponse {
 
 // Helper to map API response to FrameConfig
 export function mapFrameApiResponseToConfig(frame: FrameApiResponse): FrameConfig {
+  // Parse imageSize (format: "widthxheight" เช่น "1200x1800")
   const [widthStr, heightStr] = frame.imageSize.split('x');
   const width = parseInt(widthStr, 10);
   const height = parseInt(heightStr, 10);
+
+  // Validate parsed values
+  if (Number.isNaN(width) || Number.isNaN(height)) {
+    console.error('❌ [frameConfig] Invalid imageSize format:', frame.imageSize, 'for frame:', frame.code);
+    throw new Error(`Invalid imageSize format: ${frame.imageSize}`);
+  }
+
+  // คำนวณ orientation จาก width และ height
+  // landscape: width > height (เช่น 1800x1200)
+  // portrait: height > width (เช่น 1200x1800)
+  // แต่ถ้า backend ส่ง orientation มาให้ใช้ค่านั้นแทน
+  const orientation: 'portrait' | 'landscape' =
+    frame.orientation || (width > height ? 'landscape' : 'portrait');
+
+  console.log('🔍 [frameConfig] Mapping frame:', {
+    code: frame.code,
+    name: frame.name,
+    imageSize: frame.imageSize,
+    width,
+    height,
+    calculatedOrientation: width > height ? 'landscape' : 'portrait',
+    apiOrientation: frame.orientation,
+    finalOrientation: orientation,
+    source: frame.orientation ? 'from API' : 'calculated from imageSize',
+  });
 
   return {
     id: frame.code,
@@ -101,7 +128,7 @@ export function mapFrameApiResponseToConfig(frame: FrameApiResponse): FrameConfi
     image: frame.imageUrl,
     width: width,
     height: height,
-    orientation: width > height ? 'landscape' : 'portrait',
+    orientation: orientation,
     slots: frame.grid.slots.map((slot, index) => ({
       id: `${frame.code}_slot_${index + 1}`,
       x: slot.x,

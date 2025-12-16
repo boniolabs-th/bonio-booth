@@ -295,7 +295,7 @@ export class MachineService {
     this.machinePort = options.machinePort ? options.machinePort : Number(DEFAULT_PORT);
     this.machineId = options.machineId ? options.machineId : DEFAULT_MACHINE_ID;
     this.timeout = options.timeout ? options.timeout : DEFAULT_API_TIMEOUT;
-    
+
     // โหลด config จาก env.config.ts (async แต่ไม่ต้องรอ)
     loadEnvConfig().then((config) => {
       if (!options.apiBaseUrl) {

@@ -179,7 +179,7 @@ async function initializeApp() {
 async function generateImageWithPadding(
   base64: string,
   paddingPercent = 0,
-  orientation: 'portrait' | 'landscape' = 'landscape'
+  orientation: 'portrait' | 'landscape' = 'portrait'
 ): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     let htmlPath: string | null = null;
@@ -236,13 +236,12 @@ async function generateImageWithPadding(
         align-items: center;
       }
       img {
-        max-width: calc(100% ${orientation === 'portrait' ? '+' : '-'} ${orientation === 'portrait' ? '14' : '1'}%);
-        max-height: calc(100% ${orientation === 'portrait' ? '+' : '-'} ${orientation === 'portrait' ? '14' : '1'}%);
+        max-width: calc(100% ${orientation === 'portrait' ? '+' : '-'} ${orientation === 'portrait' ? '0' : '1'}%);
+        max-height: calc(100% ${orientation === 'portrait' ? '+' : '-'} ${orientation === 'portrait' ? '0' : '1'}%);
         width: auto;
         height: auto;
-        object-fit: contain;
-        display: block;
-        ${orientation === 'portrait' ? 'transform: rotate(90deg);' : ''}
+        object-fit: contain;        display: block;
+        transform: ${orientation !== 'portrait' ? 'rotate(90deg)' : 'none'};
       }
     </style>
   </head>
@@ -631,7 +630,33 @@ ipcMain.on("print-photo", async (event, printConfig) => {
 
   try {
     // ใช้ generateImageWithPadding เพื่อเพิ่ม padding รอบรูปภาพ (5% ทั้ง 4 ด้าน)
-    const orientation = printConfig.orientation || 'portrait';
+    // ตรวจสอบ orientation ที่ส่งมา
+    // หมายเหตุ: ถ้าไม่มี orientation ให้ตรวจสอบจาก frameId หรือใช้ default
+    let orientation = printConfig.orientation;
+
+    // ถ้าไม่มี orientation ให้ตรวจสอบจาก frameId หรือใช้ default
+    if (!orientation) {
+      // ตรวจสอบจาก frameId ว่ามีคำว่า portrait หรือ landscape หรือไม่
+      const frameId = (printConfig.frameId || '').toLowerCase();
+      if (frameId.includes('portrait')) {
+        orientation = 'portrait';
+      } else if (frameId.includes('landscape')) {
+        orientation = 'landscape';
+      } else {
+        // Default: ใช้ landscape (ตามที่ PhotoFilter ส่งมา)
+        orientation = 'landscape';
+      }
+    }
+
+    console.log('🖨️ [Print] Print config received:', {
+      frameId: printConfig.frameId,
+      frameName: printConfig.frameName,
+      copies,
+      orientation,
+      receivedOrientation: printConfig.orientation,
+      hasOrientation: !!printConfig.orientation,
+    });
+
     const paddedImageBuffer = await generateImageWithPadding(printConfig.imageDataUrl, 5, orientation);
 
     const tempDir = app.getPath("temp");

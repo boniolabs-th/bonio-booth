@@ -340,3 +340,21 @@
   object-fit: contain;
   display: block;
 }
+
+/* Orientation Log - แสดงที่มุมล่างซ้าย */
+.orientation-log {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: #00ff00;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+  z-index: 9999;
+  max-width: 400px;
+  word-break: break-word;
+  border: 2px solid #00ff00;
+  box-shadow: 0 4px 12px rgba(0, 255, 0, 0.3);
+}
