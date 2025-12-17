@@ -236,8 +236,8 @@ async function generateImageWithPadding(
         align-items: center;
       }
       img {
-        max-width: calc(100% ${orientation === 'landscape' ? '+' : '+'} ${orientation === 'landscape' ? '10' : '8'}%);
-        max-height: calc(100% ${orientation === 'landscape' ? '+' : '+'} ${orientation === 'landscape' ? '10' : '8'}%);
+        max-width: calc(100% ${orientation === 'landscape' ? '+' : '-'} ${orientation === 'landscape' ? '14' : '5'}%);
+        max-height: calc(100% ${orientation === 'landscape' ? '+' : '-'} ${orientation === 'landscape' ? '16' : '5'}%);
         width: auto;
         height: auto;
         object-fit: contain;
