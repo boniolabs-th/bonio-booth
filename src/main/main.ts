@@ -907,9 +907,9 @@ ipcMain.handle('get-env-vars', async () => {
 // Handler สำหรับ request machine data (รวม cameraCountdown)
 ipcMain.handle('get-machine-data', async () => {
   try {
-    // ดึง canCut จาก printer config ก่อน ถ้าไม่มีให้ใช้ค่าจาก env
+    // ดึง canCut จาก printer config ก่อน ถ้าไม่มีให้ default เป็น true (เครื่องตัดได้)
     const printerConfig = await getPrinterConfig();
-    const canCut = printerConfig?.canCut;
+    const canCut = printerConfig?.canCut ?? true; // default: เครื่องตัดได้
 
     if (cachedInitData?.machine) {
       return {

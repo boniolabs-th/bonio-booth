@@ -209,10 +209,10 @@ export default function PhotoDecorate() {
       const aspectRatio = frameWidth / frameHeight;
       const is2x6 = aspectRatio < 0.4; // Threshold to detect 2x6 strip
 
-      // ALWAYS duplicate if it is 2x6 frame, because backend always generates 4x6 canvas
-      // If machine can cut -> it cuts this 4x6 into two 2x6 strips
-      // If machine cannot cut -> user gets 4x6 with two 2x6 strips
-      const shouldDuplicate = is2x6;
+      // Duplicate only if it is 2x6 frame AND machine cannot cut
+      // If canCut=true (machine can cut) -> no duplication needed, printer will cut the 2x6 strip
+      // If canCut=false (machine cannot cut) -> duplicate to 4x6 (two 2x6 side by side)
+      const shouldDuplicate = is2x6 && !canCut;
 
       console.log('📸 [PhotoDecorate] Frame dimensions:', {
         width: frameWidth,
