@@ -26,6 +26,7 @@ import {
   PrintTest,
   PasswordModal,
   MachineConfigModal,
+  CameraConfigModal,
 } from './components';
 import './App.css';
 
@@ -48,6 +49,7 @@ function MaintenanceListener() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showQuitPasswordModal, setShowQuitPasswordModal] = useState(false);
   const [showClearConfigPasswordModal, setShowClearConfigPasswordModal] = useState(false);
+  const [showCameraConfigModal, setShowCameraConfigModal] = useState(false);
 
   useEffect(() => {
     // Check status on mount
@@ -113,6 +115,14 @@ function MaintenanceListener() {
       },
     );
 
+    // Listen for camera config modal request
+    const unsubscribeCameraConfigModal = (window as any).electron.ipcRenderer.on(
+      'show-camera-config-modal',
+      () => {
+        setShowCameraConfigModal(true);
+      },
+    );
+
     // Listen for SSE status 502 (Bad Gateway) - navigate to SystemMaintenance
     const unsubscribeSse502 = (window as any).electron.ipcRenderer.on(
       'sse-status-502',
@@ -127,6 +137,7 @@ function MaintenanceListener() {
       unsubscribePasswordModal();
       unsubscribeQuitPasswordModal();
       unsubscribeClearConfigPasswordModal();
+      unsubscribeCameraConfigModal();
       unsubscribeSse502();
     };
   }, [navigate]);
@@ -172,6 +183,14 @@ function MaintenanceListener() {
     setShowClearConfigPasswordModal(false);
   };
 
+  const handleCameraConfigClose = () => {
+    setShowCameraConfigModal(false);
+  };
+
+  const handleCameraConfigSuccess = () => {
+    console.log('✅ [App] Camera config saved successfully');
+  };
+
   return (
     <>
       <PasswordModal
@@ -193,6 +212,11 @@ function MaintenanceListener() {
         onCancel={handleClearConfigPasswordCancel}
         title="กรอกรหัสผ่านเพื่อล้างค่า Config"
         password="1212312121"
+      />
+      <CameraConfigModal
+        isOpen={showCameraConfigModal}
+        onClose={handleCameraConfigClose}
+        onSuccess={handleCameraConfigSuccess}
       />
     </>
   );

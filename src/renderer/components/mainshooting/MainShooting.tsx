@@ -155,7 +155,21 @@ export default function MainShooting() {
 
       console.log('📹 [Camera] Requesting camera access...');
 
+      // ดึง camera config จากที่บันทึกไว้
+      let configuredDeviceId: string | null = null;
+      try {
+        // @ts-ignore
+        const configResult = await window.electron?.payment?.getCameraConfig();
+        if (configResult?.success && configResult.config?.deviceId) {
+          configuredDeviceId = configResult.config.deviceId;
+          console.log('📹 [Camera] Using configured camera:', configResult.config);
+        }
+      } catch (configError) {
+        console.warn('⚠️ [Camera] Failed to get camera config:', configError);
+      }
+
       // List available devices ก่อน
+      let targetDeviceId = configuredDeviceId;
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(
@@ -174,17 +188,32 @@ export default function MainShooting() {
             'ไม่พบกล้องที่เชื่อมต่ออยู่ กรุณาตรวจสอบการเชื่อมต่อกล้อง',
           );
         }
+
+        // ถ้ามี config แต่ไม่พบกล้องที่ตั้งค่าไว้ ให้ใช้กล้องตัวสุดท้าย
+        if (targetDeviceId && !videoDevices.find(d => d.deviceId === targetDeviceId)) {
+          console.warn('⚠️ [Camera] Configured camera not found, using last camera');
+          targetDeviceId = videoDevices[videoDevices.length - 1].deviceId;
+        }
+
+        // ถ้าไม่มี config ให้ใช้กล้องตัวสุดท้าย (มักเป็น external camera)
+        if (!targetDeviceId) {
+          targetDeviceId = videoDevices[videoDevices.length - 1].deviceId;
+          console.log('📹 [Camera] No config, using last camera (external):', targetDeviceId);
+        }
       } catch (enumError) {
         console.warn('⚠️ [Camera] Failed to enumerate devices:', enumError);
         // ยังคงลองต่อไปแม้จะ enumerate ไม่ได้
       }
 
-      // Request camera access with better constraints
+      // Request camera access with specific device
       const constraints: MediaStreamConstraints = {
-        video: {
+        video: targetDeviceId ? {
+          deviceId: { exact: targetDeviceId },
           width: { ideal: 1920 },
           height: { ideal: 1080 },
-          facingMode: 'user', // ใช้กล้องหน้า (หรือ 'environment' สำหรับกล้องหลัง)
+        } : {
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
         },
         audio: false,
       };

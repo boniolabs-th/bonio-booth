@@ -65,6 +65,12 @@ import {
   DEFAULT_PAPER_POSITION_CONFIG,
   PaperPositionConfig,
 } from './services/paperPositionConfigService';
+import {
+  getCameraConfig,
+  saveCameraConfig,
+  hasCameraConfig,
+  deleteCameraConfig,
+} from './services/cameraConfigService';
 class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
@@ -473,6 +479,19 @@ const createWindow = async () => {
         if (mainWindow) {
           // ส่ง IPC message ไปที่ renderer เพื่อแสดง password modal
           mainWindow.webContents.send('show-print-test-password-modal');
+        }
+      },
+    });
+
+    template.push({ type: 'separator' });
+
+    // เพิ่มเมนู "Camera Config"
+    template.push({
+      label: 'Camera Config',
+      click: () => {
+        if (mainWindow) {
+          // ส่ง IPC message ไปที่ renderer เพื่อแสดง camera config modal
+          mainWindow.webContents.send('show-camera-config-modal');
         }
       },
     });
@@ -1250,5 +1269,54 @@ ipcMain.on('quit-app', () => {
   // ปิด window (จะไม่ถูก preventDefault เพราะ shouldQuit = true)
   if (mainWindow) {
     mainWindow.close();
+  }
+});
+
+// Camera Config handlers
+ipcMain.handle('get-camera-config', async () => {
+  try {
+    const config = await getCameraConfig();
+    return { success: true, config };
+  } catch (error) {
+    console.error('Error in get-camera-config handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('save-camera-config', async (event, config: { deviceId: string; label: string }) => {
+  try {
+    const success = await saveCameraConfig(config);
+    return { success };
+  } catch (error) {
+    console.error('Error in save-camera-config handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('has-camera-config', async () => {
+  try {
+    const hasConfig = await hasCameraConfig();
+    return { success: true, hasConfig };
+  } catch (error) {
+    console.error('Error in has-camera-config handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('delete-camera-config', async () => {
+  try {
+    const success = await deleteCameraConfig();
+    return { success };
+  } catch (error) {
+    console.error('Error in delete-camera-config handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
   }
 });
