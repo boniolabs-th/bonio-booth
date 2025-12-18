@@ -144,18 +144,18 @@ export default function PaperPositionConfigModal({
         role="dialog"
       >
         <h2 className="paper-position-config-modal-title">
-          Configure Paper Position
+         ตั้งค่าขอบกระดาษ
         </h2>
 
         <p className="paper-position-config-modal-description">
-          ปรับค่าการจัดตำแหน่งกระดาษสำหรับการพิมพ์
+          ปรับค่าขนาดภาพเพื่อลดขอบกระดาษ
         </p>
 
         {error && <p className="paper-position-config-error">{error}</p>}
 
         <div className="paper-position-config-inputs">
           <div className="paper-position-config-group">
-            <h3 className="paper-position-config-group-title">Landscape</h3>
+            <h3 className="paper-position-config-group-title">{type === 1 ? 'ปรับขนาดภาพแนวนอน' : 'ปรับขนาดภาพแนวตั้ง'}</h3>
             <div className="paper-position-config-input-group">
               <label htmlFor="landscape-width" className="paper-position-config-label">
                 Width (%):
@@ -257,7 +257,7 @@ export default function PaperPositionConfigModal({
           </div>
 
           <div className="paper-position-config-group">
-            <h3 className="paper-position-config-group-title">Portrait</h3>
+            <h3 className="paper-position-config-group-title">{type === 1 ? 'ปรับขนาดภาพแนวตั้ง' : 'ปรับขนาดภาพแนวนอน'}</h3>
             <div className="paper-position-config-input-group">
               <label htmlFor="portrait-width" className="paper-position-config-label">
                 Width (%):
@@ -370,7 +370,7 @@ export default function PaperPositionConfigModal({
                   disabled={isLoading}
                   aria-label="เลือก Landscape"
                 >
-                  Landscape
+                  Type 1
                 </button>
                 <button
                   type="button"
@@ -381,7 +381,7 @@ export default function PaperPositionConfigModal({
                   disabled={isLoading}
                   aria-label="เลือก Portrait"
                 >
-                  Portrait
+                  Type 2
                 </button>
               </div>
             </div>
