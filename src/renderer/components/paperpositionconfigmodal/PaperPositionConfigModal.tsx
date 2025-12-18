@@ -140,7 +140,7 @@ export default function PaperPositionConfigModal({
       <div
         className="paper-position-config-modal-content"
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
+        // onKeyDown={(e) => e.stopPropagation()}
         role="dialog"
       >
         <h2 className="paper-position-config-modal-title">
@@ -155,7 +155,7 @@ export default function PaperPositionConfigModal({
 
         <div className="paper-position-config-inputs">
           <div className="paper-position-config-group">
-            <h3 className="paper-position-config-group-title">{type === 1 ? 'ปรับขนาดภาพแนวนอน' : 'ปรับขนาดภาพแนวตั้ง'}</h3>
+            <h3 className="paper-position-config-group-title">{type === 1 ? 'ปรับขนาดภาพแนวตั้ง' : 'ปรับขนาดภาพแนวนอน'}</h3>
             <div className="paper-position-config-input-group">
               <label htmlFor="landscape-width" className="paper-position-config-label">
                 Width (%):
@@ -257,7 +257,7 @@ export default function PaperPositionConfigModal({
           </div>
 
           <div className="paper-position-config-group">
-            <h3 className="paper-position-config-group-title">{type === 1 ? 'ปรับขนาดภาพแนวตั้ง' : 'ปรับขนาดภาพแนวนอน'}</h3>
+            <h3 className="paper-position-config-group-title">{type === 1 ? 'ปรับขนาดภาพแนวนอน' : 'ปรับขนาดภาพแนวตั้ง'}</h3>
             <div className="paper-position-config-input-group">
               <label htmlFor="portrait-width" className="paper-position-config-label">
                 Width (%):
