@@ -58,6 +58,13 @@ import {
   deleteMachineConfig,
   getConfigFilePath,
 } from './services/configService';
+import {
+  getPaperPositionConfig,
+  savePaperPositionConfig,
+  deletePaperPositionConfig,
+  DEFAULT_PAPER_POSITION_CONFIG,
+  PaperPositionConfig,
+} from './services/paperPositionConfigService';
 class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
@@ -204,6 +211,13 @@ async function generateImageWithPadding(
     }, 15000); // 15 seconds timeout
 
     try {
+      // โหลด paper position config จากไฟล์
+      const paperPositionConfig = await getPaperPositionConfig();
+      const landscapeWidth = paperPositionConfig.landscapeWidth;
+      const landscapeHeight = paperPositionConfig.landscapeHeight;
+      const portraitWidth = paperPositionConfig.portraitWidth;
+      const portraitHeight = paperPositionConfig.portraitHeight;
+
       // สร้างไฟล์ HTML ชั่วคราว
       const tempDir = app.getPath("temp");
       htmlPath = path.join(tempDir, `padded-image-${Date.now()}.html`);
@@ -236,8 +250,8 @@ async function generateImageWithPadding(
         align-items: center;
       }
       img {
-        max-width: calc(100% ${orientation === 'landscape' ? '+' : '-'} ${orientation === 'landscape' ? '14' : '5'}%);
-        max-height: calc(100% ${orientation === 'landscape' ? '+' : '-'} ${orientation === 'landscape' ? '16' : '5'}%);
+        max-width: calc(100% ${orientation === 'landscape' ? '+' : '-'} ${orientation === 'landscape' ? landscapeWidth : portraitWidth}%);
+        max-height: calc(100% ${orientation === 'landscape' ? '+' : '-'} ${orientation === 'landscape' ? landscapeHeight : portraitHeight}%);
         width: auto;
         height: auto;
         object-fit: contain;
@@ -1020,6 +1034,8 @@ ipcMain.handle('delete-machine-config', async () => {
     if (success) {
       // Clear cache เพื่อให้อ่าน config ใหม่
       clearEnvConfigCache();
+      // Reset paper position config เป็น default ด้วย
+      await deletePaperPositionConfig();
       return { success: true };
     }
     return { success: false, error: 'Failed to delete config' };
@@ -1080,6 +1096,47 @@ ipcMain.handle('get-theme-data', async () => {
     return { success: true, theme: initResponse.theme };
   } catch (error) {
     console.error('Error in get-theme-data handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+// Paper Position Config handlers
+ipcMain.handle('get-paper-position-config', async () => {
+  try {
+    const config = await getPaperPositionConfig();
+    return { success: true, config };
+  } catch (error) {
+    console.error('Error in get-paper-position-config handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('save-paper-position-config', async (event, config: PaperPositionConfig) => {
+  try {
+    const success = await savePaperPositionConfig(config);
+    if (success) {
+      return { success: true };
+    }
+    return { success: false, error: 'Failed to save config' };
+  } catch (error) {
+    console.error('Error in save-paper-position-config handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('reset-paper-position-config', async () => {
+  try {
+    // ลบ config file เพื่อใช้ default values
+    await deletePaperPositionConfig();
+    return { success: true };
+  } catch (error) {
+    console.error('Error in reset-paper-position-config handler:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage };

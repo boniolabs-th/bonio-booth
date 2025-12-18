@@ -106,6 +106,15 @@ const electronHandler = {
     getConfigFilePath: () => {
       return ipcRenderer.invoke('get-config-file-path');
     },
+    getPaperPositionConfig: () => {
+      return ipcRenderer.invoke('get-paper-position-config');
+    },
+    savePaperPositionConfig: (config: { landscapeWidth: number; landscapeHeight: number; portraitWidth: number; portraitHeight: number }) => {
+      return ipcRenderer.invoke('save-paper-position-config', config);
+    },
+    resetPaperPositionConfig: () => {
+      return ipcRenderer.invoke('reset-paper-position-config');
+    },
   },
   video: {
     createBoomerang: (videoPath: string, format: 'video' | 'gif' = 'video') => {

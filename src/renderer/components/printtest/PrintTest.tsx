@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BackButton } from '../index';
+import BackButton from '../backbutton';
+import PaperPositionConfigModal from '../paperpositionconfigmodal';
 import './PrintTest.css';
 
 const TEST_IMAGE_URL = '../../../assets/images/image-print-test.png';
@@ -30,6 +31,8 @@ export default function PrintTest(): React.JSX.Element {
   const [originalVertical, setOriginalVertical] = useState<number>(0);
   const [envConfig, setEnvConfig] = useState<EnvConfig | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPaperPositionConfigModalOpen, setIsPaperPositionConfigModalOpen] =
+    useState(false);
 
   // Load environment config and paper position
   useEffect(() => {
@@ -330,14 +333,24 @@ export default function PrintTest(): React.JSX.Element {
         <div className="print-test-settings">
           <div className="section-header">
             <h2 className="section-title">ตั้งค่าการพิมพ์</h2>
-            <button
-              type="button"
-              className="position-paper-button"
-              onClick={handleOpenPositionModal}
-              disabled={isPrinting}
-            >
-              Position Paper
-            </button>
+            <div>
+              <button
+                type="button"
+                className="position-paper-button"
+                onClick={handleOpenPositionModal}
+                disabled={isPrinting}
+              >
+                Position Paper
+              </button>
+              <button
+                type="button"
+                className="position-paper-button"
+                onClick={() => setIsPaperPositionConfigModalOpen(true)}
+                disabled={isPrinting}
+              >
+                Configure paper position
+              </button>
+            </div>
           </div>
 
           <div className="setting-group">
@@ -525,6 +538,16 @@ export default function PrintTest(): React.JSX.Element {
           </div>
         </div>
       )}
+
+      {/* Paper Position Config Modal */}
+      <PaperPositionConfigModal
+        isOpen={isPaperPositionConfigModalOpen}
+        onSave={() => {
+          setIsPaperPositionConfigModalOpen(false);
+          alert('บันทึกการตั้งค่าสำเร็จ');
+        }}
+        onCancel={() => setIsPaperPositionConfigModalOpen(false)}
+      />
     </div>
   );
 }
