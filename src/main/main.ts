@@ -232,6 +232,8 @@ async function generateImageWithPadding(
       const portraitWidth = paperPositionConfig.portraitWidth;
       const portraitHeight = paperPositionConfig.portraitHeight;
 
+      const typeTransform = paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
+
       // สร้างไฟล์ HTML ชั่วคราว
       const tempDir = app.getPath("temp");
       htmlPath = path.join(tempDir, `padded-image-${Date.now()}.html`);
@@ -264,13 +266,13 @@ async function generateImageWithPadding(
         align-items: center;
       }
       img {
-        max-width: calc(100% ${orientation === 'landscape' ? '+' : '-'} ${orientation === 'landscape' ? landscapeWidth : portraitWidth}%);
-        max-height: calc(100% ${orientation === 'landscape' ? '+' : '-'} ${orientation === 'landscape' ? landscapeHeight : portraitHeight}%);
+        max-width: calc(100% + ${orientation === 'landscape' ? landscapeWidth : portraitWidth}%);
+        max-height: calc(100% + ${orientation === 'landscape' ? landscapeHeight : portraitHeight}%);
         width: auto;
         height: auto;
         object-fit: contain;
         display: block;
-        transform: ${orientation === 'landscape' ? 'rotate(90deg)' : 'none'};
+        transform: ${orientation === typeTransform ? 'none' : 'rotate(90deg)'};
       }
     </style>
   </head>

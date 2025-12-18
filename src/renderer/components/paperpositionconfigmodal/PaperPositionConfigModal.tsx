@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './PaperPositionConfigModal.css';
 
 export interface PaperPositionConfig {
@@ -6,6 +6,7 @@ export interface PaperPositionConfig {
   landscapeHeight: number;
   portraitWidth: number;
   portraitHeight: number;
+  type: number; // 1: landscape, 2: portrait
 }
 
 interface PaperPositionConfigModalProps {
@@ -28,6 +29,7 @@ export default function PaperPositionConfigModal({
   const [landscapeHeight, setLandscapeHeight] = useState<number>(16);
   const [portraitWidth, setPortraitWidth] = useState<number>(5);
   const [portraitHeight, setPortraitHeight] = useState<number>(5);
+  const [type, setType] = useState<number>(1); // 1: landscape, 2: portrait
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
@@ -41,6 +43,7 @@ export default function PaperPositionConfigModal({
         setLandscapeHeight(roundToDecimal(result.config.landscapeHeight || 16));
         setPortraitWidth(roundToDecimal(result.config.portraitWidth || 5));
         setPortraitHeight(roundToDecimal(result.config.portraitHeight || 5));
+        setType(result.config.type || 1);
       }
     } catch (err) {
       console.error(
@@ -53,6 +56,11 @@ export default function PaperPositionConfigModal({
     }
   };
 
+  const handleCancel = useCallback(() => {
+    setError('');
+    onCancel();
+  }, [onCancel]);
+
   // โหลด config เมื่อเปิด modal
   useEffect(() => {
     if (isOpen) {
@@ -60,15 +68,32 @@ export default function PaperPositionConfigModal({
     }
   }, [isOpen]);
 
+  // จัดการ Escape key เพื่อปิด modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        handleCancel();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }
+    return undefined;
+  }, [isOpen, handleCancel]);
+
   const handleSave = async () => {
-    // Validate values
+    // Validate values - อนุญาตให้มีค่าติดลบได้
     if (
-      landscapeWidth < 0 ||
-      landscapeHeight < 0 ||
-      portraitWidth < 0 ||
-      portraitHeight < 0
+      Number.isNaN(landscapeWidth) ||
+      Number.isNaN(landscapeHeight) ||
+      Number.isNaN(portraitWidth) ||
+      Number.isNaN(portraitHeight)
     ) {
-      setError('ค่าต้องเป็นตัวเลขที่มากกว่าหรือเท่ากับ 0');
+      setError('ค่าต้องเป็นตัวเลขที่ถูกต้อง');
       return;
     }
 
@@ -81,6 +106,7 @@ export default function PaperPositionConfigModal({
         landscapeHeight: roundToDecimal(landscapeHeight),
         portraitWidth: roundToDecimal(portraitWidth),
         portraitHeight: roundToDecimal(portraitHeight),
+        type,
       };
 
       // @ts-ignore
@@ -102,24 +128,14 @@ export default function PaperPositionConfigModal({
     }
   };
 
-  const handleCancel = () => {
-    setError('');
-    onCancel();
-  };
-
   if (!isOpen) return null;
 
   return (
     <div
       className="paper-position-config-modal-overlay"
       onClick={handleCancel}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          handleCancel();
-        }
-      }}
-      role="button"
-      tabIndex={0}
+      role="presentation"
+      aria-label="ปิด modal"
     >
       <div
         className="paper-position-config-modal-content"
@@ -149,9 +165,7 @@ export default function PaperPositionConfigModal({
                   type="button"
                   className="paper-position-config-button-decrement"
                   onClick={() =>
-                    setLandscapeWidth(
-                      roundToDecimal(Math.max(0, landscapeWidth - 0.1)),
-                    )
+                    setLandscapeWidth(roundToDecimal(landscapeWidth - 0.1))
                   }
                   disabled={isLoading}
                   aria-label="ลดค่า"
@@ -161,7 +175,6 @@ export default function PaperPositionConfigModal({
                 <input
                   id="landscape-width"
                   type="number"
-                  min="0"
                   step="0.1"
                   value={landscapeWidth}
                   onChange={(e) => {
@@ -201,9 +214,7 @@ export default function PaperPositionConfigModal({
                   type="button"
                   className="paper-position-config-button-decrement"
                   onClick={() =>
-                    setLandscapeHeight(
-                      roundToDecimal(Math.max(0, landscapeHeight - 0.1)),
-                    )
+                    setLandscapeHeight(roundToDecimal(landscapeHeight - 0.1))
                   }
                   disabled={isLoading}
                   aria-label="ลดค่า"
@@ -213,7 +224,6 @@ export default function PaperPositionConfigModal({
                 <input
                   id="landscape-height"
                   type="number"
-                  min="0"
                   step="0.1"
                   value={landscapeHeight}
                   onChange={(e) => {
@@ -257,9 +267,7 @@ export default function PaperPositionConfigModal({
                   type="button"
                   className="paper-position-config-button-decrement"
                   onClick={() =>
-                    setPortraitWidth(
-                      roundToDecimal(Math.max(0, portraitWidth - 0.1)),
-                    )
+                    setPortraitWidth(roundToDecimal(portraitWidth - 0.1))
                   }
                   disabled={isLoading}
                   aria-label="ลดค่า"
@@ -269,7 +277,6 @@ export default function PaperPositionConfigModal({
                 <input
                   id="portrait-width"
                   type="number"
-                  min="0"
                   step="0.1"
                   value={portraitWidth}
                   onChange={(e) => {
@@ -309,9 +316,7 @@ export default function PaperPositionConfigModal({
                   type="button"
                   className="paper-position-config-button-decrement"
                   onClick={() =>
-                    setPortraitHeight(
-                      roundToDecimal(Math.max(0, portraitHeight - 0.1)),
-                    )
+                    setPortraitHeight(roundToDecimal(portraitHeight - 0.1))
                   }
                   disabled={isLoading}
                   aria-label="ลดค่า"
@@ -321,7 +326,6 @@ export default function PaperPositionConfigModal({
                 <input
                   id="portrait-height"
                   type="number"
-                  min="0"
                   step="0.1"
                   value={portraitHeight}
                   onChange={(e) => {
@@ -352,6 +356,35 @@ export default function PaperPositionConfigModal({
                 </button>
               </div>
             </div>
+            <div className="paper-position-config-input-group">
+              <span className="paper-position-config-label">
+                Type Transform:
+              </span>
+              <div className="paper-position-config-toggle-group">
+                <button
+                  type="button"
+                  className={`paper-position-config-toggle-button ${
+                    type === 1 ? 'active' : ''
+                  }`}
+                  onClick={() => setType(1)}
+                  disabled={isLoading}
+                  aria-label="เลือก Landscape"
+                >
+                  Landscape
+                </button>
+                <button
+                  type="button"
+                  className={`paper-position-config-toggle-button ${
+                    type === 2 ? 'active' : ''
+                  }`}
+                  onClick={() => setType(2)}
+                  disabled={isLoading}
+                  aria-label="เลือก Portrait"
+                >
+                  Portrait
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -377,4 +410,3 @@ export default function PaperPositionConfigModal({
     </div>
   );
 }
-

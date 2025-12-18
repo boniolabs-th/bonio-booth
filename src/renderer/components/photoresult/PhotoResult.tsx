@@ -596,25 +596,80 @@ export default function PhotoResult() {
 
   // Log orientation when component mounts
   useEffect(() => {
-    if (state?.selectedFrame) {
-      const orientation = state.selectedFrame.orientation || 'unknown';
-      const frameName = state.selectedFrame.name || state.selectedFrame.id || 'unknown';
-      const frameId = state.selectedFrame.id || 'unknown';
-      const width = state.selectedFrame.width || 0;
-      const height = state.selectedFrame.height || 0;
+    const loadOrientationLog = async () => {
+      if (state?.selectedFrame) {
+        const orientation = state.selectedFrame.orientation || 'unknown';
+        const frameName =
+          state.selectedFrame.name || state.selectedFrame.id || 'unknown';
+        const frameId = state.selectedFrame.id || 'unknown';
+        const width = state.selectedFrame.width || 0;
+        const height = state.selectedFrame.height || 0;
 
-      const logText = `🖨️ PRINT ORIENTATION: ${orientation.toUpperCase()}\nFrame: ${frameName}\nID: ${frameId}\nSize: ${width}x${height}`;
-      console.log('🖨️ [PhotoResult] Orientation Log:', {
-        orientation,
-        frameName,
-        frameId,
-        width,
-        height,
-      });
-      setOrientationLog(logText);
-    } else {
-      setOrientationLog('⚠️ No frame selected');
-    }
+        // โหลด paper position config
+        let paperPositionConfig = null;
+        try {
+          // @ts-ignore
+          const result =
+            await window.electron?.payment?.getPaperPositionConfig();
+          if (result?.success && result.config) {
+            paperPositionConfig = result.config;
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error(
+            '❌ [PhotoResult] Failed to load paper position config:',
+            err,
+          );
+        }
+
+        // คำนวณ typeTransform จาก paperPositionConfig.type
+        let typeTransform = 'unknown';
+        if (paperPositionConfig) {
+          typeTransform =
+            paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
+        }
+
+        // คำนวณ transform (ตาม logic ใน main.ts)
+        // transform: ${orientation === typeTransform ? 'none' : 'rotate(90deg)'}
+        const transform =
+          orientation === typeTransform ? 'none' : 'rotate(90deg)';
+
+        // สร้าง log text
+        let logText = `🖨️ PRINT ORIENTATION: ${orientation.toUpperCase()}\n`;
+        logText += `Frame: ${frameName}\n`;
+        logText += `ID: ${frameId}\n`;
+        logText += `Size: ${width}x${height}\n`;
+        logText += `Type Transform: ${typeTransform}\n`;
+        logText += `Transform: ${transform}\n`;
+
+        if (paperPositionConfig) {
+          logText += `\n📐 Paper Position Config:\n`;
+          logText += `Type: ${paperPositionConfig.type} (${typeTransform})\n`;
+          logText += `Landscape Width: ${paperPositionConfig.landscapeWidth}%\n`;
+          logText += `Landscape Height: ${paperPositionConfig.landscapeHeight}%\n`;
+          logText += `Portrait Width: ${paperPositionConfig.portraitWidth}%\n`;
+          logText += `Portrait Height: ${paperPositionConfig.portraitHeight}%`;
+        } else {
+          logText += `\n⚠️ Paper Position Config: Not loaded`;
+        }
+
+        console.log('🖨️ [PhotoResult] Orientation Log:', {
+          orientation,
+          frameName,
+          frameId,
+          width,
+          height,
+          typeTransform,
+          transform,
+          paperPositionConfig,
+        });
+        setOrientationLog(logText);
+      } else {
+        setOrientationLog('⚠️ No frame selected');
+      }
+    };
+
+    loadOrientationLog();
   }, [state?.selectedFrame]);
 
   // Setup preview (boomerang or video based on user choice)

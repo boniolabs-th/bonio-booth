@@ -204,3 +204,44 @@
   background: #5568d3;
 }
 
+/* Toggle Group for Type Transform */
+.paper-position-config-toggle-group {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+}
+
+.paper-position-config-toggle-button {
+  flex: 1;
+  padding: 12px 20px;
+  font-size: 16px;
+  font-weight: 500;
+  border: 2px solid #e0e0e0;
+  background: white;
+  color: #333;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.paper-position-config-toggle-button:hover:not(:disabled) {
+  border-color: #667eea;
+  background: #f0f4ff;
+}
+
+.paper-position-config-toggle-button.active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.paper-position-config-toggle-button.active:hover:not(:disabled) {
+  background: #5568d3;
+  border-color: #5568d3;
+}
+
+.paper-position-config-toggle-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

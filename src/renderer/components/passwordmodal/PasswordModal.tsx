@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import './PasswordModal.css';
 
 const TEST_PRINT_PASSWORD = '1212312121';
@@ -20,24 +20,18 @@ export default function PasswordModal({
 }: PasswordModalProps): React.JSX.Element | null {
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // ใช้ custom password ถ้ามี ไม่เช่นนั้นใช้ default
   const targetPassword = expectedPassword || TEST_PRINT_PASSWORD;
 
-  const handleNumberClick = useCallback((num: string) => {
-    setPassword((prev) => {
-      if (prev.length >= 20) {
-        return prev;
-      }
-      return prev + num;
-    });
-    setPasswordError('');
-  }, []);
-
-  const handleBackspace = useCallback(() => {
-    setPassword((prev) => prev.slice(0, -1));
-    setPasswordError('');
-  }, []);
+  const handlePasswordChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setPassword(e.target.value);
+      setPasswordError('');
+    },
+    [],
+  );
 
   const handleSubmit = useCallback(() => {
     if (password === targetPassword) {
@@ -47,6 +41,10 @@ export default function PasswordModal({
     } else {
       setPasswordError('รหัสผ่านไม่ถูกต้อง');
       setPassword('');
+      // Focus input อีกครั้งหลังจาก clear
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     }
   }, [password, targetPassword, onSuccess]);
 
@@ -56,122 +54,99 @@ export default function PasswordModal({
     onCancel();
   }, [onCancel]);
 
+  // Focus input เมื่อ modal เปิด และจัดการ Escape key
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      // รอสักครู่เพื่อให้ modal render เสร็จก่อน focus
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    }
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        handleCancel();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }
+    return undefined;
+  }, [isOpen, handleCancel]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSubmit();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleCancel();
+      }
+    },
+    [handleSubmit, handleCancel],
+  );
+
   if (!isOpen) return null;
 
   return (
-    <div className="password-modal-overlay" onClick={handleCancel}>
+    <div className="password-modal-overlay" role="presentation">
+      <button
+        type="button"
+        className="password-modal-backdrop"
+        onClick={handleCancel}
+        aria-label="ปิด modal"
+      />
       <div
         className="password-modal-content"
-        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="password-modal-title"
       >
-        <h2 className="password-modal-title">{title}</h2>
+        <h2 id="password-modal-title" className="password-modal-title">
+          {title}
+        </h2>
 
-        {/* Password Display */}
-        <div className="password-display-container">
-          <div className="password-display">
-            {password.length > 0 ? (
-              <span className="password-dots">
-                {'•'.repeat(password.length)}
-              </span>
-            ) : (
-              <span className="password-placeholder">กรอกรหัสผ่าน</span>
-            )}
-          </div>
+        {/* Password Input */}
+        <div className="password-input-container">
+          <input
+            ref={inputRef}
+            type="password"
+            className="password-input"
+            value={password}
+            onChange={handlePasswordChange}
+            onKeyDown={handleKeyDown}
+            placeholder="กรอกรหัสผ่าน"
+            maxLength={50}
+            aria-label="กรอกรหัสผ่าน"
+          />
         </div>
 
-        {passwordError && (
-          <p className="password-error">{passwordError}</p>
-        )}
+        {passwordError && <p className="password-error">{passwordError}</p>}
 
-        {/* Number Pad */}
-        <div className="number-pad-container">
-          {/* Row 1: 1, 2, 3 */}
-          <div className="number-pad-row">
-            {['1', '2', '3'].map((num) => (
-              <button
-                key={num}
-                type="button"
-                className="number-pad-button"
-                onClick={() => handleNumberClick(num)}
-              >
-                {num}
-              </button>
-            ))}
-          </div>
-
-          {/* Row 2: 4, 5, 6 */}
-          <div className="number-pad-row">
-            {['4', '5', '6'].map((num) => (
-              <button
-                key={num}
-                type="button"
-                className="number-pad-button"
-                onClick={() => handleNumberClick(num)}
-              >
-                {num}
-              </button>
-            ))}
-          </div>
-
-          {/* Row 3: 7, 8, 9 */}
-          <div className="number-pad-row">
-            {['7', '8', '9'].map((num) => (
-              <button
-                key={num}
-                type="button"
-                className="number-pad-button"
-                onClick={() => handleNumberClick(num)}
-              >
-                {num}
-              </button>
-            ))}
-          </div>
-
-          {/* Row 4: Backspace, 0, Submit */}
-          <div className="number-pad-row">
-            <button
-              type="button"
-              className="number-pad-button number-pad-button-action"
-              onClick={handleBackspace}
-              disabled={password.length === 0}
-              aria-label="ลบ"
-            >
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
-                <line x1="18" y1="9" x2="12" y2="15" />
-                <line x1="12" y1="9" x2="18" y2="15" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="number-pad-button"
-              onClick={() => handleNumberClick('0')}
-            >
-              0
-            </button>
-            <button
-              type="button"
-              className="number-pad-button number-pad-button-submit"
-              onClick={handleSubmit}
-              disabled={password.length === 0}
-              aria-label="ยืนยัน"
-            >
-              ✓
-            </button>
-          </div>
+        {/* Action Buttons */}
+        <div className="password-modal-actions">
+          <button
+            type="button"
+            className="password-modal-button password-modal-button-cancel"
+            onClick={handleCancel}
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            className="password-modal-button password-modal-button-submit"
+            onClick={handleSubmit}
+            disabled={password.length === 0}
+          >
+            ยืนยัน
+          </button>
         </div>
       </div>
     </div>
   );
 }
-
