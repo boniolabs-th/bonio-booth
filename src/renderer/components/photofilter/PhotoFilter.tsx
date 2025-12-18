@@ -375,10 +375,9 @@ export default function PhotoFilter() {
         const aspectRatio = frameWidth / frameHeight;
         const is2x6 = aspectRatio < 0.4;
 
-        // Duplicate only if it is 2x6 frame AND machine cannot cut
-        // If canCut=true (machine can cut) -> no duplication needed, printer will cut the 2x6 strip
-        // If canCut=false (machine cannot cut) -> duplicate to 4x6 (two 2x6 side by side)
-        const shouldDuplicate = is2x6 && !canCut;
+        // ALWAYS duplicate if it is 2x6 frame
+        // Printer always outputs 4x6 paper, then cuts into two 2x6 strips
+        const shouldDuplicate = is2x6;
 
         console.log('🖨️ [PhotoFilter] Duplication check:', {
           canCut,

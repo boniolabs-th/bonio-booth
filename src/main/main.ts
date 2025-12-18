@@ -76,6 +76,8 @@ import {
   savePrinterConfig,
   hasPrinterConfig,
   deletePrinterConfig,
+  getActivePrinter,
+  PrinterConfig,
 } from './services/printerConfigService';
 class AppUpdater {
   constructor() {
@@ -716,14 +718,28 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     const pngPath = path.join(tempDir, `photo-${Date.now()}.png`);
     await fs.writeFile(pngPath, paddedImageBuffer);
 
+    // ตรวจสอบว่าเป็น frame 2x6 หรือไม่
+    const frameId = (printConfig.frameId || '').toLowerCase();
+    const is2x6Frame = frameId.includes('2x6') || orientation === 'portrait';
+
     // ดึง printer name จาก config ก่อน
     let printerName = "DP-QW410";
 
     // 1. ลองดึงจาก printer config ที่บันทึกไว้
     const printerConfig = await getPrinterConfig();
-    if (printerConfig?.printerName) {
-      printerName = printerConfig.printerName;
-      console.log('🖨️ [Print] Using configured printer:', printerName);
+    if (printerConfig) {
+      // ใช้ getActivePrinter เพื่อเลือก printer ตาม frame type
+      // ถ้าเป็น 2x6 และมี secondary ที่ canCut=true → ใช้ secondary
+      const activePrinter = getActivePrinter(printerConfig, is2x6Frame);
+      printerName = activePrinter.printerName;
+      console.log('🖨️ [Print] Using configured printer:', printerName, {
+        is2x6Frame,
+        frameId: printConfig.frameId,
+        canCut: activePrinter.canCut,
+        hasSecondary: !!printerConfig.secondary,
+        secondaryCanCut: printerConfig.secondary?.canCut,
+        paperSize: activePrinter.paperSize,
+      });
     } else if (mainWindow) {
       // 2. ถ้าไม่มี config ให้หา QW410 จากรายการ printers
       const printers = await mainWindow.webContents.getPrintersAsync();
@@ -907,9 +923,15 @@ ipcMain.handle('get-env-vars', async () => {
 // Handler สำหรับ request machine data (รวม cameraCountdown)
 ipcMain.handle('get-machine-data', async () => {
   try {
-    // ดึง canCut จาก printer config ก่อน ถ้าไม่มีให้ default เป็น true (เครื่องตัดได้)
+    // ดึง canCut จาก main printer config (ใช้สำหรับ UI decision)
+    // Note: ตอนปริ้นจริงจะเลือก printer ตาม frame type อีกที
     const printerConfig = await getPrinterConfig();
-    const canCut = printerConfig?.canCut ?? true; // default: เครื่องตัดได้
+    let canCut = true; // default: เครื่องตัดได้
+    if (printerConfig) {
+      // ใช้ main.canCut เป็นค่าหลัก
+      // ถ้ามี secondary ที่ canCut=true ก็ถือว่าระบบตัดได้
+      canCut = printerConfig.main.canCut || (printerConfig.secondary?.canCut ?? false);
+    }
 
     if (cachedInitData?.machine) {
       return {
@@ -1383,7 +1405,7 @@ ipcMain.handle('get-printer-config', async () => {
   }
 });
 
-ipcMain.handle('save-printer-config', async (event, config: { printerName: string; displayName: string; canCut: boolean }) => {
+ipcMain.handle('save-printer-config', async (event, config: PrinterConfig) => {
   try {
     const success = await savePrinterConfig(config);
     return { success };
