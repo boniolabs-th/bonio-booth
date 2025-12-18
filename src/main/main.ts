@@ -720,9 +720,12 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     const pngPath = path.join(tempDir, `photo-${Date.now()}.png`);
     await fs.writeFile(pngPath, paddedImageBuffer);
 
-    // ตรวจสอบว่าเป็น frame 2x6 หรือไม่
+    // ตรวจสอบว่าเป็น frame 2x6 หรือไม่ (ต้องตัดกระดาษ)
+    // ใช้ frameId เท่านั้น ไม่ใช้ orientation เพราะ:
+    // - 2x6 = ต้องตัด (duplicate เป็น 4x6 แล้วตัดครึ่ง)
+    // - 6x4 = ไม่ต้องตัด (พิมพ์เต็มแผ่น)
     const frameId = (printConfig.frameId || '').toLowerCase();
-    const is2x6Frame = frameId.includes('2x6') || orientation === 'portrait';
+    const is2x6Frame = frameId.includes('2x6');
 
     // ดึง printer name จาก config ก่อน
     let printerName = "DP-QW410";
