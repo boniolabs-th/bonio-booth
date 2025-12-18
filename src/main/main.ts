@@ -907,7 +907,9 @@ ipcMain.handle('get-env-vars', async () => {
 // Handler สำหรับ request machine data (รวม cameraCountdown)
 ipcMain.handle('get-machine-data', async () => {
   try {
-    const canCut = process.env.MACHINE_CAN_CUT !== 'false';
+    // ดึง canCut จาก printer config ก่อน ถ้าไม่มีให้ใช้ค่าจาก env
+    const printerConfig = await getPrinterConfig();
+    const canCut = printerConfig?.canCut;
 
     if (cachedInitData?.machine) {
       return {
@@ -1381,7 +1383,7 @@ ipcMain.handle('get-printer-config', async () => {
   }
 });
 
-ipcMain.handle('save-printer-config', async (event, config: { printerName: string; displayName: string }) => {
+ipcMain.handle('save-printer-config', async (event, config: { printerName: string; displayName: string; canCut: boolean }) => {
   try {
     const success = await savePrinterConfig(config);
     return { success };

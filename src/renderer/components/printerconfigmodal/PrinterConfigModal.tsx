@@ -20,9 +20,11 @@ export default function PrinterConfigModal({
 }: PrinterConfigModalProps): React.JSX.Element | null {
   const [printers, setPrinters] = useState<PrinterDevice[]>([]);
   const [selectedPrinterName, setSelectedPrinterName] = useState<string>('');
+  const [canCut, setCanCut] = useState<boolean>(true);
   const [currentConfig, setCurrentConfig] = useState<{
     printerName: string;
     displayName: string;
+    canCut?: boolean;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -54,6 +56,7 @@ export default function PrinterConfigModal({
         if (configResult?.success && configResult.config) {
           setCurrentConfig(configResult.config);
           setSelectedPrinterName(configResult.config.printerName);
+          setCanCut(configResult.config.canCut ?? true);
         } else if (printerList.length > 0) {
           // ถ้าไม่มี config ให้เลือก default printer หรือตัวที่มี qw410 ในชื่อ
           const qw410Printer = printerList.find((p) =>
@@ -104,6 +107,7 @@ export default function PrinterConfigModal({
       const result = await window.electron?.payment?.savePrinterConfig({
         printerName: selectedPrinter.name,
         displayName: selectedPrinter.displayName,
+        canCut,
       });
 
       if (result?.success) {
@@ -173,6 +177,32 @@ export default function PrinterConfigModal({
                   <strong>{currentConfig.displayName}</strong>
                 </p>
               )}
+            </div>
+
+            {/* Can Cut Toggle */}
+            <div className="printer-config-form">
+              <label className="printer-config-label">
+                ความสามารถในการตัดกระดาษ
+              </label>
+              <div className="printer-config-toggle-container">
+                <label className="printer-config-toggle">
+                  <input
+                    type="checkbox"
+                    checked={canCut}
+                    onChange={(e) => setCanCut(e.target.checked)}
+                    disabled={isSaving}
+                  />
+                  <span className="printer-config-toggle-slider" />
+                </label>
+                <span className="printer-config-toggle-label">
+                  {canCut ? 'เครื่องปริ้นตัดกระดาษได้' : 'เครื่องปริ้นตัดกระดาษไม่ได้'}
+                </span>
+              </div>
+              <p className="printer-config-hint">
+                {canCut
+                  ? 'ระบบจะพิมพ์แบบแยกแผ่น (ตัดอัตโนมัติหลังพิมพ์แต่ละรูป)'
+                  : 'ระบบจะพิมพ์แบบต่อเนื่อง (ไม่ตัดกระดาษ)'}
+              </p>
             </div>
 
             {/* Printer Info */}

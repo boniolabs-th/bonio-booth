@@ -133,7 +133,7 @@ const electronHandler = {
     getPrinterConfig: () => {
       return ipcRenderer.invoke('get-printer-config');
     },
-    savePrinterConfig: (config: { printerName: string; displayName: string }) => {
+    savePrinterConfig: (config: { printerName: string; displayName: string; canCut: boolean }) => {
       return ipcRenderer.invoke('save-printer-config', config);
     },
     hasPrinterConfig: () => {

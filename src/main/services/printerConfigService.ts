@@ -11,6 +11,7 @@ import path from 'path';
 export interface PrinterConfig {
   printerName: string;
   displayName: string;
+  canCut: boolean; // เครื่องปริ้นตัดกระดาษได้หรือไม่
 }
 
 const CONFIG_FILE_NAME = 'printer-config.json';

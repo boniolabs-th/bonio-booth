@@ -15,7 +15,6 @@ export interface EnvConfig {
   API_BASE_URL: string;
   PORT: string;
   MACHINE_ID: string;
-  MACHINE_CAN_CUT: boolean;
   API_TIMEOUT: number;
 }
 
@@ -74,7 +73,6 @@ export async function getEnvConfig(): Promise<EnvConfig> {
     API_BASE_URL: apiBaseUrl,
     PORT: port,
     MACHINE_ID: machineId,
-    MACHINE_CAN_CUT: process.env.MACHINE_CAN_CUT !== 'false',
     API_TIMEOUT: apiTimeout,
   };
 
