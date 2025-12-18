@@ -464,8 +464,11 @@ export default function PhotoFilter() {
             try {
               const printOrientation = state.selectedFrame?.orientation || 'landscape';
 
+              const frameIdToSend = state.selectedFrame?.id || 'classic_2x6';
+              const is2x6Check = frameIdToSend.toLowerCase().includes('2x6');
+
               console.log('🖨️ [PhotoFilter] Sending print request:', {
-                frameId: state.selectedFrame?.id || 'classic_2x6',
+                frameId: frameIdToSend,
                 frameName: state.selectedFrame?.name || '2x6 Classic',
                 copies: state.quantity || 1,
                 orientation: printOrientation,
@@ -473,9 +476,16 @@ export default function PhotoFilter() {
                 selectedFrameOrientation: state.selectedFrame?.orientation,
               });
 
+              console.log('🔍 [PhotoFilter] Frame check for printer selection:', {
+                frameId: frameIdToSend,
+                frameIdLower: frameIdToSend.toLowerCase(),
+                includes2x6: is2x6Check,
+                expectedPrinter: is2x6Check ? 'Secondary (Cut)' : 'Main (No Cut)',
+              });
+
               window.electron.print.printPhoto({
                 imageDataUrl: printImage,
-                frameId: state.selectedFrame?.id || 'classic_2x6',
+                frameId: frameIdToSend,
                 frameName: state.selectedFrame?.name || '2x6 Classic',
                 copies: state.quantity || 1,
                 orientation: printOrientation,

@@ -748,7 +748,9 @@ ipcMain.on("print-photo", async (event, printConfig) => {
       // ถ้าเป็น 2x6 และมี secondary ที่ canCut=true → ใช้ secondary
       const activePrinter = getActivePrinter(printerConfig, is2x6Frame);
       printerName = activePrinter.printerName;
-      console.log('🖨️ [Print] Printer selection debug:', {
+
+      // ใช้ electron-log เพื่อบันทึกลงไฟล์
+      log.info('🖨️ [Print] Printer selection debug:', {
         is2x6Frame,
         frameId: printConfig.frameId,
         frameIdLower: frameId,
@@ -765,7 +767,7 @@ ipcMain.on("print-photo", async (event, printConfig) => {
       const printers = await mainWindow.webContents.getPrintersAsync();
       const target = printers.find(p => p.name.toLowerCase().includes("qw410"));
       if (target) printerName = target.name;
-      console.log('🖨️ [Print] Using auto-detected printer:', printerName);
+      log.info('🖨️ [Print] Using auto-detected printer:', printerName);
     }
 
     // พิมพ์หลายครั้งตาม copies
