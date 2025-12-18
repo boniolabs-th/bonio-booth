@@ -466,6 +466,16 @@ const createWindow = async () => {
     const { Menu } = require('electron');
     const template: any[] = [];
 
+    // เพิ่ม Developer Tools (เปิดได้เสมอ)
+    template.push({
+      label: 'Developer Tools',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.webContents.toggleDevTools();
+        }
+      },
+    });
+
     // ถ้าเป็น development mode ให้เพิ่ม inspect element
     if (
       process.env.NODE_ENV === 'development' ||
@@ -479,8 +489,9 @@ const createWindow = async () => {
           }
         },
       });
-      template.push({ type: 'separator' });
     }
+
+    template.push({ type: 'separator' });
 
     // เพิ่มเมนู "Print Test" (ต้องเข้ารหัสก่อน)
     template.push({
@@ -737,13 +748,17 @@ ipcMain.on("print-photo", async (event, printConfig) => {
       // ถ้าเป็น 2x6 และมี secondary ที่ canCut=true → ใช้ secondary
       const activePrinter = getActivePrinter(printerConfig, is2x6Frame);
       printerName = activePrinter.printerName;
-      console.log('🖨️ [Print] Using configured printer:', printerName, {
+      console.log('🖨️ [Print] Printer selection debug:', {
         is2x6Frame,
         frameId: printConfig.frameId,
-        canCut: activePrinter.canCut,
-        hasSecondary: !!printerConfig.secondary,
+        frameIdLower: frameId,
+        includes2x6: frameId.includes('2x6'),
+        mainPrinter: printerConfig.main.printerName,
+        mainCanCut: printerConfig.main.canCut,
+        secondaryPrinter: printerConfig.secondary?.printerName,
         secondaryCanCut: printerConfig.secondary?.canCut,
-        paperSize: activePrinter.paperSize,
+        selectedPrinter: printerName,
+        selectedCanCut: activePrinter.canCut,
       });
     } else if (mainWindow) {
       // 2. ถ้าไม่มี config ให้หา QW410 จากรายการ printers
