@@ -71,6 +71,12 @@ import {
   hasCameraConfig,
   deleteCameraConfig,
 } from './services/cameraConfigService';
+import {
+  getPrinterConfig,
+  savePrinterConfig,
+  hasPrinterConfig,
+  deletePrinterConfig,
+} from './services/printerConfigService';
 class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
@@ -498,6 +504,19 @@ const createWindow = async () => {
 
     template.push({ type: 'separator' });
 
+    // เพิ่มเมนู "Printer Config"
+    template.push({
+      label: 'Printer Config',
+      click: () => {
+        if (mainWindow) {
+          // ส่ง IPC message ไปที่ renderer เพื่อแสดง printer config modal
+          mainWindow.webContents.send('show-printer-config-modal');
+        }
+      },
+    });
+
+    template.push({ type: 'separator' });
+
     // เพิ่มเมนู "ล้างค่า Config" (ต้องเข้ารหัสก่อน)
     template.push({
       label: 'Format Reset',
@@ -697,12 +716,20 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     const pngPath = path.join(tempDir, `photo-${Date.now()}.png`);
     await fs.writeFile(pngPath, paddedImageBuffer);
 
+    // ดึง printer name จาก config ก่อน
     let printerName = "DP-QW410";
 
-    if (mainWindow) {
+    // 1. ลองดึงจาก printer config ที่บันทึกไว้
+    const printerConfig = await getPrinterConfig();
+    if (printerConfig?.printerName) {
+      printerName = printerConfig.printerName;
+      console.log('🖨️ [Print] Using configured printer:', printerName);
+    } else if (mainWindow) {
+      // 2. ถ้าไม่มี config ให้หา QW410 จากรายการ printers
       const printers = await mainWindow.webContents.getPrintersAsync();
       const target = printers.find(p => p.name.toLowerCase().includes("qw410"));
       if (target) printerName = target.name;
+      console.log('🖨️ [Print] Using auto-detected printer:', printerName);
     }
 
     // พิมพ์หลายครั้งตาม copies
@@ -1315,6 +1342,75 @@ ipcMain.handle('delete-camera-config', async () => {
     return { success };
   } catch (error) {
     console.error('Error in delete-camera-config handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+// Printer Config handlers
+ipcMain.handle('get-printers', async () => {
+  try {
+    if (!mainWindow) {
+      return { success: false, error: 'Main window not available' };
+    }
+    const printers = await mainWindow.webContents.getPrintersAsync();
+    const printerList = printers.map((p) => ({
+      name: p.name,
+      displayName: p.displayName || p.name,
+      isDefault: p.isDefault || false,
+    }));
+    return { success: true, printers: printerList };
+  } catch (error) {
+    console.error('Error in get-printers handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('get-printer-config', async () => {
+  try {
+    const config = await getPrinterConfig();
+    return { success: true, config };
+  } catch (error) {
+    console.error('Error in get-printer-config handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('save-printer-config', async (event, config: { printerName: string; displayName: string }) => {
+  try {
+    const success = await savePrinterConfig(config);
+    return { success };
+  } catch (error) {
+    console.error('Error in save-printer-config handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('has-printer-config', async () => {
+  try {
+    const hasConfig = await hasPrinterConfig();
+    return { success: true, hasConfig };
+  } catch (error) {
+    console.error('Error in has-printer-config handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('delete-printer-config', async () => {
+  try {
+    const success = await deletePrinterConfig();
+    return { success };
+  } catch (error) {
+    console.error('Error in delete-printer-config handler:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage };

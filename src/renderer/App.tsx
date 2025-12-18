@@ -27,6 +27,7 @@ import {
   PasswordModal,
   MachineConfigModal,
   CameraConfigModal,
+  PrinterConfigModal,
 } from './components';
 import './App.css';
 
@@ -50,6 +51,7 @@ function MaintenanceListener() {
   const [showQuitPasswordModal, setShowQuitPasswordModal] = useState(false);
   const [showClearConfigPasswordModal, setShowClearConfigPasswordModal] = useState(false);
   const [showCameraConfigModal, setShowCameraConfigModal] = useState(false);
+  const [showPrinterConfigModal, setShowPrinterConfigModal] = useState(false);
 
   useEffect(() => {
     // Check status on mount
@@ -123,6 +125,14 @@ function MaintenanceListener() {
       },
     );
 
+    // Listen for printer config modal request
+    const unsubscribePrinterConfigModal = (window as any).electron.ipcRenderer.on(
+      'show-printer-config-modal',
+      () => {
+        setShowPrinterConfigModal(true);
+      },
+    );
+
     // Listen for SSE status 502 (Bad Gateway) - navigate to SystemMaintenance
     const unsubscribeSse502 = (window as any).electron.ipcRenderer.on(
       'sse-status-502',
@@ -138,6 +148,7 @@ function MaintenanceListener() {
       unsubscribeQuitPasswordModal();
       unsubscribeClearConfigPasswordModal();
       unsubscribeCameraConfigModal();
+      unsubscribePrinterConfigModal();
       unsubscribeSse502();
     };
   }, [navigate]);
@@ -191,6 +202,14 @@ function MaintenanceListener() {
     console.log('✅ [App] Camera config saved successfully');
   };
 
+  const handlePrinterConfigClose = () => {
+    setShowPrinterConfigModal(false);
+  };
+
+  const handlePrinterConfigSuccess = () => {
+    console.log('✅ [App] Printer config saved successfully');
+  };
+
   return (
     <>
       <PasswordModal
@@ -217,6 +236,11 @@ function MaintenanceListener() {
         isOpen={showCameraConfigModal}
         onClose={handleCameraConfigClose}
         onSuccess={handleCameraConfigSuccess}
+      />
+      <PrinterConfigModal
+        isOpen={showPrinterConfigModal}
+        onClose={handlePrinterConfigClose}
+        onSuccess={handlePrinterConfigSuccess}
       />
     </>
   );

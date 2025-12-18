@@ -2,7 +2,7 @@
 /* eslint no-unused-vars: off */
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
-export type Channels = 'ipc-example' | 'print-photo' | 'print-response' | 'theme-loaded' | 'machine-init' | 'navigate-to' | 'show-print-test-password-modal' | 'show-quit-app-password-modal' | 'show-clear-config-password-modal' | 'show-camera-config-modal' | 'quit-app' | 'sse-status-502';
+export type Channels = 'ipc-example' | 'print-photo' | 'print-response' | 'theme-loaded' | 'machine-init' | 'navigate-to' | 'show-print-test-password-modal' | 'show-quit-app-password-modal' | 'show-clear-config-password-modal' | 'show-camera-config-modal' | 'show-printer-config-modal' | 'quit-app' | 'sse-status-502';
 
 const electronHandler = {
   ipcRenderer: {
@@ -126,6 +126,21 @@ const electronHandler = {
     },
     deleteCameraConfig: () => {
       return ipcRenderer.invoke('delete-camera-config');
+    },
+    getPrinters: () => {
+      return ipcRenderer.invoke('get-printers');
+    },
+    getPrinterConfig: () => {
+      return ipcRenderer.invoke('get-printer-config');
+    },
+    savePrinterConfig: (config: { printerName: string; displayName: string }) => {
+      return ipcRenderer.invoke('save-printer-config', config);
+    },
+    hasPrinterConfig: () => {
+      return ipcRenderer.invoke('has-printer-config');
+    },
+    deletePrinterConfig: () => {
+      return ipcRenderer.invoke('delete-printer-config');
     },
   },
   video: {
