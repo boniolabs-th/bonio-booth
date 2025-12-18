@@ -9,8 +9,8 @@ import { app } from 'electron';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-// ขนาดกระดาษที่รองรับ
-export type PaperSize = '4x6' | '5x7' | '6x8';
+// ขนาดกระดาษที่รองรับ (ตรงกับ printer driver setting)
+export type PaperSize = '2x6' | '6x4';
 
 export interface SinglePrinterConfig {
   printerName: string;
@@ -58,7 +58,7 @@ function migrateLegacyConfig(legacy: LegacyPrinterConfig): PrinterConfig {
     main: {
       printerName: legacy.printerName,
       displayName: legacy.displayName,
-      paperSize: '4x6', // default
+      paperSize: '6x4', // default
       canCut: legacy.canCut,
     },
     secondary: undefined,

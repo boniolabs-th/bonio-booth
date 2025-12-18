@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './PrinterConfigModal.css';
 
-type PaperSize = '2x6' | '4x6';
+type PaperSize = '2x6' | '6x4';
 type TabType = 'main' | 'secondary';
 
 interface PrinterDevice {
@@ -30,7 +30,7 @@ interface PrinterConfigModalProps {
 
 const PAPER_SIZES: { value: PaperSize; label: string }[] = [
   { value: '2x6', label: '2x6 นิ้ว (5x15 ซม.)' },
-  { value: '4x6', label: '4x6 นิ้ว (10x15 ซม.)' },
+  { value: '6x4', label: '6x4 นิ้ว (15x10 ซม.)' },
 ];
 
 export default function PrinterConfigModal({
@@ -43,12 +43,12 @@ export default function PrinterConfigModal({
 
   // Main Printer
   const [mainPrinterName, setMainPrinterName] = useState<string>('');
-  const [mainPaperSize, setMainPaperSize] = useState<PaperSize>('4x6');
+  const [mainPaperSize, setMainPaperSize] = useState<PaperSize>('6x4');
   const [mainCanCut, setMainCanCut] = useState<boolean>(true);
 
   // Secondary Printer
   const [secondaryPrinterName, setSecondaryPrinterName] = useState<string>('');
-  const [secondaryPaperSize, setSecondaryPaperSize] = useState<PaperSize>('4x6');
+  const [secondaryPaperSize, setSecondaryPaperSize] = useState<PaperSize>('6x4');
   const [secondaryCanCut, setSecondaryCanCut] = useState<boolean>(true);
 
   const [currentConfig, setCurrentConfig] = useState<PrinterConfig | null>(null);
@@ -84,13 +84,13 @@ export default function PrinterConfigModal({
 
           // Main printer
           setMainPrinterName(config.main.printerName);
-          setMainPaperSize(config.main.paperSize || '4x6');
+          setMainPaperSize(config.main.paperSize || '6x4');
           setMainCanCut(config.main.canCut ?? true);
 
           // Secondary printer
           if (config.secondary) {
             setSecondaryPrinterName(config.secondary.printerName);
-            setSecondaryPaperSize(config.secondary.paperSize || '4x6');
+            setSecondaryPaperSize(config.secondary.paperSize || '6x4');
             setSecondaryCanCut(config.secondary.canCut ?? true);
           }
         } else if (printerList.length > 0) {
