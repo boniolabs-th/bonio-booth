@@ -652,6 +652,7 @@ interface PrintConfig {
   frameName: string;
   copies?: number;
   orientation?: 'portrait' | 'landscape';
+  imageSize?: string; // เช่น "1200x3600", "3600x2400", "2400x3600"
 }
 
 let isPrinting = false;
@@ -734,11 +735,19 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     await fs.writeFile(pngPath, paddedImageBuffer);
 
     // ตรวจสอบว่าเป็น frame 2x6 หรือไม่ (ต้องตัดกระดาษ)
-    // ใช้ frameId เท่านั้น ไม่ใช้ orientation เพราะ:
-    // - 2x6 = ต้องตัด (duplicate เป็น 4x6 แล้วตัดครึ่ง)
-    // - 6x4 = ไม่ต้องตัด (พิมพ์เต็มแผ่น)
-    const frameId = (printConfig.frameId || '').toLowerCase();
-    const is2x6Frame = frameId.includes('2x6');
+    // ใช้ imageSize เพื่อตรวจสอบ:
+    // - 1200x3600 = 2x6 (ต้องตัด)
+    // - 3600x2400 = 6x4 (ไม่ต้องตัด)
+    // - 2400x3600 = 4x6 (ไม่ต้องตัด)
+    const imageSize = printConfig.imageSize || '';
+    const is2x6Frame = imageSize === '1200x3600';
+
+    // Log สำหรับ debug
+    console.log('🖨️ [Print] Frame type detection:', {
+      imageSize,
+      is2x6Frame,
+      frameId: printConfig.frameId,
+    });
 
     // ดึง printer name จาก config ก่อน
     let printerName = "DP-QW410";
@@ -754,9 +763,8 @@ ipcMain.on("print-photo", async (event, printConfig) => {
       // ใช้ electron-log เพื่อบันทึกลงไฟล์
       log.info('🖨️ [Print] Printer selection debug:', {
         is2x6Frame,
+        imageSize,
         frameId: printConfig.frameId,
-        frameIdLower: frameId,
-        includes2x6: frameId.includes('2x6'),
         mainPrinter: printerConfig.main.printerName,
         mainCanCut: printerConfig.main.canCut,
         secondaryPrinter: printerConfig.secondary?.printerName,

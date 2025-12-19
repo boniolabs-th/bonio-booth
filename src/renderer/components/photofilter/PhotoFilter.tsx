@@ -483,12 +483,18 @@ export default function PhotoFilter() {
                 expectedPrinter: is2x6Check ? 'Secondary (Cut)' : 'Main (No Cut)',
               });
 
+              // สร้าง imageSize จาก width และ height ของ frame
+              const frameWidth = state.selectedFrame?.width || 1200;
+              const frameHeight = state.selectedFrame?.height || 1800;
+              const imageSize = `${frameWidth}x${frameHeight}`;
+
               window.electron.print.printPhoto({
                 imageDataUrl: printImage,
                 frameId: frameIdToSend,
                 frameName: state.selectedFrame?.name || '2x6 Classic',
                 copies: state.quantity || 1,
                 orientation: printOrientation,
+                imageSize: imageSize, // เพิ่ม imageSize สำหรับตรวจสอบ frame type
               });
               console.log('Print request sent - waiting for response...');
             } catch (printError) {
