@@ -46,6 +46,8 @@ import { resolveHtmlPath } from './util';
 import {
   applyLutToVideo,
   createBoomerangWithLut,
+  convertWebmToMp4,
+  convertWebmToMp4Base64,
 } from './services/videoService';
 import machineService from './services/machineService';
 import sseClient from './services/sseClient';
@@ -1069,6 +1071,37 @@ ipcMain.handle('create-boomerang-with-lut', async (event, videoPath: string, lut
     };
   } catch (error) {
     console.error('❌ [Main] Error creating boomerang with LUT:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+});
+
+// Handler สำหรับ convert WebM to MP4 (iPhone/Safari compatibility)
+ipcMain.handle('convert-to-mp4', async (event, videoPath: string, returnBase64: boolean = false) => {
+  try {
+    console.log('🎬 [Main] Converting WebM to MP4:', videoPath, 'returnBase64:', returnBase64);
+
+    if (returnBase64) {
+      // Return as Base64 data URL (useful for direct download/embedding)
+      const dataUrl = await convertWebmToMp4Base64(videoPath);
+      return {
+        success: true,
+        dataUrl,
+      };
+    } else {
+      // Return file path
+      const outputPath = await convertWebmToMp4(videoPath);
+      return {
+        success: true,
+        path: outputPath,
+      };
+    }
+  } catch (error) {
+    console.error('❌ [Main] Error converting to MP4:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return {

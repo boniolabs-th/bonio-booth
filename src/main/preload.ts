@@ -168,6 +168,14 @@ const electronHandler = {
     readVideoFile: (filePath: string) => {
       return ipcRenderer.invoke('read-video-file', filePath);
     },
+    /**
+     * Convert WebM video to MP4 for iPhone/Safari compatibility
+     * @param videoPath - Path to WebM video file
+     * @param returnBase64 - If true, returns base64 data URL instead of file path
+     */
+    convertToMp4: (videoPath: string, returnBase64: boolean = false) => {
+      return ipcRenderer.invoke('convert-to-mp4', videoPath, returnBase64);
+    },
   },
 };
 

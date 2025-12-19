@@ -406,3 +406,95 @@ export const cleanupTempFiles = async (filePaths: string[]): Promise<void> => {
     }),
   );
 };
+
+/**
+ * Convert WebM video to MP4 (H.264) for iPhone/Safari compatibility
+ * iPhone/Safari does not support WebM format, so we need to convert to MP4
+ */
+export const convertWebmToMp4 = async (
+  inputVideoPath: string,
+  outputPath?: string,
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const output =
+      outputPath ||
+      path.join(
+        app.getPath('temp'),
+        `converted-${Date.now()}.mp4`,
+      );
+
+    // FFmpeg command to convert WebM to MP4 (H.264)
+    // - libx264: Most compatible codec for all devices including iPhone
+    // - aac: Audio codec (if audio exists)
+    // - movflags +faststart: Optimize for web streaming
+    const args = [
+      '-i',
+      inputVideoPath,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'fast', // Balance between speed and quality
+      '-crf',
+      '23', // Quality (lower = better, 18-28 is good range)
+      '-pix_fmt',
+      'yuv420p', // Required for iPhone compatibility
+      '-c:a',
+      'aac', // Audio codec
+      '-b:a',
+      '128k', // Audio bitrate
+      '-movflags',
+      '+faststart', // Enable fast start for web playback
+      '-y', // Overwrite output file
+      output,
+    ];
+
+    const ffmpeg = spawn(ffmpegPath.path, args);
+
+    let stderrOutput = '';
+
+    ffmpeg.stderr.on('data', (data) => {
+      stderrOutput += data.toString();
+    });
+
+    ffmpeg.on('error', (error) => {
+      reject(new Error(`FFmpeg process error: ${error.message}`));
+    });
+
+    ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        if (fs.existsSync(output)) {
+          resolve(output);
+        } else {
+          reject(new Error('FFmpeg completed but output file not found'));
+        }
+      } else {
+        reject(
+          new Error(
+            `FFmpeg exited with code ${code}\nOutput: ${stderrOutput}`,
+          ),
+        );
+      }
+    });
+  });
+};
+
+/**
+ * Convert WebM to MP4 and return as Base64 data URL
+ * Useful for direct embedding or download
+ */
+export const convertWebmToMp4Base64 = async (
+  inputVideoPath: string,
+): Promise<string> => {
+  const mp4Path = await convertWebmToMp4(inputVideoPath);
+  const buffer = await fs.promises.readFile(mp4Path);
+  const base64 = buffer.toString('base64');
+
+  // Cleanup temp mp4 file
+  try {
+    await fs.promises.unlink(mp4Path);
+  } catch (error) {
+    console.error('Failed to cleanup temp MP4 file:', error);
+  }
+
+  return `data:video/mp4;base64,${base64}`;
+};

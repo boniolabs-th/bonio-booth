@@ -1088,6 +1088,7 @@ export default function PhotoResult() {
         }
 
         // เพิ่มวิดีโอจาก compiledVideoUrl (วิดีโอที่ผ่าน LUT แล้ว)
+        // แปลง WebM เป็น MP4 ก่อน upload เพื่อให้ iPhone/Safari เปิดดูได้
         console.log(
           '📤 [PhotoResult] ========== VIDEO UPLOAD CHECK ==========',
         );
@@ -1105,48 +1106,93 @@ export default function PhotoResult() {
         if (compiledVideoUrl) {
           try {
             console.log(
-              '📤 [PhotoResult] Converting compiledVideoUrl to data URL...',
+              '📤 [PhotoResult] Converting WebM video to MP4 for iPhone/Safari compatibility...',
             );
-            const convertedVideo = await blobUrlToDataUrl(compiledVideoUrl);
 
-            // คำนวณขนาดไฟล์ (ประมาณ)
-            const base64Length = convertedVideo.includes('base64,')
-              ? convertedVideo.split('base64,')[1].length
-              : convertedVideo.length;
-            const estimatedSizeMB = (base64Length * 3) / 4 / (1024 * 1024); // base64 encoding เพิ่มขนาด ~33%
+            // Step 1: Fetch blob from blob URL
+            const response = await fetch(compiledVideoUrl);
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
 
-            console.log('📤 [PhotoResult] Video conversion successful:', {
-              dataUrlLength: convertedVideo.length,
+            console.log('📤 [PhotoResult] Video blob fetched:', {
+              blobSize: blob.size,
+              blobType: blob.type,
+            });
+
+            // Step 2: Save WebM to temp file
+            const saveResult = await window.electron.video.saveTempVideo(arrayBuffer);
+            if (!saveResult.success) {
+              throw new Error(`Failed to save temp video: ${saveResult.error}`);
+            }
+            console.log('📤 [PhotoResult] WebM saved to temp:', saveResult.path);
+
+            // Step 3: Convert WebM to MP4 using FFmpeg (returns base64 data URL)
+            const convertResult = await window.electron.video.convertToMp4(saveResult.path, true);
+            if (!convertResult.success) {
+              throw new Error(`Failed to convert to MP4: ${convertResult.error}`);
+            }
+
+            const mp4DataUrl = convertResult.dataUrl;
+            console.log('📤 [PhotoResult] MP4 conversion successful:', {
+              dataUrlLength: mp4DataUrl.length,
+              preview: mp4DataUrl.substring(0, 50),
+            });
+
+            // คำนวณขนาดไฟล์ MP4 (ประมาณ)
+            const base64Length = mp4DataUrl.includes('base64,')
+              ? mp4DataUrl.split('base64,')[1].length
+              : mp4DataUrl.length;
+            const estimatedSizeMB = (base64Length * 3) / 4 / (1024 * 1024);
+
+            console.log('📤 [PhotoResult] MP4 video size:', {
               base64Length,
               estimatedSizeMB: estimatedSizeMB.toFixed(2),
             });
 
             if (estimatedSizeMB > 10) {
               console.warn(
-                `⚠️ [PhotoResult] Video size (${estimatedSizeMB.toFixed(2)}MB) exceeds 10MB limit!`,
+                `⚠️ [PhotoResult] MP4 video size (${estimatedSizeMB.toFixed(2)}MB) exceeds 10MB limit!`,
               );
               console.warn(
                 '⚠️ [PhotoResult] Video will be skipped to avoid upload failure',
               );
-              // ไม่ push วิดีโอถ้าขนาดเกิน 10MB
             } else {
-              videos.push(convertedVideo);
+              videos.push(mp4DataUrl);
               console.log(
-                '✅ [PhotoResult] Added compiledVideoUrl (LUT processed video) to videos',
+                '✅ [PhotoResult] Added MP4 video (converted from WebM) to videos',
               );
-              console.log(
-                '📤 [PhotoResult] Video data URL preview:',
-                convertedVideo.substring(0, 100),
-              );
+            }
+
+            // Cleanup temp WebM file
+            try {
+              await window.electron.video.cleanupTemp([saveResult.path]);
+            } catch (cleanupError) {
+              console.warn('⚠️ [PhotoResult] Failed to cleanup temp file:', cleanupError);
             }
           } catch (error) {
             console.error(
-              '❌ [PhotoResult] Failed to convert compiledVideoUrl to data URL:',
+              '❌ [PhotoResult] Failed to convert video to MP4:',
               error,
             );
             console.warn(
-              '⚠️ [PhotoResult] Skipping video upload due to conversion error',
+              '⚠️ [PhotoResult] Falling back to WebM format...',
             );
+
+            // Fallback: upload WebM if MP4 conversion fails
+            try {
+              const convertedVideo = await blobUrlToDataUrl(compiledVideoUrl);
+              const base64Length = convertedVideo.includes('base64,')
+                ? convertedVideo.split('base64,')[1].length
+                : convertedVideo.length;
+              const estimatedSizeMB = (base64Length * 3) / 4 / (1024 * 1024);
+
+              if (estimatedSizeMB <= 10) {
+                videos.push(convertedVideo);
+                console.log('✅ [PhotoResult] Added WebM video (fallback) to videos');
+              }
+            } catch (fallbackError) {
+              console.error('❌ [PhotoResult] Fallback also failed:', fallbackError);
+            }
           }
         } else {
           console.warn(
@@ -1541,20 +1587,47 @@ export default function PhotoResult() {
                 );
               }
 
-              // เพิ่มวิดีโอ
+              // เพิ่มวิดีโอ (แปลง WebM เป็น MP4 สำหรับ iPhone/Safari)
               if (compiledVideoUrl) {
                 try {
-                  const convertedVideo =
-                    await blobUrlToDataUrl(compiledVideoUrl);
-                  videos.push(convertedVideo);
-                  console.log(
-                    '✅ [PhotoResult] Added video to upload (from compiledVideoUrl effect)',
-                  );
+                  console.log('📤 [PhotoResult] Converting WebM to MP4 (useEffect)...');
+
+                  // Fetch blob from blob URL
+                  const response = await fetch(compiledVideoUrl);
+                  const blob = await response.blob();
+                  const arrayBuffer = await blob.arrayBuffer();
+
+                  // Save WebM to temp file
+                  const saveResult = await window.electron.video.saveTempVideo(arrayBuffer);
+                  if (!saveResult.success) {
+                    throw new Error(`Failed to save temp video: ${saveResult.error}`);
+                  }
+
+                  // Convert WebM to MP4
+                  const convertResult = await window.electron.video.convertToMp4(saveResult.path, true);
+                  if (!convertResult.success) {
+                    throw new Error(`Failed to convert to MP4: ${convertResult.error}`);
+                  }
+
+                  videos.push(convertResult.dataUrl);
+                  console.log('✅ [PhotoResult] Added MP4 video to upload (useEffect)');
+
+                  // Cleanup temp file
+                  try {
+                    await window.electron.video.cleanupTemp([saveResult.path]);
+                  } catch (cleanupErr) {
+                    console.warn('⚠️ Cleanup failed:', cleanupErr);
+                  }
                 } catch (error) {
-                  console.error(
-                    '❌ [PhotoResult] Failed to convert video:',
-                    error,
-                  );
+                  console.error('❌ [PhotoResult] MP4 conversion failed, trying WebM fallback:', error);
+                  // Fallback to WebM
+                  try {
+                    const convertedVideo = await blobUrlToDataUrl(compiledVideoUrl);
+                    videos.push(convertedVideo);
+                    console.log('✅ [PhotoResult] Added WebM video (fallback) to upload');
+                  } catch (fallbackError) {
+                    console.error('❌ [PhotoResult] Fallback also failed:', fallbackError);
+                  }
                 }
               }
 
@@ -1565,25 +1638,7 @@ export default function PhotoResult() {
                 compiledVideoUrlPreview: compiledVideoUrl?.substring(0, 50),
               });
 
-              if (videos.length === 0 && compiledVideoUrl) {
-                console.warn(
-                  '⚠️ [PhotoResult] compiledVideoUrl exists but videos array is empty!',
-                );
-                console.warn(
-                  '⚠️ [PhotoResult] Attempting to add video again...',
-                );
-                try {
-                  const convertedVideo =
-                    await blobUrlToDataUrl(compiledVideoUrl);
-                  videos.push(convertedVideo);
-                  console.log('✅ [PhotoResult] Video added to array (retry)');
-                } catch (error) {
-                  console.error(
-                    '❌ [PhotoResult] Failed to add video (retry):',
-                    error,
-                  );
-                }
-              }
+              // Retry logic removed - MP4 conversion already handles fallback
 
               console.log('📤 [PhotoResult] Final arrays before upload:', {
                 photosCount: photos.length,
