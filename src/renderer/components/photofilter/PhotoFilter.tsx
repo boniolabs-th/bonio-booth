@@ -657,6 +657,23 @@ export default function PhotoFilter() {
                 <div className="filter-preview-section">
                   <div className="filter-preview-title">เลือก Filter</div>
                   <div className="filter-preview-grid">
+                    {/* ปุ่มไม่ใช้ Filter */}
+                    <button
+                      key="none"
+                      type="button"
+                      className={`filter-preview-item ${
+                        selectedFilter === 'none' ? 'active' : ''
+                      }`}
+                      onClick={() => handleFilterClick('none')}
+                    >
+                      <div className="filter-preview-image">
+                        <img
+                          src={state.selectedCaptures[0].photo}
+                          alt="ไม่ใช้ Filter"
+                        />
+                      </div>
+                      <div className="filter-preview-name">ไม่ใช้ Filter</div>
+                    </button>
                     {FILTERS.map((filter) => {
                       const getFilterStyle = (filterId: string) => {
                         const f = FILTERS.find((fl) => fl.id === filterId);

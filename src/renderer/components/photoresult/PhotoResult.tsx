@@ -593,6 +593,72 @@ export default function PhotoResult() {
   const [isUploading, setIsUploading] = useState(false);
   const hasUploaded = useRef(false); // ป้องกันการ upload ซ้ำ
   const [orientationLog, setOrientationLog] = useState<string>('');
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const gifImageRef = useRef<HTMLImageElement | null>(null);
+
+  // Ensure video loops continuously
+  useEffect(() => {
+    const video = videoRef.current;
+    const videoUrl = state?.selectedCaptures?.[0]?.video;
+
+    if (video && videoUrl && !previewBoomerangGif) {
+      const handleEnded = () => {
+        video.currentTime = 0;
+        video.play().catch(() => {
+          // Ignore play errors
+        });
+      };
+
+      video.addEventListener('ended', handleEnded);
+      // Ensure loop attribute is set
+      video.loop = true;
+
+      return () => {
+        video.removeEventListener('ended', handleEnded);
+      };
+    }
+
+    return undefined;
+  }, [state?.selectedCaptures, previewBoomerangGif]);
+
+  // Ensure GIF loops continuously by reloading it
+  useEffect(() => {
+    const img = gifImageRef.current;
+    if (img && previewBoomerangGif) {
+      // Set up interval to reload GIF periodically to ensure it loops
+      const interval = setInterval(() => {
+        if (img.complete) {
+          const currentSrc = img.src;
+          img.src = '';
+          setTimeout(() => {
+            img.src = currentSrc;
+          }, 10);
+        }
+      }, 2000); // Reload every 2 seconds (adjust based on GIF duration)
+
+      return () => {
+        clearInterval(interval);
+      };
+    }
+
+    return undefined;
+  }, [previewBoomerangGif]);
+
+  // Prevent invalid previewBoomerangGif values
+  useEffect(() => {
+    if (
+      previewBoomerangGif &&
+      (previewBoomerangGif === 'http://localhost:1212/index.html' ||
+        !previewBoomerangGif.startsWith('data:'))
+    ) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '⚠️ [PhotoResult] Invalid previewBoomerangGif detected, resetting:',
+        previewBoomerangGif,
+      );
+      setPreviewBoomerangGif(null);
+    }
+  }, [previewBoomerangGif]);
 
   // Log orientation when component mounts
   useEffect(() => {
@@ -683,24 +749,61 @@ export default function PhotoResult() {
       const shouldUseBoomerang = state.useBoomerang || false;
 
       if (shouldUseBoomerang) {
-        // Check if boomerang assets already exist
-        if (firstCapture.boomerangGif) {
+        // Check if boomerang assets already exist and is valid data URL
+        if (
+          firstCapture.boomerangGif &&
+          firstCapture.boomerangGif.startsWith('data:')
+        ) {
+          // eslint-disable-next-line no-console
+          console.log(
+            '✅ [PhotoResult] Using existing boomerang GIF:',
+            firstCapture.boomerangGif.substring(0, 50),
+          );
           setPreviewBoomerangGif(firstCapture.boomerangGif);
           return;
         }
 
         // Generate boomerang assets if not exists
-        try {
-          const assets = await generateBoomerangAssets(firstCapture.video);
-          setPreviewBoomerangGif(assets.boomerangGif);
-        } catch (error) {
+        if (firstCapture.video) {
+          try {
+            // eslint-disable-next-line no-console
+            console.log(
+              '🔄 [PhotoResult] Generating boomerang assets from video:',
+              firstCapture.video,
+            );
+            const assets = await generateBoomerangAssets(firstCapture.video);
+            if (assets.boomerangGif && assets.boomerangGif.startsWith('data:')) {
+              // eslint-disable-next-line no-console
+              console.log(
+                '✅ [PhotoResult] Boomerang GIF generated:',
+                assets.boomerangGif.substring(0, 50),
+              );
+              setPreviewBoomerangGif(assets.boomerangGif);
+            } else {
+              // eslint-disable-next-line no-console
+              console.warn(
+                '⚠️ [PhotoResult] Invalid boomerang GIF, falling back to video',
+              );
+              setPreviewBoomerangGif(null);
+            }
+          } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('❌ [PhotoResult] Failed to create boomerang preview:', error);
+            // Fallback to video if boomerang generation fails
+            setPreviewBoomerangGif(null);
+          }
+        } else {
           // eslint-disable-next-line no-console
-          console.error('Failed to create boomerang preview:', error);
-          // Fallback to video if boomerang generation fails
+          console.warn('⚠️ [PhotoResult] No video available for boomerang');
           setPreviewBoomerangGif(null);
         }
       } else {
         // Use regular video, no boomerang
+        // eslint-disable-next-line no-console
+        console.log(
+          '📹 [PhotoResult] Using regular video (no boomerang):',
+          firstCapture.video,
+        );
         setPreviewBoomerangGif(null);
       }
     };
@@ -1803,17 +1906,42 @@ export default function PhotoResult() {
           {state?.selectedCaptures?.[0] && (
             <>
               <div className="video-preview-container">
-                {previewBoomerangGif ? (
+                {previewBoomerangGif &&
+                previewBoomerangGif !== 'http://localhost:1212/index.html' &&
+                previewBoomerangGif.startsWith('data:') ? (
                   <img
+                    ref={gifImageRef}
                     src={previewBoomerangGif}
                     alt="Boomerang preview"
                     className="video-preview"
                     style={{
                       filter: getFilterStyle(),
                     }}
+                    onLoad={(e) => {
+                      // Force reload to loop GIF
+                      const img = e.currentTarget;
+                      if (img.complete) {
+                        // Reset image to force replay
+                        const currentSrc = img.src;
+                        img.src = '';
+                        setTimeout(() => {
+                          img.src = currentSrc;
+                        }, 10);
+                      }
+                    }}
+                    onError={() => {
+                      // eslint-disable-next-line no-console
+                      console.error(
+                        '❌ [PhotoResult] Failed to load GIF:',
+                        previewBoomerangGif?.substring(0, 50),
+                      );
+                      // Fallback to video if GIF fails to load
+                      setPreviewBoomerangGif(null);
+                    }}
                   />
                 ) : state?.selectedCaptures?.[0]?.video ? (
                   <video
+                    ref={videoRef}
                     src={state.selectedCaptures[0].video}
                     className="video-preview"
                     style={{
@@ -1823,6 +1951,13 @@ export default function PhotoResult() {
                     muted
                     playsInline
                     autoPlay
+                    onEnded={(e) => {
+                      const video = e.currentTarget;
+                      video.currentTime = 0;
+                      video.play().catch(() => {
+                        // Ignore play errors
+                      });
+                    }}
                   />
                 ) : (
                   <div className="video-preview-loading">
