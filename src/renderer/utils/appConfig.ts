@@ -23,15 +23,15 @@ export const COUNTDOWN = {
     VISIBLE: true,
   },
   FRAME_SELECTION: {
-    DURATION: 30000,
+    DURATION: 300,
     VISIBLE: true,
   },
   PHOTO_PREPARE: {
-    DURATION: 30000,
+    DURATION: 300,
     VISIBLE: true,
   },
   PHOTO_DECORATE: {
-    DURATION: 30000,
+    DURATION: 300,
     VISIBLE: true,
   },
   PHOTO_FILTER: {

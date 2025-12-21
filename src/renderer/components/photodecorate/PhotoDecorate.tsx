@@ -27,7 +27,7 @@ export default function PhotoDecorate() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
-  const selectedFrame = state.selectedFrame;
+  const { selectedFrame } = state;
   const [photoAssignments, setPhotoAssignments] = useState<{
     [slotIndex: number]: number;
   }>({});
@@ -523,13 +523,12 @@ export default function PhotoDecorate() {
             ref={containerRef}
             className="frame-preview-container"
             style={{
-              aspectRatio: frameAspectRatio,
-              height: '65vh',
-              width: 'auto',
-              maxWidth: '100%',
               position: 'relative',
-              isolation: 'isolate', // Create stacking context
-              backgroundColor: '#ffffff', // White background for transparent frames
+              width: '100%',
+              maxWidth: `calc(65vh * ${frameAspectRatio})`,
+              aspectRatio: frameAspectRatio,
+              isolation: 'isolate',
+              backgroundColor: '#ffffff',
             }}
           >
             <img
@@ -543,7 +542,7 @@ export default function PhotoDecorate() {
                 left: 0,
                 width: '100%',
                 height: '100%',
-                objectFit: 'fill',
+                objectFit: 'contain',
                 zIndex: 0,
                 pointerEvents: 'none',
               }}
@@ -573,7 +572,8 @@ export default function PhotoDecorate() {
                     borderRadius: `${scaledRadius}px`,
                     overflow: 'hidden', // Ensure content is clipped
                     zIndex: zIndex < 0 ? -1 : 1, // Simple layering relative to frame
-                    transform: rotation !== 0 ? `rotate(${rotation}deg)` : undefined,
+                    transform:
+                      rotation !== 0 ? `rotate(${rotation}deg)` : undefined,
                   }}
                 >
                   {photoAssignments[slotIndex] !== undefined && (

@@ -45,6 +45,124 @@ export default function PhotoFilter() {
   const [canCut, setCanCut] = useState<boolean>(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Horizontal scroll for filter thumbnails
+  const filtersContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+  const thumbnailWidthRef = useRef(120 + 16); // thumbnail width + gap
+
+  // Update scroll position state
+  const updateScrollButtons = useCallback(() => {
+    if (filtersContainerRef.current) {
+      const {
+        scrollLeft: sl,
+        scrollWidth,
+        clientWidth,
+      } = filtersContainerRef.current;
+      setCanScrollLeft(sl > 0);
+      setCanScrollRight(sl < scrollWidth - clientWidth - 1);
+    }
+  }, []);
+
+  // Scroll by one filter
+  const scrollByOneFilter = (direction: 'left' | 'right') => {
+    if (filtersContainerRef.current) {
+      const scrollAmount =
+        direction === 'left'
+          ? -thumbnailWidthRef.current
+          : thumbnailWidthRef.current;
+      filtersContainerRef.current.scrollBy({
+        left: scrollAmount,
+        behavior: 'smooth',
+      });
+    }
+  };
+
+  // Drag-to-scroll state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [dragScrollLeft, setDragScrollLeft] = useState(0);
+  const isDraggingRef = useRef(false);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    isDraggingRef.current = false;
+    if (filtersContainerRef.current) {
+      setDragStartX(e.pageX - filtersContainerRef.current.offsetLeft);
+      setDragScrollLeft(filtersContainerRef.current.scrollLeft);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    if (filtersContainerRef.current) {
+      const x = e.pageX - filtersContainerRef.current.offsetLeft;
+      const walk = (x - dragStartX) * 2; // Scroll speed multiplier
+      if (Math.abs(walk) > 5) {
+        isDraggingRef.current = true;
+      }
+      filtersContainerRef.current.scrollLeft = dragScrollLeft - walk;
+    }
+  };
+
+  // Touch event handlers for touch screen
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setIsDragging(true);
+    isDraggingRef.current = false;
+    if (filtersContainerRef.current) {
+      setDragStartX(
+        e.touches[0].pageX - filtersContainerRef.current.offsetLeft,
+      );
+      setDragScrollLeft(filtersContainerRef.current.scrollLeft);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    if (filtersContainerRef.current) {
+      const x = e.touches[0].pageX - filtersContainerRef.current.offsetLeft;
+      const walk = (x - dragStartX) * 2;
+      if (Math.abs(walk) > 5) {
+        isDraggingRef.current = true;
+      }
+      filtersContainerRef.current.scrollLeft = dragScrollLeft - walk;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
+  // Update scroll buttons on scroll and on resize
+  useEffect(() => {
+    const container = filtersContainerRef.current;
+    if (container && !isGeneratingThumbnails) {
+      container.addEventListener('scroll', updateScrollButtons);
+
+      const resizeObserver = new ResizeObserver(() => {
+        updateScrollButtons();
+      });
+      resizeObserver.observe(container);
+
+      updateScrollButtons();
+
+      return () => {
+        container.removeEventListener('scroll', updateScrollButtons);
+        resizeObserver.disconnect();
+      };
+    }
+    return undefined;
+  }, [updateScrollButtons, isGeneratingThumbnails, lutThumbnails]);
+
   useEffect(() => {
     const fetchMachineData = async () => {
       try {
@@ -462,7 +580,8 @@ export default function PhotoFilter() {
 
             // Send print request with frame configuration
             try {
-              const printOrientation = state.selectedFrame?.orientation || 'landscape';
+              const printOrientation =
+                state.selectedFrame?.orientation || 'landscape';
 
               const frameIdToSend = state.selectedFrame?.id || 'classic_2x6';
               const is2x6Check = frameIdToSend.toLowerCase().includes('2x6');
@@ -476,12 +595,17 @@ export default function PhotoFilter() {
                 selectedFrameOrientation: state.selectedFrame?.orientation,
               });
 
-              console.log('🔍 [PhotoFilter] Frame check for printer selection:', {
-                frameId: frameIdToSend,
-                frameIdLower: frameIdToSend.toLowerCase(),
-                includes2x6: is2x6Check,
-                expectedPrinter: is2x6Check ? 'Secondary (Cut)' : 'Main (No Cut)',
-              });
+              console.log(
+                '🔍 [PhotoFilter] Frame check for printer selection:',
+                {
+                  frameId: frameIdToSend,
+                  frameIdLower: frameIdToSend.toLowerCase(),
+                  includes2x6: is2x6Check,
+                  expectedPrinter: is2x6Check
+                    ? 'Secondary (Cut)'
+                    : 'Main (No Cut)',
+                },
+              );
 
               // สร้าง imageSize จาก width และ height ของ frame
               const frameWidth = state.selectedFrame?.width || 1200;
@@ -546,7 +670,9 @@ export default function PhotoFilter() {
   };
 
   const handleFilterClick = (filterId: string) => {
-    setSelectedFilter(filterId);
+    if (!isDraggingRef.current) {
+      setSelectedFilter(filterId);
+    }
   };
 
   // สร้าง preview ของ finalImage ที่มี filter applied กับรูปภาพใน frame
@@ -597,138 +723,211 @@ export default function PhotoFilter() {
 
       {/* Main Content */}
       <div className="main-content-filter">
-        {/* Row 1: Title (20%) */}
-        <div className="row-top">
+        {/* Row 1: Title (10%) */}
+        <div className="row-top-filter">
           <div className="title-section">
             <h1 className="filter-title">ตกแต่งรูปของคุณ</h1>
             <p className="filter-subtitle">DECORATE YOUR PHOTO</p>
           </div>
         </div>
 
-        {/* Row 2: Main Layout (60%) */}
-        <div className="row-middle">
-          <div className="filter-main">
-            {/* Left - Canvas Preview */}
-            <div className="canvas-section">
-              <div className="canvas-container">
-                {previewImage ? (
-                  <img
-                    src={previewImage}
-                    alt="Photo with frame preview"
-                    className="canvas-image"
+        {/* Row 2: Filter Thumbnails - Horizontal Scroll (25%) */}
+        <div className="row-filter-selection">
+          {state.selectedCaptures.length > 0 && (
+            <div className="filter-thumbnails-wrapper">
+              {/* Left Arrow Button */}
+              <button
+                type="button"
+                className="filter-nav-button filter-nav-left"
+                onClick={() => scrollByOneFilter('left')}
+                aria-label="Previous filter"
+                disabled={!canScrollLeft}
+              >
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M15 18l-6-6 6-6"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
-                ) : state.finalImage ? (
-                  <img
-                    src={state.finalImage}
-                    alt="Photo with frame"
-                    className="canvas-image"
-                  />
-                ) : null}
-                {isGeneratingPreview && (
-                  <div className="preview-loading-overlay">
-                    <div className="preview-spinner">
+                </svg>
+              </button>
+
+              <div
+                className="filter-thumbnails"
+                ref={filtersContainerRef}
+                onMouseDown={handleMouseDown}
+                onMouseLeave={handleMouseLeave}
+                onMouseUp={handleMouseUp}
+                onMouseMove={handleMouseMove}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                style={{
+                  cursor: isDragging ? 'grabbing' : 'grab',
+                  userSelect: 'none',
+                }}
+              >
+                {/* ปุ่มไม่ใช้ Filter */}
+                <button
+                  key="none"
+                  type="button"
+                  className={`filter-thumbnail-item ${
+                    selectedFilter === 'none' ? 'selected' : ''
+                  }`}
+                  onClick={() => handleFilterClick('none')}
+                >
+                  {selectedFilter === 'none' && (
+                    <div className="filter-selected-badge">
                       <svg
-                        width="60"
-                        height="60"
+                        width="16"
+                        height="16"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
                       >
-                        <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
                         <path
-                          d="M12 2a10 10 0 0 1 10 10"
+                          d="M20 6L9 17l-5-5"
+                          stroke="white"
+                          strokeWidth="3"
                           strokeLinecap="round"
+                          strokeLinejoin="round"
                         />
                       </svg>
                     </div>
-                    <p className="preview-loading-text">
-                      กำลังประมวลผล Filter...
-                    </p>
+                  )}
+                  <div className="filter-thumbnail-image">
+                    <img
+                      src={state.selectedCaptures[0].photo}
+                      alt="ไม่ใช้ Filter"
+                    />
                   </div>
-                )}
-              </div>
-            </div>
+                  <div className="filter-thumbnail-name">ไม่ใช้ Filter</div>
+                </button>
 
-            {/* Right - Filter Selection */}
-            <div className="photo-strip-section">
-              {/* Filter Preview Section */}
-              {state.selectedCaptures.length > 0 && (
-                <div className="filter-preview-section">
-                  <div className="filter-preview-title">เลือก Filter</div>
-                  <div className="filter-preview-grid">
-                    {/* ปุ่มไม่ใช้ Filter */}
+                {FILTERS.map((filter) => {
+                  const getFilterStyle = (filterId: string) => {
+                    const f = FILTERS.find((fl) => fl.id === filterId);
+                    if (f?.type === 'css') {
+                      return f?.filter || '';
+                    }
+                    return '';
+                  };
+
+                  const getThumbnailSrc = () => {
+                    if (filter.type === 'lut' && lutThumbnails[filter.id]) {
+                      return lutThumbnails[filter.id];
+                    }
+                    return state.selectedCaptures[0].photo;
+                  };
+
+                  return (
                     <button
-                      key="none"
+                      key={filter.id}
                       type="button"
-                      className={`filter-preview-item ${
-                        selectedFilter === 'none' ? 'active' : ''
+                      className={`filter-thumbnail-item ${
+                        selectedFilter === filter.id ? 'selected' : ''
                       }`}
-                      onClick={() => handleFilterClick('none')}
+                      onClick={() => handleFilterClick(filter.id)}
                     >
-                      <div className="filter-preview-image">
-                        <img
-                          src={state.selectedCaptures[0].photo}
-                          alt="ไม่ใช้ Filter"
-                        />
+                      {selectedFilter === filter.id && (
+                        <div className="filter-selected-badge">
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                          >
+                            <path
+                              d="M20 6L9 17l-5-5"
+                              stroke="white"
+                              strokeWidth="3"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                      <div className="filter-thumbnail-image">
+                        {filter.type === 'lut' &&
+                        !lutThumbnails[filter.id] &&
+                        isGeneratingThumbnails ? (
+                          <div className="lut-thumbnail-loading">
+                            <div className="lut-thumbnail-spinner" />
+                          </div>
+                        ) : (
+                          <img
+                            src={getThumbnailSrc()}
+                            alt={filter.name}
+                            style={{ filter: getFilterStyle(filter.id) }}
+                          />
+                        )}
+                        {filter.type === 'lut' && (
+                          <div className="lut-badge">LUT</div>
+                        )}
                       </div>
-                      <div className="filter-preview-name">ไม่ใช้ Filter</div>
+                      <div className="filter-thumbnail-name">{filter.name}</div>
                     </button>
-                    {FILTERS.map((filter) => {
-                      const getFilterStyle = (filterId: string) => {
-                        const f = FILTERS.find((fl) => fl.id === filterId);
-                        // Only return CSS filter (LUT preview handled separately)
-                        if (f?.type === 'css') {
-                          return f?.filter || '';
-                        }
-                        return '';
-                      };
+                  );
+                })}
+              </div>
 
-                      // Get thumbnail source - use LUT processed thumbnail if available
-                      const getThumbnailSrc = () => {
-                        if (filter.type === 'lut' && lutThumbnails[filter.id]) {
-                          return lutThumbnails[filter.id];
-                        }
-                        return state.selectedCaptures[0].photo;
-                      };
-
-                      return (
-                        <button
-                          key={filter.id}
-                          type="button"
-                          className={`filter-preview-item ${
-                            selectedFilter === filter.id ? 'active' : ''
-                          }`}
-                          onClick={() => handleFilterClick(filter.id)}
-                        >
-                          <div className="filter-preview-image">
-                            {filter.type === 'lut' &&
-                            !lutThumbnails[filter.id] &&
-                            isGeneratingThumbnails ? (
-                              <div className="lut-thumbnail-loading">
-                                <div className="lut-thumbnail-spinner" />
-                              </div>
-                            ) : (
-                              <img
-                                src={getThumbnailSrc()}
-                                alt={filter.name}
-                                style={{ filter: getFilterStyle(filter.id) }}
-                              />
-                            )}
-                            {filter.type === 'lut' && (
-                              <div className="lut-badge">LUT</div>
-                            )}
-                          </div>
-                          <div className="filter-preview-name">
-                            {filter.name}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              {/* Right Arrow Button */}
+              <button
+                type="button"
+                className="filter-nav-button filter-nav-right"
+                onClick={() => scrollByOneFilter('right')}
+                aria-label="Next filter"
+                disabled={!canScrollRight}
+              >
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M9 18l6-6-6-6"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
             </div>
+          )}
+        </div>
+
+        {/* Row 3: Preview Image - Center (45%) */}
+        <div className="row-preview">
+          <div className="preview-container">
+            {previewImage ? (
+              <img
+                src={previewImage}
+                alt="Photo with frame preview"
+                className="preview-image"
+              />
+            ) : state.finalImage ? (
+              <img
+                src={state.finalImage}
+                alt="Photo with frame"
+                className="preview-image"
+              />
+            ) : null}
+            {isGeneratingPreview && (
+              <div className="preview-loading-overlay">
+                <div className="preview-spinner">
+                  <svg
+                    width="60"
+                    height="60"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                    <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <p className="preview-loading-text">กำลังประมวลผล Filter...</p>
+              </div>
+            )}
           </div>
         </div>
 
