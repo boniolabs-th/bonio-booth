@@ -48,8 +48,8 @@
 }
 
 /* Row 1: Title (20%) */
-.row-top {
-  flex: 0 0 25%;
+.prepare-row-top {
+  flex: 0 0 35%;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -58,7 +58,7 @@
 }
 
 /* Row 2: Steps (dynamic height - fills remaining space) */
-.row-middle {
+.prepare-row-middle {
   flex: 1;
   min-height: 0;
   width: 100%;
@@ -71,7 +71,7 @@
 }
 
 /* Row 3: Button (20%) */
-.row-bottom {
+.prepare-row-bottom {
   flex: 0 0 25%;
   width: 100%;
   display: flex;
@@ -84,14 +84,14 @@
 }
 
 .title-prepare {
-  font-size: 4rem;
+  font-size: 3rem;
   font-weight: 700;
   margin: 0 0 8px 0;
   line-height: 1.2;
 }
 
 .subtitle-prepare {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 500;
   margin: 0;
   letter-spacing: 0.5px;
@@ -129,7 +129,7 @@
 }
 
 .step-number {
-  font-size: 4rem;
+  font-size: 3rem;
   font-weight: 700;
 }
 

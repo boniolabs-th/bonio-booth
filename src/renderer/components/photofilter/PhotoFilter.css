@@ -59,7 +59,7 @@
 }
 
 .filter-title {
-  font-size: 4rem;
+  font-size: 3rem;
   font-weight: 700;
   margin: 0 0 8px 0;
   text-align: center;
@@ -67,7 +67,7 @@
 }
 
 .filter-subtitle {
-  font-size: 2rem;
+  font-size: 1.5rem;
   margin: 0;
   text-align: center;
   font-weight: 500;
@@ -139,7 +139,7 @@
 .photo-strip-item.selected {
   border-color: #ffa500;
   box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.3),
-              0 8px 24px rgba(255, 165, 0, 0.2);
+    0 8px 24px rgba(255, 165, 0, 0.2);
 }
 
 /* Orange overlay for selected photos */
@@ -256,6 +256,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -434,4 +435,3 @@
 .photo-strip::-webkit-scrollbar-thumb:hover {
   background: #ff8c00;
 }
-

@@ -24,7 +24,7 @@
 }
 
 .title-thai {
-  font-size: 4rem;
+  font-size: 3rem;
   font-weight: 700;
   color: var(--font-color);
   margin: 0 0 8px 0;
@@ -32,7 +32,7 @@
 }
 
 .title-english {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 500;
   color: var(--font-color);
   margin: 0;
@@ -74,7 +74,7 @@
 }
 
 .quantity-display {
-  font-size: 4rem;
+  font-size: 3rem;
   font-weight: 700;
   color: #2c2c2c;
   min-width: 100px;
@@ -97,7 +97,7 @@
 }
 
 .price {
-  font-size: 4rem;
+  font-size: 3rem;
   font-weight: 600;
 }
 
@@ -184,7 +184,7 @@
 }
 
 .button-text-thai {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 600;
   line-height: 1.2;
 }

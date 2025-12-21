@@ -57,7 +57,7 @@ export default function PhotoPrepare() {
       {/* Main Content */}
       <div className="main-content">
         {/* Row 1: Title (20%) */}
-        <div className="row-top">
+        <div className="prepare-row-top">
           <div className="title-prepare-section">
             <h1 className="title-prepare">เตรียมถ่ายภาพ</h1>
             <p className="subtitle-prepare">PREPARE FOR PHOTOSHOOT</p>
@@ -65,7 +65,7 @@ export default function PhotoPrepare() {
         </div>
 
         {/* Row 2: Steps (dynamic height) */}
-        <div className="row-middle">
+        <div className="prepare-row-middle">
           <div className="steps-container">
             {/* Step 1 */}
             <div className="step">
@@ -178,7 +178,7 @@ export default function PhotoPrepare() {
         </div>
 
         {/* Row 3: Confirm Button (20%) */}
-        <div className="row-bottom">
+        <div className="prepare-row-bottom">
           <button
             type="button"
             className="start-shooting-button"

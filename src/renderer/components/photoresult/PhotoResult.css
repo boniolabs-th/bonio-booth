@@ -17,14 +17,14 @@
 }
 
 .result-title {
-  font-size: 4rem;
+  font-size: 3rem;
   font-weight: 700;
   margin: 0 0 5px 0;
   line-height: 1.2;
 }
 
 .result-subtitle {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 500;
   margin: 0;
   letter-spacing: 0.5px;
@@ -291,6 +291,7 @@
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }

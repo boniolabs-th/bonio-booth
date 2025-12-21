@@ -35,7 +35,7 @@
 }
 
 .title-english {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 500;
   color: var(--font-color);
   margin: 0;
@@ -62,7 +62,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: #2c2c2c;
   letter-spacing: 2px;

@@ -20,8 +20,8 @@
 }
 
 /* Row 1: Title + Thumbnails (20%) */
-.row-top {
-  flex: 0 0 25%;
+.selection-row-top {
+  flex: 0 0 35%;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -30,7 +30,7 @@
 }
 
 /* Row 2: Preview (dynamic height - fills remaining space) */
-.row-middle {
+.selection-row-middle {
   flex: 1;
   min-height: 0;
   width: 100%;
@@ -43,7 +43,7 @@
 }
 
 /* Row 3: Button (20%) */
-.row-bottom {
+.selection-row-bottom {
   flex: 0 0 25%;
   width: 100%;
   display: flex;
@@ -57,7 +57,7 @@
 }
 
 .title-frame {
-  font-size: 4rem;
+  font-size: 3rem;
   font-weight: 700;
   margin: 0 0 8px 0;
   text-align: center;
@@ -65,7 +65,7 @@
 }
 
 .subtitle-frame {
-  font-size: 2rem;
+  font-size: 1.5rem;
   margin: 0;
   text-align: center;
   font-weight: 500;
@@ -91,8 +91,10 @@
   width: fit-content;
   align-items: center;
   /* Hide scrollbar for IE, Edge and Firefox */
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 .frames-thumbnails::-webkit-scrollbar {
@@ -292,4 +294,3 @@
   transition: all 0.3s ease;
   min-width: 250px;
 }
-

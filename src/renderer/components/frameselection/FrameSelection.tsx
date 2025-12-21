@@ -133,7 +133,7 @@ export default function FrameSelection() {
       {/* Main Content */}
       <div className="main-content-frame">
         {/* Row 1: Title + Thumbnails (20%) */}
-        <div className="row-top">
+        <div className="selection-row-top">
           {/* Title Section */}
           <div className="title-section">
             <h1 className="title-frame">เลือกกรอบรูป</h1>
@@ -210,14 +210,14 @@ export default function FrameSelection() {
         </div>
 
         {/* Row 2: Large Preview (60%) */}
-        <div className="row-middle">
+        <div className="selection-row-middle">
           <div className="frame-preview-large">
             <img src={selectedFrame?.image} alt={selectedFrame?.name} />
           </div>
         </div>
 
         {/* Row 3: Confirm Button (20%) */}
-        <div className="row-bottom">
+        <div className="selection-row-bottom">
           <button
             type="button"
             className="next-button-frame"
