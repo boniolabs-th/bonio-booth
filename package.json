@@ -248,8 +248,8 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "boniolabs",
-      "repo": "boniolabs"
+      "owner": "boniolabs-th",
+      "repo": "bonio-booth"
     }
   },
   "devEngines": {
