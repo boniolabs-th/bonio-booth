@@ -18,11 +18,11 @@ export interface PaperPositionConfig {
 
 // Default values
 export const DEFAULT_PAPER_POSITION_CONFIG: PaperPositionConfig = {
-  landscapeWidth: -3.5,
-  landscapeHeight: 4,
-  portraitWidth: -8,
+  landscapeWidth: 43,
+  landscapeHeight: 1,
+  portraitWidth: -4.5,
   portraitHeight: -12,
-  type: 1, // 1: landscape, 2: portrait for set transform print
+  type: 2, // 1: landscape, 2: portrait for set transform print
 };
 
 const CONFIG_FILE_NAME = 'paper-position-config.json';
