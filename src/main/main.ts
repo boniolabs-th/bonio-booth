@@ -236,6 +236,25 @@ async function generateImageWithPadding(
 
       const typeTransform = paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
 
+      // ใช้ค่าปรับขนาดตาม orientation เดิม (ก่อน rotate)
+      // เพื่อให้ขนาดภาพเท่ากันทั้งเครื่อง develop (type 1) และเครื่องอื่น (type 2)
+      // การหมุนภาพ (rotate) จะทำแค่เพื่อให้ภาพตรงกับกระดาษเท่านั้น
+      const widthPercent = orientation === 'landscape' ? landscapeWidth : portraitWidth;
+      const heightPercent = orientation === 'landscape' ? landscapeHeight : portraitHeight;
+
+      // ตรวจสอบว่าต้องหมุนภาพหรือไม่
+      const willRotate = orientation !== typeTransform;
+
+      // Log สำหรับ debug
+      console.log('🖼️ [generateImageWithPadding] Orientation calculation:', {
+        originalOrientation: orientation,
+        typeTransform,
+        willRotate,
+        widthPercent,
+        heightPercent,
+        note: 'Using original orientation for size adjustment, typeTransform only for rotation',
+      });
+
       // สร้างไฟล์ HTML ชั่วคราว
       const tempDir = app.getPath("temp");
       htmlPath = path.join(tempDir, `padded-image-${Date.now()}.html`);
@@ -268,8 +287,8 @@ async function generateImageWithPadding(
         align-items: center;
       }
       img {
-        max-width: calc(100% + ${orientation === 'landscape' ? landscapeWidth : portraitWidth}%);
-        max-height: calc(100% + ${orientation === 'landscape' ? landscapeHeight : portraitHeight}%);
+        max-width: calc(100% + ${widthPercent}%);
+        max-height: calc(100% + ${heightPercent}%);
         width: auto;
         height: auto;
         object-fit: contain;
