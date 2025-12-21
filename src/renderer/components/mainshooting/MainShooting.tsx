@@ -19,41 +19,53 @@ interface Capture {
   boomerangFrames?: string[]; // Captured frames used for boomerang playback
 }
 
-// Crop overlay component that shows the crop area based on slot ratio
+// Crop overlay component that shows the crop area based on actual slot pixel size
 function CropOverlay({
   slotWidth,
   slotHeight,
   videoWidth,
   videoHeight,
+  containerWidth,
+  containerHeight,
 }: {
   slotWidth: number;
   slotHeight: number;
   videoWidth: number;
   videoHeight: number;
+  containerWidth: number;
+  containerHeight: number;
 }) {
-  const slotRatio = slotWidth / slotHeight;
+  // คำนวณว่า video ถูก scale เท่าไหร่ใน container (object-fit: cover)
   const videoRatio = videoWidth / videoHeight;
+  const containerRatio = containerWidth / containerHeight;
 
-  // Calculate the crop area dimensions as percentages of the video feed
-  // The crop area maintains the slot ratio and is centered within the video
-  const getCropDimensions = () => {
-    let cropWidth: number;
-    let cropHeight: number;
+  let displayedVideoWidth: number;
+  let displayedVideoHeight: number;
 
-    if (slotRatio >= videoRatio) {
-      // Slot is wider than video - width fills 100%, height adjusts
-      cropWidth = 100;
-      cropHeight = (100 * videoRatio) / slotRatio;
-    } else {
-      // Slot is taller than video - height fills 100%, width adjusts
-      cropHeight = 100;
-      cropWidth = (100 * slotRatio) / videoRatio;
-    }
+  if (videoRatio > containerRatio) {
+    // Video กว้างกว่า container - height เต็ม, width ถูกครอป
+    displayedVideoHeight = containerHeight;
+    displayedVideoWidth = containerHeight * videoRatio;
+  } else {
+    // Video สูงกว่า container - width เต็ม, height ถูกครอป
+    displayedVideoWidth = containerWidth;
+    displayedVideoHeight = containerWidth / videoRatio;
+  }
 
-    return { cropWidth, cropHeight };
-  };
+  // คำนวณ scale factor ระหว่าง video จริงกับที่แสดง
+  const scale = displayedVideoWidth / videoWidth;
 
-  const { cropWidth, cropHeight } = getCropDimensions();
+  // ขนาด slot ที่แสดงจริงบน container (ตาม pixel จริง)
+  const displayedSlotWidth = slotWidth * scale;
+  const displayedSlotHeight = slotHeight * scale;
+
+  // คำนวณเป็น percentage ของ container
+  const cropWidthPercent = (displayedSlotWidth / containerWidth) * 100;
+  const cropHeightPercent = (displayedSlotHeight / containerHeight) * 100;
+
+  // จำกัดไม่ให้เกิน 100%
+  const cropWidth = Math.min(cropWidthPercent, 100);
+  const cropHeight = Math.min(cropHeightPercent, 100);
 
   // Calculate position to center the crop area
   const cropX = (100 - cropWidth) / 2;
@@ -123,9 +135,14 @@ export default function MainShooting() {
     width: number;
     height: number;
   }>({ width: 1920, height: 1080 });
+  const [containerDimensions, setContainerDimensions] = useState<{
+    width: number;
+    height: number;
+  }>({ width: 800, height: 600 });
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cameraContainerRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -453,6 +470,29 @@ export default function MainShooting() {
     });
   };
 
+  // Update container dimensions when component mounts and on resize
+  useEffect(() => {
+    const updateContainerDimensions = () => {
+      if (cameraContainerRef.current) {
+        const rect = cameraContainerRef.current.getBoundingClientRect();
+        setContainerDimensions({
+          width: rect.width,
+          height: rect.height,
+        });
+      }
+    };
+
+    // Initial update
+    updateContainerDimensions();
+
+    // Update on resize
+    window.addEventListener('resize', updateContainerDimensions);
+
+    return () => {
+      window.removeEventListener('resize', updateContainerDimensions);
+    };
+  }, []);
+
   // รับ cameraCountdown จาก machine-init event และ request ข้อมูลทันที (fallback)
   useEffect(() => {
     // ฟังก์ชันสำหรับ set cameraCountdown
@@ -650,7 +690,7 @@ export default function MainShooting() {
 
       {/* Main Content */}
       <div className="main-content">
-        <div className="camera-container">
+        <div className="camera-container" ref={cameraContainerRef}>
           <video
             ref={videoRef}
             autoPlay
@@ -660,15 +700,39 @@ export default function MainShooting() {
           />
           <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-          {/* Crop Overlay - shows the crop area based on slot ratio */}
-          {!isCameraLoading && state.selectedFrame?.slots?.[0] && (
-            <CropOverlay
-              slotWidth={state.selectedFrame.slots[0].width}
-              slotHeight={state.selectedFrame.slots[0].height}
-              videoWidth={videoDimensions.width}
-              videoHeight={videoDimensions.height}
-            />
-          )}
+          {/* Crop Overlay - shows the crop area based on current slot pixel size */}
+          {/* For spare photos (beyond slots.length), use the largest slot dimensions */}
+          {!isCameraLoading &&
+           state.selectedFrame?.slots &&
+           state.selectedFrame.slots.length > 0 && (() => {
+            const slots = state.selectedFrame.slots;
+            const currentIndex = captures.length;
+
+            // ถ้ายังไม่เกิน slots.length ให้ใช้ slot ปัจจุบัน
+            // ถ้าเกินแล้ว (รูปสำรอง) ให้หา slot ที่ใหญ่ที่สุด (พื้นที่มากสุด)
+            let targetSlot;
+            if (currentIndex < slots.length) {
+              targetSlot = slots[currentIndex];
+            } else {
+              // หา slot ที่มีพื้นที่มากที่สุด
+              targetSlot = slots.reduce((largest, current) => {
+                const largestArea = largest.width * largest.height;
+                const currentArea = current.width * current.height;
+                return currentArea > largestArea ? current : largest;
+              }, slots[0]);
+            }
+
+            return (
+              <CropOverlay
+                slotWidth={targetSlot.width}
+                slotHeight={targetSlot.height}
+                videoWidth={videoDimensions.width}
+                videoHeight={videoDimensions.height}
+                containerWidth={containerDimensions.width}
+                containerHeight={containerDimensions.height}
+              />
+            );
+          })()}
 
           {/* Camera Loading Overlay */}
           {isCameraLoading && (
