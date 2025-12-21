@@ -115,6 +115,9 @@ const electronHandler = {
     resetPaperPositionConfig: () => {
       return ipcRenderer.invoke('reset-paper-position-config');
     },
+    getDefaultPaperPositionConfig: () => {
+      return ipcRenderer.invoke('get-default-paper-position-config');
+    },
     getCameraConfig: () => {
       return ipcRenderer.invoke('get-camera-config');
     },

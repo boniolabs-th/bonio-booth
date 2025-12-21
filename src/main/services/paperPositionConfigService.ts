@@ -51,7 +51,9 @@ export async function getPaperPositionConfig(): Promise<PaperPositionConfig> {
       typeof config.portraitWidth !== 'number' ||
       typeof config.portraitHeight !== 'number'
     ) {
-      console.warn('⚠️ [paperPositionConfigService] Invalid config format, using defaults');
+      console.warn(
+        '⚠️ [paperPositionConfigService] Invalid config format, using defaults',
+      );
       return DEFAULT_PAPER_POSITION_CONFIG;
     }
 
@@ -60,10 +62,15 @@ export async function getPaperPositionConfig(): Promise<PaperPositionConfig> {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       // ไฟล์ยังไม่มี (ครั้งแรกที่เปิด app)
-      console.log('ℹ️ [paperPositionConfigService] Config file not found, using defaults');
+      console.log(
+        'ℹ️ [paperPositionConfigService] Config file not found, using defaults',
+      );
       return DEFAULT_PAPER_POSITION_CONFIG;
     }
-    console.error('❌ [paperPositionConfigService] Failed to read config:', error);
+    console.error(
+      '❌ [paperPositionConfigService] Failed to read config:',
+      error,
+    );
     return DEFAULT_PAPER_POSITION_CONFIG;
   }
 }
@@ -87,7 +94,10 @@ export async function savePaperPositionConfig(
     console.log('✅ [paperPositionConfigService] Config saved:', config);
     return true;
   } catch (error) {
-    console.error('❌ [paperPositionConfigService] Failed to save config:', error);
+    console.error(
+      '❌ [paperPositionConfigService] Failed to save config:',
+      error,
+    );
     return false;
   }
 }
@@ -104,11 +114,15 @@ export async function deletePaperPositionConfig(): Promise<boolean> {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       // ไฟล์ไม่มีอยู่แล้ว
-      console.log('ℹ️ [paperPositionConfigService] Config file not found (already deleted)');
+      console.log(
+        'ℹ️ [paperPositionConfigService] Config file not found (already deleted)',
+      );
       return true;
     }
-    console.error('❌ [paperPositionConfigService] Failed to delete config:', error);
+    console.error(
+      '❌ [paperPositionConfigService] Failed to delete config:',
+      error,
+    );
     return false;
   }
 }
-

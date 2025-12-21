@@ -186,6 +186,15 @@
   cursor: not-allowed;
 }
 
+.paper-position-config-button-default {
+  background: #f39c12;
+  color: white;
+}
+
+.paper-position-config-button-default:hover:not(:disabled) {
+  background: #e67e22;
+}
+
 .paper-position-config-button-cancel {
   background: #e0e0e0;
   color: #333;

@@ -25,11 +25,11 @@ export default function PaperPositionConfigModal({
   onSave,
   onCancel,
 }: PaperPositionConfigModalProps): React.JSX.Element | null {
-  const [landscapeWidth, setLandscapeWidth] = useState<number>(14);
-  const [landscapeHeight, setLandscapeHeight] = useState<number>(16);
-  const [portraitWidth, setPortraitWidth] = useState<number>(5);
-  const [portraitHeight, setPortraitHeight] = useState<number>(5);
-  const [type, setType] = useState<number>(1); // 1: landscape, 2: portrait
+  const [landscapeWidth, setLandscapeWidth] = useState<number>(0);
+  const [landscapeHeight, setLandscapeHeight] = useState<number>(0);
+  const [portraitWidth, setPortraitWidth] = useState<number>(0);
+  const [portraitHeight, setPortraitHeight] = useState<number>(0);
+  const [type, setType] = useState<number>(2); // 1: landscape, 2: portrait
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
@@ -39,11 +39,11 @@ export default function PaperPositionConfigModal({
       // @ts-ignore
       const result = await window.electron?.payment?.getPaperPositionConfig();
       if (result?.success && result.config) {
-        setLandscapeWidth(roundToDecimal(result.config.landscapeWidth || 14));
-        setLandscapeHeight(roundToDecimal(result.config.landscapeHeight || 16));
-        setPortraitWidth(roundToDecimal(result.config.portraitWidth || 5));
-        setPortraitHeight(roundToDecimal(result.config.portraitHeight || 5));
-        setType(result.config.type || 1);
+        setLandscapeWidth(roundToDecimal(result.config.landscapeWidth));
+        setLandscapeHeight(roundToDecimal(result.config.landscapeHeight));
+        setPortraitWidth(roundToDecimal(result.config.portraitWidth));
+        setPortraitHeight(roundToDecimal(result.config.portraitHeight));
+        setType(result.config.type);
       }
     } catch (err) {
       console.error(
@@ -51,6 +51,61 @@ export default function PaperPositionConfigModal({
         err,
       );
       setError('ไม่สามารถโหลดการตั้งค่าได้');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSetDefault = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      console.log('🔄 [PaperPositionConfigModal] Loading default config...');
+
+      // @ts-ignore
+      if (!window.electron?.payment?.getDefaultPaperPositionConfig) {
+        console.error(
+          '❌ [PaperPositionConfigModal] getDefaultPaperPositionConfig not available',
+        );
+        setError('ฟังก์ชันไม่พร้อมใช้งาน กรุณา restart แอป');
+        return;
+      }
+
+      // @ts-ignore
+      const result =
+        await window.electron?.payment?.getDefaultPaperPositionConfig();
+
+      console.log(
+        '📋 [PaperPositionConfigModal] Default config result:',
+        result,
+      );
+
+      if (result?.success && result.config) {
+        console.log(
+          '✅ [PaperPositionConfigModal] Setting default values:',
+          result.config,
+        );
+        setLandscapeWidth(roundToDecimal(result.config.landscapeWidth));
+        setLandscapeHeight(roundToDecimal(result.config.landscapeHeight));
+        setPortraitWidth(roundToDecimal(result.config.portraitWidth));
+        setPortraitHeight(roundToDecimal(result.config.portraitHeight));
+        setType(result.config.type);
+      } else {
+        const errorMsg = result?.error || 'ไม่สามารถโหลดค่าเริ่มต้นได้';
+        console.error(
+          '❌ [PaperPositionConfigModal] Failed to load default:',
+          errorMsg,
+        );
+        setError(errorMsg);
+      }
+    } catch (err) {
+      console.error(
+        '❌ [PaperPositionConfigModal] Failed to load default config:',
+        err,
+      );
+      setError(
+        err instanceof Error ? err.message : 'ไม่สามารถโหลดค่าเริ่มต้นได้',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -143,9 +198,7 @@ export default function PaperPositionConfigModal({
         // onKeyDown={(e) => e.stopPropagation()}
         role="dialog"
       >
-        <h2 className="paper-position-config-modal-title">
-         ตั้งค่าขอบกระดาษ
-        </h2>
+        <h2 className="paper-position-config-modal-title">ตั้งค่าขอบกระดาษ</h2>
 
         <p className="paper-position-config-modal-description">
           ปรับค่าขนาดภาพเพื่อลดขอบกระดาษ
@@ -155,9 +208,14 @@ export default function PaperPositionConfigModal({
 
         <div className="paper-position-config-inputs">
           <div className="paper-position-config-group">
-            <h3 className="paper-position-config-group-title">{type === 1 ? 'ปรับขนาดภาพแนวตั้ง' : 'ปรับขนาดภาพแนวนอน'}</h3>
+            <h3 className="paper-position-config-group-title">
+              {type === 1 ? 'ปรับขนาดภาพแนวตั้ง' : 'ปรับขนาดภาพแนวนอน'}
+            </h3>
             <div className="paper-position-config-input-group">
-              <label htmlFor="landscape-width" className="paper-position-config-label">
+              <label
+                htmlFor="landscape-width"
+                className="paper-position-config-label"
+              >
                 Width (%):
               </label>
               <div className="paper-position-config-input-with-buttons">
@@ -206,7 +264,10 @@ export default function PaperPositionConfigModal({
               </div>
             </div>
             <div className="paper-position-config-input-group">
-              <label htmlFor="landscape-height" className="paper-position-config-label">
+              <label
+                htmlFor="landscape-height"
+                className="paper-position-config-label"
+              >
                 Height (%):
               </label>
               <div className="paper-position-config-input-with-buttons">
@@ -257,9 +318,14 @@ export default function PaperPositionConfigModal({
           </div>
 
           <div className="paper-position-config-group">
-            <h3 className="paper-position-config-group-title">{type === 1 ? 'ปรับขนาดภาพแนวนอน' : 'ปรับขนาดภาพแนวตั้ง'}</h3>
+            <h3 className="paper-position-config-group-title">
+              {type === 1 ? 'ปรับขนาดภาพแนวนอน' : 'ปรับขนาดภาพแนวตั้ง'}
+            </h3>
             <div className="paper-position-config-input-group">
-              <label htmlFor="portrait-width" className="paper-position-config-label">
+              <label
+                htmlFor="portrait-width"
+                className="paper-position-config-label"
+              >
                 Width (%):
               </label>
               <div className="paper-position-config-input-with-buttons">
@@ -308,7 +374,10 @@ export default function PaperPositionConfigModal({
               </div>
             </div>
             <div className="paper-position-config-input-group">
-              <label htmlFor="portrait-height" className="paper-position-config-label">
+              <label
+                htmlFor="portrait-height"
+                className="paper-position-config-label"
+              >
                 Height (%):
               </label>
               <div className="paper-position-config-input-with-buttons">
@@ -389,6 +458,14 @@ export default function PaperPositionConfigModal({
         </div>
 
         <div className="paper-position-config-actions">
+          <button
+            type="button"
+            className="paper-position-config-button paper-position-config-button-default"
+            onClick={handleSetDefault}
+            disabled={isLoading}
+          >
+            Set Default
+          </button>
           <button
             type="button"
             className="paper-position-config-button paper-position-config-button-cancel"

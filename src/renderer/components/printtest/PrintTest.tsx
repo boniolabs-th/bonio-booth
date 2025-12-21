@@ -4,7 +4,9 @@ import BackButton from '../backbutton';
 import PaperPositionConfigModal from '../paperpositionconfigmodal';
 import './PrintTest.css';
 
-const TEST_IMAGE_URL = '../../../assets/images/image-print-test.png';
+const TEST_IMAGE_PORTRAIT_URL = '../../../assets/images/image-print-test.png';
+const TEST_IMAGE_LANDSCAPE_URL =
+  '../../../assets/images/image-print-lanscape-test.jpg';
 
 interface EnvConfig {
   apiUrl: string;
@@ -15,6 +17,9 @@ interface EnvConfig {
 export default function PrintTest(): React.JSX.Element {
   const navigate = useNavigate();
   const [copies, setCopies] = useState<number>(1);
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>(
+    'portrait',
+  );
   const [isPrinting, setIsPrinting] = useState(false);
   const [printStatus, setPrintStatus] = useState<
     'idle' | 'printing' | 'success' | 'error'
@@ -240,14 +245,19 @@ export default function PrintTest(): React.JSX.Element {
     setErrorMessage('');
 
     try {
+      const testImageUrl =
+        orientation === 'portrait'
+          ? TEST_IMAGE_PORTRAIT_URL
+          : TEST_IMAGE_LANDSCAPE_URL;
       console.log('🖨️ [PrintTest] Starting print test...', {
         copies,
-        imageUrl: TEST_IMAGE_URL,
+        orientation,
+        imageUrl: testImageUrl,
       });
 
       // แปลง image URL เป็น data URL
       console.log('📥 [PrintTest] Converting image URL to data URL...');
-      const imageDataUrl = await convertImageUrlToDataUrl(TEST_IMAGE_URL);
+      const imageDataUrl = await convertImageUrlToDataUrl(testImageUrl);
       console.log('✅ [PrintTest] Image converted successfully');
 
       // เรียก print function
@@ -274,7 +284,7 @@ export default function PrintTest(): React.JSX.Element {
             frameId: 'test',
             frameName: 'Test Print',
             copies,
-            orientation: 'portrait', // ใช้ portrait ตามที่ต้องการ
+            orientation, // ใช้ orientation ที่เลือก
           });
 
           // Timeout after 60 seconds
@@ -314,8 +324,8 @@ export default function PrintTest(): React.JSX.Element {
   return (
     <div className="print-test-container">
       {/* Header */}
+      <BackButton onBackClick={handleBack} disabled={isPrinting} />
       <div className="print-test-header">
-        <BackButton onBackClick={handleBack} disabled={isPrinting} />
         <h1 className="print-test-title">เทสปริ้น</h1>
       </div>
 
@@ -325,7 +335,15 @@ export default function PrintTest(): React.JSX.Element {
         <div className="print-test-image-section">
           <h2 className="section-title">รูปภาพทดสอบ</h2>
           <div className="image-preview-container">
-            <img src={TEST_IMAGE_URL} alt="Test print" className="test-image" />
+            <img
+              src={
+                orientation === 'portrait'
+                  ? TEST_IMAGE_PORTRAIT_URL
+                  : TEST_IMAGE_LANDSCAPE_URL
+              }
+              alt="Test print"
+              className="test-image"
+            />
           </div>
         </div>
 
@@ -334,21 +352,21 @@ export default function PrintTest(): React.JSX.Element {
           <div className="section-header">
             <h2 className="section-title">ตั้งค่าการพิมพ์</h2>
             <div>
-              <button
+              {/* <button
                 type="button"
                 className="position-paper-button"
                 onClick={handleOpenPositionModal}
                 disabled={isPrinting}
               >
                 Position Paper
-              </button>
+              </button> */}
               <button
                 type="button"
                 className="position-paper-button"
                 onClick={() => setIsPaperPositionConfigModalOpen(true)}
                 disabled={isPrinting}
               >
-                Configure paper position
+                Deverper Config
               </button>
             </div>
           </div>
@@ -394,9 +412,21 @@ export default function PrintTest(): React.JSX.Element {
           </div>
 
           <div className="setting-group">
-            <p className="setting-info">
-              <strong>Orientation:</strong> Portrait (ตั้ง)
-            </p>
+            <label htmlFor="orientation" className="setting-label">
+              Orientation:
+            </label>
+            <select
+              id="orientation"
+              value={orientation}
+              onChange={(e) =>
+                setOrientation(e.target.value as 'portrait' | 'landscape')
+              }
+              className="orientation-select"
+              disabled={isPrinting}
+            >
+              <option value="portrait">Portrait (ตั้ง)</option>
+              <option value="landscape">Landscape (นอน)</option>
+            </select>
           </div>
 
           {/* Print Status */}

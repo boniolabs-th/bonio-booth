@@ -1282,6 +1282,19 @@ ipcMain.handle('save-paper-position-config', async (event, config: PaperPosition
   }
 });
 
+ipcMain.handle('get-default-paper-position-config', async () => {
+  try {
+    console.log('📋 [Main] get-default-paper-position-config called');
+    console.log('📋 [Main] DEFAULT_PAPER_POSITION_CONFIG:', DEFAULT_PAPER_POSITION_CONFIG);
+    return { success: true, config: DEFAULT_PAPER_POSITION_CONFIG };
+  } catch (error) {
+    console.error('❌ [Main] Error in get-default-paper-position-config handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
 ipcMain.handle('reset-paper-position-config', async () => {
   try {
     // ลบ config file เพื่อใช้ default values
