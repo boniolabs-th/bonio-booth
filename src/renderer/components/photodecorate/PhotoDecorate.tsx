@@ -125,15 +125,39 @@ export default function PhotoDecorate() {
     : 1;
 
   const calculateScaleFactor = useCallback(() => {
+    const frameImg = frameImgRef.current;
     const container = containerRef.current;
-    if (container && selectedFrame) {
-      const actualWidth = container.offsetWidth || container.clientWidth;
-      const actualHeight = container.offsetHeight || container.clientHeight;
-      const scaleX = actualWidth / selectedFrame.width;
-      const scaleY = actualHeight / selectedFrame.height;
+    if (frameImg && container && selectedFrame) {
+      const containerWidth = container.offsetWidth || container.clientWidth;
+      const containerHeight = container.offsetHeight || container.clientHeight;
+
+      // Calculate actual rendered size with object-fit: contain
+      const imgAspect = selectedFrame.width / selectedFrame.height;
+      const containerAspect = containerWidth / containerHeight;
+
+      let renderedWidth: number;
+      let renderedHeight: number;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (imgAspect > containerAspect) {
+        // Image is wider - fit by width
+        renderedWidth = containerWidth;
+        renderedHeight = containerWidth / imgAspect;
+        offsetY = (containerHeight - renderedHeight) / 2;
+      } else {
+        // Image is taller - fit by height
+        renderedHeight = containerHeight;
+        renderedWidth = containerHeight * imgAspect;
+        offsetX = (containerWidth - renderedWidth) / 2;
+      }
+
+      const scaleX = renderedWidth / selectedFrame.width;
+      const scaleY = renderedHeight / selectedFrame.height;
       setScaleFactor({ x: scaleX, y: scaleY });
+      setImageOffset({ x: offsetX, y: offsetY });
     }
-  }, [selectedFrame?.height, selectedFrame?.width]);
+  }, [selectedFrame?.height, selectedFrame?.width, selectedFrame]);
 
   // Redirect if no frame selected
   useEffect(() => {
@@ -549,8 +573,9 @@ export default function PhotoDecorate() {
             />
             {previewSlots.map((slot, slotIndex) => {
               // Calculate pixel positions and sizes based on previewSlots dimensions
-              const slotX = slot.x * scaleFactor.x;
-              const slotY = slot.y * scaleFactor.y;
+              // Add imageOffset to account for object-fit: contain positioning
+              const slotX = slot.x * scaleFactor.x + imageOffset.x;
+              const slotY = slot.y * scaleFactor.y + imageOffset.y;
               const slotWidth = slot.width * scaleFactor.x;
               const slotHeight = slot.height * scaleFactor.y;
               const slotAspectRatio = slot.width / slot.height;
