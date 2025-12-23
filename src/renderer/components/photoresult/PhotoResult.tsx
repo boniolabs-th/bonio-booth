@@ -2046,9 +2046,9 @@ export default function PhotoResult() {
       </div>
 
       {/* Orientation Log - แสดงที่มุมล่างซ้าย */}
-      {orientationLog && (
+      {/* {orientationLog && (
         <div className="orientation-log">{orientationLog}</div>
-      )}
+      )} */}
     </div>
   );
 }

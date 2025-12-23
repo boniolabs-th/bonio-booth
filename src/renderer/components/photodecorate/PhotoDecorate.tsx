@@ -552,7 +552,7 @@ export default function PhotoDecorate() {
               maxWidth: `calc(65vh * ${frameAspectRatio})`,
               aspectRatio: frameAspectRatio,
               isolation: 'isolate',
-              backgroundColor: '#ffffff',
+              backgroundColor: 'transparent',
             }}
           >
             <img
