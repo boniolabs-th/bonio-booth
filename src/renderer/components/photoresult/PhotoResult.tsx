@@ -8,6 +8,7 @@ import {
   applyLUTToCanvas,
   getLUTFilePath,
 } from '../../utils/lutProcessor';
+import { applyLUTWithWorker } from '../../utils/lutWorkerHelper';
 import { COUNTDOWN } from '../../utils/appConfig';
 
 import './PhotoResult.css';
@@ -64,6 +65,76 @@ const ensureBoomerangAssets = async (
       }
     }),
   );
+};
+
+/**
+ * Apply filter to a photo (supports both CSS and LUT filters)
+ * Returns base64 data URL of the filtered image
+ */
+const applyFilterToPhoto = async (
+  photoUrl: string,
+  selectedFilterId: string,
+): Promise<string> => {
+  const filter = FILTERS.find((f) => f.id === selectedFilterId);
+
+  // If no filter or 'none' filter, return original
+  if (!filter || selectedFilterId === 'none') {
+    return photoUrl;
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = async () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        reject(new Error('Cannot create canvas context'));
+        return;
+      }
+
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      // Check filter type
+      if (filter.type === 'lut' && filter.lutFile) {
+        // Apply LUT filter using Web Worker (non-blocking)
+        try {
+          // Draw image to canvas first
+          ctx.drawImage(img, 0, 0);
+
+          // Load and apply LUT in background thread
+          const lutPath = await getLUTFilePath(filter.lutFile);
+          const lut = await getCachedLUT(lutPath);
+          const processedCanvas = await applyLUTWithWorker(canvas, lut);
+
+          resolve(processedCanvas.toDataURL('image/png'));
+        } catch (error) {
+          console.error('Failed to apply LUT:', error);
+          // Fallback to original
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        }
+      } else if (filter.type === 'css' && filter.filter) {
+        // Apply CSS filter
+        ctx.filter = filter.filter;
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } else {
+        // No filter to apply
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      }
+    };
+
+    img.onerror = () => {
+      reject(new Error('Failed to load image for filtering'));
+    };
+
+    img.src = photoUrl;
+  });
 };
 
 const generateFramedVideo = async (
@@ -844,7 +915,8 @@ export default function PhotoResult() {
 
         if (filter?.type === 'lut' && filter.lutFile) {
           setIsApplyingLUT(true);
-          console.log('🎨 [PhotoResult] Applying LUT filter to original videos:', filter.lutFile);
+          const lutFileName = filter.lutFile; // Store in local variable for type narrowing
+          console.log('🎨 [PhotoResult] Applying LUT filter to original videos:', lutFileName);
 
           try {
             // Apply LUT filter to each capture video
@@ -869,7 +941,7 @@ export default function PhotoResult() {
                   // Apply LUT via FFmpeg
                   const lutResult = await window.electron.video.applyLutToVideo(
                     saveResult.path,
-                    filter.lutFile,
+                    lutFileName,
                   );
 
                   if (lutResult.success && lutResult.path) {
@@ -1130,16 +1202,16 @@ export default function PhotoResult() {
         });
 
         // เตรียม photos และ videos
-        // ส่ง: 1) finalImage (รูปที่ print - order 1) 2) รูปอื่นๆ จาก selectedCaptures (order 2, 3, ...) 3) วิดีโอจาก compiledVideoUrl
+        // ส่ง: 1) finalImage (รูปที่ print - order 1) 2) รูปอื่นๆ จาก selectedCaptures ที่ apply filter แล้ว (order 2, 3, ...) 3) วิดีโอจาก compiledVideoUrl
         const photos: string[] = [];
         const videos: string[] = [];
 
-        // เพิ่ม finalImage (รูปที่ print) - order 1
+        // เพิ่ม finalImage (รูปที่ print - มี filter applied แล้ว) - order 1
         if (state.finalImage) {
           const convertedImage = await blobUrlToDataUrl(state.finalImage);
           photos.push(convertedImage);
           console.log(
-            '📤 [PhotoResult] Added finalImage (order 1 - print image) to photos',
+            '📤 [PhotoResult] Added finalImage (order 1 - print image with filter) to photos',
           );
         } else {
           console.warn(
@@ -1147,43 +1219,36 @@ export default function PhotoResult() {
           );
         }
 
-        // เพิ่มรูปอื่นๆ จาก selectedCaptures ที่ไม่ได้เป็น finalImage (order 2, 3, ...)
+        // เพิ่มรูปอื่นๆ จาก selectedCaptures ที่ apply filter แล้ว (order 2, 3, ...)
+        // รูปเหล่านี้จะถูก apply filter เดียวกันกับ finalImage
         if (state.selectedCaptures && state.selectedCaptures.length > 0) {
-          // แปลง finalImage เป็น data URL เพื่อเปรียบเทียบ
-          let finalImageDataUrl: string | null = null;
-          if (state.finalImage) {
-            finalImageDataUrl = await blobUrlToDataUrl(state.finalImage);
-          }
+          console.log(
+            `📤 [PhotoResult] Applying filter "${state.selectedFilter}" to ${state.selectedCaptures.length} original photos...`,
+          );
 
           for (let i = 0; i < state.selectedCaptures.length; i++) {
             const capture = state.selectedCaptures[i];
             if (capture.photo) {
-              const convertedPhoto = await blobUrlToDataUrl(capture.photo);
-
-              // เปรียบเทียบว่าเป็นรูปเดียวกันหรือไม่ (เปรียบเทียบ base64 data)
-              // ใช้ substring เพื่อเปรียบเทียบส่วน base64 data เท่านั้น (ข้าม data:image/...;base64,)
-              const photoBase64 = convertedPhoto.includes('base64,')
-                ? convertedPhoto.split('base64,')[1]
-                : convertedPhoto;
-              const finalBase64 =
-                finalImageDataUrl && finalImageDataUrl.includes('base64,')
-                  ? finalImageDataUrl.split('base64,')[1]
-                  : finalImageDataUrl;
-
-              // เปรียบเทียบ 1000 ตัวอักษรแรก (เพื่อความเร็ว)
-              const isSameAsFinalImage =
-                finalBase64 &&
-                photoBase64.substring(0, 1000) ===
-                  finalBase64.substring(0, 1000);
-
-              if (!isSameAsFinalImage) {
+              try {
+                // Apply filter to original photo before upload
+                const filteredPhoto = await applyFilterToPhoto(
+                  capture.photo,
+                  state.selectedFilter,
+                );
+                photos.push(filteredPhoto);
+                console.log(
+                  `📤 [PhotoResult] Added filtered capture[${i}].photo (order ${photos.length}) to photos`,
+                );
+              } catch (filterError) {
+                console.error(
+                  `❌ [PhotoResult] Failed to apply filter to capture[${i}].photo:`,
+                  filterError,
+                );
+                // Fallback: upload original photo without filter
+                const convertedPhoto = await blobUrlToDataUrl(capture.photo);
                 photos.push(convertedPhoto);
                 console.log(
-                  `📤 [PhotoResult] Added capture[${i}].photo (order ${photos.length}) to photos`,
-                );
-              } else {
-                console.log(
-                  `📤 [PhotoResult] Skipped capture[${i}].photo (same as finalImage - order 1)`,
+                  `📤 [PhotoResult] Added original capture[${i}].photo (fallback, order ${photos.length}) to photos`,
                 );
               }
             }
@@ -1277,25 +1342,11 @@ export default function PhotoResult() {
               '❌ [PhotoResult] Failed to convert video to MP4:',
               error,
             );
-            console.warn(
-              '⚠️ [PhotoResult] Falling back to WebM format...',
+            // ไม่ fallback ไป WebM อีกต่อไป เพราะ iPhone/Safari ไม่รองรับ
+            // ถ้าแปลง MP4 ไม่สำเร็จ ให้ skip video upload
+            console.error(
+              '⚠️ [PhotoResult] Skipping video upload because MP4 conversion failed. iPhone/Safari will not be able to play WebM.',
             );
-
-            // Fallback: upload WebM if MP4 conversion fails
-            try {
-              const convertedVideo = await blobUrlToDataUrl(compiledVideoUrl);
-              const base64Length = convertedVideo.includes('base64,')
-                ? convertedVideo.split('base64,')[1].length
-                : convertedVideo.length;
-              const estimatedSizeMB = (base64Length * 3) / 4 / (1024 * 1024);
-
-              if (estimatedSizeMB <= 10) {
-                videos.push(convertedVideo);
-                console.log('✅ [PhotoResult] Added WebM video (fallback) to videos');
-              }
-            } catch (fallbackError) {
-              console.error('❌ [PhotoResult] Fallback also failed:', fallbackError);
-            }
           }
         } else {
           console.warn(
@@ -1627,7 +1678,7 @@ export default function PhotoResult() {
                 const convertedImage = await blobUrlToDataUrl(state.finalImage);
                 photos.push(convertedImage);
                 console.log(
-                  '📤 [PhotoResult] Added finalImage (order 1 - print image) to photos (useEffect)',
+                  '📤 [PhotoResult] Added finalImage (order 1 - print image with filter) to photos (useEffect)',
                 );
               } else {
                 console.warn(
@@ -1635,51 +1686,37 @@ export default function PhotoResult() {
                 );
               }
 
-              // เพิ่มรูปอื่นๆ จาก selectedCaptures ที่ไม่ได้เป็น finalImage (order 2, 3, ...)
+              // เพิ่มรูปอื่นๆ จาก selectedCaptures ที่ apply filter แล้ว (order 2, 3, ...)
               if (state.selectedCaptures && state.selectedCaptures.length > 0) {
                 console.log(
-                  '📤 [PhotoResult] Processing selectedCaptures (useEffect):',
-                  {
-                    capturesCount: state.selectedCaptures.length,
-                  },
+                  `📤 [PhotoResult] Applying filter "${state.selectedFilter}" to ${state.selectedCaptures.length} original photos (useEffect)...`,
                 );
-
-                // แปลง finalImage เป็น data URL เพื่อเปรียบเทียบ
-                let finalImageDataUrl: string | null = null;
-                if (state.finalImage) {
-                  finalImageDataUrl = await blobUrlToDataUrl(state.finalImage);
-                }
 
                 for (let i = 0; i < state.selectedCaptures.length; i++) {
                   const capture = state.selectedCaptures[i];
                   if (capture.photo) {
-                    const convertedPhoto = await blobUrlToDataUrl(
-                      capture.photo,
-                    );
-
-                    // เปรียบเทียบว่าเป็นรูปเดียวกันหรือไม่ (เปรียบเทียบ base64 data)
-                    const photoBase64 = convertedPhoto.includes('base64,')
-                      ? convertedPhoto.split('base64,')[1]
-                      : convertedPhoto;
-                    const finalBase64 =
-                      finalImageDataUrl && finalImageDataUrl.includes('base64,')
-                        ? finalImageDataUrl.split('base64,')[1]
-                        : finalImageDataUrl;
-
-                    // เปรียบเทียบ 1000 ตัวอักษรแรก (เพื่อความเร็ว)
-                    const isSameAsFinalImage =
-                      finalBase64 &&
-                      photoBase64.substring(0, 1000) ===
-                        finalBase64.substring(0, 1000);
-
-                    if (!isSameAsFinalImage) {
+                    try {
+                      // Apply filter to original photo before upload
+                      const filteredPhoto = await applyFilterToPhoto(
+                        capture.photo,
+                        state.selectedFilter,
+                      );
+                      photos.push(filteredPhoto);
+                      console.log(
+                        `📤 [PhotoResult] Added filtered capture[${i}].photo (order ${photos.length}) to photos (useEffect)`,
+                      );
+                    } catch (filterError) {
+                      console.error(
+                        `❌ [PhotoResult] Failed to apply filter to capture[${i}].photo (useEffect):`,
+                        filterError,
+                      );
+                      // Fallback: upload original photo without filter
+                      const convertedPhoto = await blobUrlToDataUrl(
+                        capture.photo,
+                      );
                       photos.push(convertedPhoto);
                       console.log(
-                        `📤 [PhotoResult] Added capture[${i}].photo (order ${photos.length}) to photos (useEffect)`,
-                      );
-                    } else {
-                      console.log(
-                        `📤 [PhotoResult] Skipped capture[${i}].photo (same as finalImage - order 1) (useEffect)`,
+                        `📤 [PhotoResult] Added original capture[${i}].photo (fallback, order ${photos.length}) to photos (useEffect)`,
                       );
                     }
                   }
@@ -1722,15 +1759,11 @@ export default function PhotoResult() {
                     console.warn('⚠️ Cleanup failed:', cleanupErr);
                   }
                 } catch (error) {
-                  console.error('❌ [PhotoResult] MP4 conversion failed, trying WebM fallback:', error);
-                  // Fallback to WebM
-                  try {
-                    const convertedVideo = await blobUrlToDataUrl(compiledVideoUrl);
-                    videos.push(convertedVideo);
-                    console.log('✅ [PhotoResult] Added WebM video (fallback) to upload');
-                  } catch (fallbackError) {
-                    console.error('❌ [PhotoResult] Fallback also failed:', fallbackError);
-                  }
+                  console.error('❌ [PhotoResult] MP4 conversion failed (useEffect):', error);
+                  // ไม่ fallback ไป WebM เพราะ iPhone/Safari ไม่รองรับ
+                  console.error(
+                    '⚠️ [PhotoResult] Skipping video upload because MP4 conversion failed. iPhone/Safari will not be able to play WebM.',
+                  );
                 }
               }
 

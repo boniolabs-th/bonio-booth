@@ -425,7 +425,7 @@ export const convertWebmToMp4 = async (
 
     // FFmpeg command to convert WebM to MP4 (H.264)
     // - libx264: Most compatible codec for all devices including iPhone
-    // - aac: Audio codec (if audio exists)
+    // - an: No audio (WebM from canvas recording usually has no audio)
     // - movflags +faststart: Optimize for web streaming
     const args = [
       '-i',
@@ -438,15 +438,14 @@ export const convertWebmToMp4 = async (
       '23', // Quality (lower = better, 18-28 is good range)
       '-pix_fmt',
       'yuv420p', // Required for iPhone compatibility
-      '-c:a',
-      'aac', // Audio codec
-      '-b:a',
-      '128k', // Audio bitrate
+      '-an', // No audio (WebM from canvas usually has no audio track)
       '-movflags',
       '+faststart', // Enable fast start for web playback
       '-y', // Overwrite output file
       output,
     ];
+
+    console.log('🎬 [VideoService] Converting WebM to MP4 with args:', args.join(' '));
 
     const ffmpeg = spawn(ffmpegPath.path, args);
 
@@ -457,17 +456,21 @@ export const convertWebmToMp4 = async (
     });
 
     ffmpeg.on('error', (error) => {
+      console.error('❌ [VideoService] FFmpeg process error:', error.message);
       reject(new Error(`FFmpeg process error: ${error.message}`));
     });
 
     ffmpeg.on('close', (code) => {
       if (code === 0) {
         if (fs.existsSync(output)) {
+          console.log('✅ [VideoService] MP4 conversion successful:', output);
           resolve(output);
         } else {
+          console.error('❌ [VideoService] FFmpeg completed but output file not found');
           reject(new Error('FFmpeg completed but output file not found'));
         }
       } else {
+        console.error(`❌ [VideoService] FFmpeg exited with code ${code}:`, stderrOutput);
         reject(
           new Error(
             `FFmpeg exited with code ${code}\nOutput: ${stderrOutput}`,
