@@ -433,7 +433,7 @@ export const convertWebmToMp4 = async (
       '-c:v',
       'libx264',
       '-preset',
-      'fast', // Good balance between speed and compression
+      'ultrafast', // Good balance between speed and compression
       '-crf',
       '20', // Lower = better quality (18-22 is good for web, 23+ causes visible artifacts)
       '-pix_fmt',

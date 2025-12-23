@@ -126,6 +126,22 @@ export class ShutdownManager {
   }
 
   /**
+   * เริ่ม countdown ถ้ายังไม่เริ่ม (ไม่ reset ถ้าเริ่มแล้ว)
+   * ใช้สำหรับเช็คจาก isShutdownReady เพื่อไม่ให้ reset countdown ที่กำลังรันอยู่
+   */
+  ensureCountdown(minutes: number = DEFAULT_COUNTDOWN_MINUTES, reason: ShutdownReason = 'manual'): void {
+    // ถ้า countdown กำลังรันอยู่แล้ว ไม่ต้อง reset
+    if (this.state.isScheduled && this.countdownTimer !== null) {
+      console.log('⏸️ [ShutdownManager] Countdown already running, skipping reset');
+      return;
+    }
+
+    // ถ้ายังไม่เริ่ม ให้เริ่มใหม่
+    console.log('▶️ [ShutdownManager] Countdown not running, starting new countdown');
+    this.startCountdown(minutes, reason);
+  }
+
+  /**
    * เริ่ม countdown timer
    */
   private startCountdownTimer(): void {
@@ -241,7 +257,7 @@ export class ShutdownManager {
   /**
    * Execute shutdown command
    */
-  private async executeShutdown(): Promise<void> {
+  async executeShutdown(): Promise<void> {
     console.log('🛑 [ShutdownManager] Executing shutdown...');
 
     this.clearCountdownTimer();
@@ -309,6 +325,15 @@ export class ShutdownManager {
    */
   isShutdownScheduled(): boolean {
     return this.state.isScheduled;
+  }
+
+  /**
+   * ทดสอบ shutdown service (สำหรับ development/testing)
+   * ⚠️ คำเตือน: จะ shutdown เครื่องจริงๆ!
+   */
+  testShutdown(): void {
+    console.log('🧪 [ShutdownManager] Test shutdown called');
+    this.executeShutdown();
   }
 
   /**

@@ -90,6 +90,24 @@ class AppUpdater {
 }
 
 
+/**
+ * Helper function สำหรับเช็คและจัดการ isShutdownReady หลังจากเรียก init()
+ */
+function handleShutdownReady(initResponse: any): void {
+  const isShutdownReady = (initResponse as any).isShutdownReady || initResponse.isShutdownReady;
+  console.log('🔍 [Main] isShutdownReady from init:', isShutdownReady);
+
+  if (isShutdownReady === true) {
+    // ถ้า isShutdownReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
+    console.log('🛑 [Main] isShutdownReady is true, ensuring countdown is running');
+    shutdownManager.ensureCountdown(10, 'manual'); // 10 นาที default
+  } else if (isShutdownReady === false) {
+    // ถ้า isShutdownReady เป็น false ให้เคลียร์ shutdown ทันที
+    console.log('🔄 [Main] isShutdownReady is false, cancelling shutdown');
+    shutdownManager.cancelShutdown();
+  }
+}
+
 async function initializeApp() {
   try {
     console.log('🚀 Initializing app...');
@@ -114,6 +132,9 @@ async function initializeApp() {
     // ส่ง machineId จาก config ถ้ามี
     console.log('🔍 [Main] Calling init with machineId:', machineIdFromConfig);
     const initResponse = await machineService.init(machineIdFromConfig);
+
+    // เช็ค isShutdownReady และจัดการ shutdown countdown
+    handleShutdownReady(initResponse);
 
     // Send theme to renderer process
     if (mainWindow && initResponse.theme.background) {
@@ -566,6 +587,33 @@ const createWindow = async () => {
 
     template.push({ type: 'separator' });
 
+    // เพิ่มเมนูทดสอบการปิด window และ shutdown (เฉพาะ development mode)
+    if (
+      process.env.NODE_ENV === 'development' ||
+      process.env.DEBUG_PROD === 'true'
+    ) {
+      template.push({
+        label: 'Test: ปิด Window (Direct)',
+        click: () => {
+          // ทดสอบการปิด window โดยตรง (ไม่ต้องผ่าน password)
+          shouldQuit = true;
+          if (mainWindow) {
+            mainWindow.close();
+          }
+        },
+      });
+      template.push({
+        label: 'Test: Shutdown Service',
+        click: () => {
+          // ทดสอบ shutdown service (จะ shutdown เครื่องจริงๆ!)
+          // ⚠️ คำเตือน: จะ shutdown เครื่องจริงๆ!
+          console.log('🧪 [Test] Testing shutdown service...');
+          shutdownManager.testShutdown();
+        },
+      });
+      template.push({ type: 'separator' });
+    }
+
     template.push({
       label: 'ปิดแอป',
       click: () => {
@@ -950,6 +998,7 @@ ipcMain.handle('get-machine-prices', async () => {
     }
     // ถ้ายังไม่มี cache ให้เรียก API ใหม่
     const initResponse = await machineService.init();
+    handleShutdownReady(initResponse);
     cachedInitData = {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
@@ -995,6 +1044,7 @@ ipcMain.handle('get-machine-data', async () => {
     }
     // ถ้ายังไม่มี cache ให้เรียก API ใหม่
     const initResponse = await machineService.init();
+    handleShutdownReady(initResponse);
     cachedInitData = {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
@@ -1239,6 +1289,7 @@ ipcMain.handle('get-theme-data', async () => {
     }
     // ถ้ายังไม่มี cache ให้เรียก API ใหม่
     const initResponse = await machineService.init();
+    handleShutdownReady(initResponse);
     cachedInitData = {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],
@@ -1316,6 +1367,7 @@ ipcMain.handle('get-paper-position', async () => {
     }
     // ถ้ายังไม่มี cache ให้เรียก API ใหม่
     const initResponse = await machineService.init();
+    handleShutdownReady(initResponse);
     cachedInitData = {
       machine: initResponse.machine,
       prices: initResponse.machine.prices || [],

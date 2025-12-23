@@ -265,6 +265,7 @@ export interface InitResponse {
   theme: InitTheme;
   frames: InitFrame[];
   paperPosition?: PaperPosition;
+  isShutdownReady?: boolean;
 }
 
 export interface PaperPosition {
@@ -467,7 +468,11 @@ export class MachineService {
 
       // Access paperPosition with type assertion to handle optional property
       const paperPosition = (response as any).paperPosition || response.paperPosition;
-      return response;
+      const isShutdownReady = (response as any).isShutdownReady || response.isShutdownReady;
+      console.log('🔍 [MachineService] Init response:', {
+        isShutdownReady,
+      });
+      return { ...response, isShutdownReady };
     } catch (error) {
       console.error('❌ [MachineService] Init failed:', error);
       throw error;
