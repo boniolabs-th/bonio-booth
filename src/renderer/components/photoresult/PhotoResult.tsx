@@ -263,7 +263,7 @@ const generateFramedVideo = async (
 
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: selectedMimeType,
-        videoBitsPerSecond: 1500000, // 1.5 Mbps (reduced from 2.5 for smaller files)
+        videoBitsPerSecond: 10000000, // 10 Mbps for high quality
       });
 
       const chunks: Blob[] = [];
@@ -483,7 +483,7 @@ const generateFramedVideo = async (
 
     const mediaRecorder = new MediaRecorder(stream, {
       mimeType: selectedMimeType,
-      videoBitsPerSecond: 1500000, // 1.5 Mbps (reduced from 2.5 for smaller files)
+      videoBitsPerSecond: 10000000, // 10 Mbps for high quality
     });
 
     const chunks: Blob[] = [];

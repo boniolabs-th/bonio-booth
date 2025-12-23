@@ -365,11 +365,11 @@ export default function MainShooting() {
 
     try {
       recordedChunksRef.current = [];
-      const options = { mimeType: 'video/webm;codecs=vp9' };
+      const options = { mimeType: 'video/webm;codecs=vp8' };
 
       // Fallback to vp8 if vp9 is not supported
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options.mimeType = 'video/webm;codecs=vp8';
+        options.mimeType = 'video/webm;codecs=vp9';
       }
 
       const mediaRecorder = new MediaRecorder(streamRef.current, options);
