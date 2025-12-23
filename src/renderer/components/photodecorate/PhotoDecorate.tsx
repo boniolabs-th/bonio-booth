@@ -21,6 +21,7 @@ interface LocationState {
   captures: Capture[];
   selectedFrame?: FrameConfig;
   useBoomerang?: boolean;
+  videoDuration?: number; // Duration in seconds from MainShooting
 }
 
 export default function PhotoDecorate() {
@@ -209,6 +210,7 @@ export default function PhotoDecorate() {
         selectedFrame,
         selectedCaptures,
         useBoomerang: state.useBoomerang || false,
+        videoDuration: state.videoDuration, // ส่งต่อ videoDuration
       },
     });
   };

@@ -22,6 +22,7 @@ interface LocationState {
   selectedFrame: FrameConfig;
   selectedCaptures: Capture[];
   useBoomerang?: boolean;
+  videoDuration?: number; // Duration in seconds from MainShooting
 }
 
 export default function PhotoFilter() {
@@ -648,6 +649,7 @@ export default function PhotoFilter() {
           printImage,
           selectedFilter,
           useBoomerang: state.useBoomerang || false,
+          videoDuration: state.videoDuration, // ส่งต่อ videoDuration
           alreadyPrinted: true, // บอกว่าเพิ่งพิมพ์แล้ว ไม่ต้อง auto-print อีก
         },
       });
@@ -658,6 +660,7 @@ export default function PhotoFilter() {
         state: {
           ...state,
           selectedFilter,
+          videoDuration: state.videoDuration, // ส่งต่อ videoDuration
         },
       });
     } finally {

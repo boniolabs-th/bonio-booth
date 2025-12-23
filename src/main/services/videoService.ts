@@ -433,9 +433,9 @@ export const convertWebmToMp4 = async (
       '-c:v',
       'libx264',
       '-preset',
-      'fast', // Balance between speed and quality
+      'fast', // Good balance between speed and compression
       '-crf',
-      '23', // Quality (lower = better, 18-28 is good range)
+      '23', // Higher = smaller file (28-35 is acceptable for web)
       '-pix_fmt',
       'yuv420p', // Required for iPhone compatibility
       '-an', // No audio (WebM from canvas usually has no audio track)

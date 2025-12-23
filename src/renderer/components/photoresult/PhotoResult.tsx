@@ -31,6 +31,7 @@ interface LocationState {
   selectedFilter: string;
   selectedCaptures: Capture[];
   useBoomerang?: boolean;
+  videoDuration?: number; // Duration in seconds from MainShooting
   transactionId?: string; // transactionId จาก payment/create response
   referenceId?: string; // mchOrderNo จาก payment/create response
   paymentDetailsId?: string;
@@ -143,6 +144,7 @@ const generateFramedVideo = async (
   selectedFilterId?: string,
   useBoomerang?: boolean,
   isLutFilterApplied?: boolean, // Flag to indicate if LUT filter is already applied
+  videoDuration?: number, // Duration in seconds from MainShooting (WebM doesn't have duration metadata)
 ): Promise<string> => {
   const loadFrameImage = () =>
     new Promise<HTMLImageElement>((resolve, reject) => {
@@ -183,6 +185,7 @@ const generateFramedVideo = async (
     enrichedCaptures: Capture[],
     selectedFilterId?: string,
     isLutFilterApplied?: boolean, // Flag to indicate if LUT filter is already applied
+    boomerangVideoDuration?: number, // Duration in seconds
   ): Promise<string> => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -238,16 +241,20 @@ const generateFramedVideo = async (
     );
 
     const fps = 12;
-    const totalDurationSeconds = 4;
+    // ใช้ videoDuration ถ้ามี หรือ fallback เป็น 4 วินาที
+    // Loop วิดีโอ 3 รอบ (เช่น countdown 5 วิ x 3 = 15 วินาที)
+    const singleLoopDuration = boomerangVideoDuration || 4;
+    const loopCount = 3;
+    const totalDurationSeconds = singleLoopDuration * loopCount;
     const totalFrames = fps * totalDurationSeconds;
 
     return new Promise<string>((resolve, reject) => {
       const stream = canvas.captureStream(fps);
 
       const mimeTypes = [
+        'video/webm;codecs=vp8',
         'video/webm;codecs=vp9',
         'video/webm',
-        'video/webm;codecs=vp8',
       ];
 
       const selectedMimeType =
@@ -256,7 +263,7 @@ const generateFramedVideo = async (
 
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: selectedMimeType,
-        videoBitsPerSecond: 2500000,
+        videoBitsPerSecond: 1500000, // 1.5 Mbps (reduced from 2.5 for smaller files)
       });
 
       const chunks: Blob[] = [];
@@ -416,6 +423,7 @@ const generateFramedVideo = async (
       enrichedCaptures,
       selectedFilterId,
       isLutFilterApplied,
+      videoDuration,
     );
   }
 
@@ -452,27 +460,35 @@ const generateFramedVideo = async (
     videoElements.map((video) => video.play().catch(() => undefined)),
   );
 
+  // ใช้ videoDuration ที่ส่งมาจาก MainShooting (เพราะ WebM ไม่มี duration metadata)
+  // Loop วิดีโอ 3 รอบ (เช่น countdown 5 วิ x 3 = 15 วินาที)
+  const singleLoopDuration = videoDuration || 6; // fallback 6 seconds
+  const loopCount = 3;
+  const maxDuration = singleLoopDuration * loopCount;
+
   return new Promise<string>((resolve, reject) => {
     const stream = canvas.captureStream(30);
 
     const mimeTypes = [
+      'video/webm;codecs=vp8',
       'video/webm;codecs=vp9',
       'video/webm',
-      'video/webm;codecs=vp8',
     ];
 
     const selectedMimeType =
       mimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ||
       mimeTypes[0];
 
+    console.log('🎬 [generateFramedVideo] Using codec:', selectedMimeType);
+
     const mediaRecorder = new MediaRecorder(stream, {
       mimeType: selectedMimeType,
-      videoBitsPerSecond: 2500000,
+      videoBitsPerSecond: 1500000, // 1.5 Mbps (reduced from 2.5 for smaller files)
     });
 
     const chunks: Blob[] = [];
     let animationFrameId: number | null = null;
-    const maxDuration = 4;
+    // maxDuration คำนวณจากความยาววิดีโอต้นฉบับแล้ว (ด้านบน)
     const startTime = performance.now();
     let recording = true;
 
@@ -1004,6 +1020,7 @@ export default function PhotoResult() {
           initialFilterId,
           hasLUTFilter: isLutFilterApplied,
           isLutFilterApplied,
+          videoDuration: state.videoDuration,
         });
 
         // Generate framed video with processed captures
@@ -1013,6 +1030,7 @@ export default function PhotoResult() {
           initialFilterId,
           state.useBoomerang,
           isLutFilterApplied,
+          state.videoDuration, // ส่ง videoDuration จาก MainShooting
         );
 
         console.log(
@@ -1331,12 +1349,7 @@ export default function PhotoResult() {
               );
             }
 
-            // Cleanup temp WebM file
-            try {
-              await window.electron.video.cleanupTemp([saveResult.path]);
-            } catch (cleanupError) {
-              console.warn('⚠️ [PhotoResult] Failed to cleanup temp file:', cleanupError);
-            }
+            // Note: Temp file cleanup is handled by OS temp folder cleanup
           } catch (error) {
             console.error(
               '❌ [PhotoResult] Failed to convert video to MP4:',
@@ -1730,11 +1743,15 @@ export default function PhotoResult() {
               // เพิ่มวิดีโอ (แปลง WebM เป็น MP4 สำหรับ iPhone/Safari)
               if (compiledVideoUrl) {
                 try {
+                  const convertStartTime = Date.now();
                   console.log('📤 [PhotoResult] Converting WebM to MP4 (useEffect)...');
 
                   // Fetch blob from blob URL
                   const response = await fetch(compiledVideoUrl);
                   const blob = await response.blob();
+                  const webmSizeMB = (blob.size / 1024 / 1024).toFixed(2);
+                  console.log(`📊 [PhotoResult] WebM blob size: ${webmSizeMB} MB`);
+
                   const arrayBuffer = await blob.arrayBuffer();
 
                   // Save WebM to temp file
@@ -1742,6 +1759,7 @@ export default function PhotoResult() {
                   if (!saveResult.success) {
                     throw new Error(`Failed to save temp video: ${saveResult.error}`);
                   }
+                  console.log(`📁 [PhotoResult] Temp WebM saved: ${saveResult.path}`);
 
                   // Convert WebM to MP4
                   const convertResult = await window.electron.video.convertToMp4(saveResult.path, true);
@@ -1749,15 +1767,15 @@ export default function PhotoResult() {
                     throw new Error(`Failed to convert to MP4: ${convertResult.error}`);
                   }
 
+                  const convertEndTime = Date.now();
+                  const convertDuration = ((convertEndTime - convertStartTime) / 1000).toFixed(1);
+                  const mp4SizeMB = convertResult.dataUrl ? ((convertResult.dataUrl.length * 0.75) / 1024 / 1024).toFixed(2) : 'N/A';
+                  console.log(`✅ [PhotoResult] MP4 conversion done in ${convertDuration}s, size: ~${mp4SizeMB} MB`);
+
                   videos.push(convertResult.dataUrl);
                   console.log('✅ [PhotoResult] Added MP4 video to upload (useEffect)');
 
-                  // Cleanup temp file
-                  try {
-                    await window.electron.video.cleanupTemp([saveResult.path]);
-                  } catch (cleanupErr) {
-                    console.warn('⚠️ Cleanup failed:', cleanupErr);
-                  }
+                  // Note: Temp file cleanup is handled by OS temp folder cleanup
                 } catch (error) {
                   console.error('❌ [PhotoResult] MP4 conversion failed (useEffect):', error);
                   // ไม่ fallback ไป WebM เพราะ iPhone/Safari ไม่รองรับ

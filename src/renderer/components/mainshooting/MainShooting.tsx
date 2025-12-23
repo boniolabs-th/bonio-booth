@@ -671,6 +671,8 @@ export default function MainShooting() {
             ...state,
             captures,
             useBoomerang: state.useBoomerang || false,
+            // ส่ง videoDuration ไปด้วย เพราะ WebM ไม่มี duration metadata
+            videoDuration: cameraCountdownRef.current + 1, // countdown + buffer
           },
         });
       }, 1000);
