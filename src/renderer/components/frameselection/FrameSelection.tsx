@@ -21,7 +21,7 @@ export default function FrameSelection() {
   const state = location.state as LocationState;
   const [frames, setFrames] = useState<FrameConfig[]>();
   const [selectedFrame, setSelectedFrame] = useState<FrameConfig>();
-  const [useBoomerang, setUseBoomerang] = useState<boolean>(true);
+  const [useBoomerang, setUseBoomerang] = useState<boolean>(false); // Default: ไม่ใช้ Boomerang (Live Photo style)
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Drag to scroll state
