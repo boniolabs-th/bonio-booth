@@ -94,10 +94,6 @@ class AppUpdater {
  * Helper function สำหรับเช็คและจัดการ isShutdownReady หลังจากเรียก init()
  */
 function handleShutdownReady(initResponse: any): void {
-  // ดึง isShutdownReady โดยเช็คทั้ง undefined, null, false
-  const isShutdownReady = (initResponse as any)?.isShutdownReady ?? initResponse?.isShutdownReady;
-  const isShutdownReadyBool = isShutdownReady === true || isShutdownReady === 'true';
-
   // ส่ง log ไปที่ renderer
   const sendLog = (level: 'log' | 'warn' | 'error', message: string, data?: any) => {
     if (mainWindow) {
@@ -105,33 +101,90 @@ function handleShutdownReady(initResponse: any): void {
     }
   };
 
+  // ดึง isShutdownReady โดยเช็คทั้ง undefined, null, false
+  const isShutdownReady = (initResponse as any)?.isShutdownReady ?? initResponse?.isShutdownReady;
+  const isShutdownReadyBool = isShutdownReady === true || isShutdownReady === 'true';
+
+  // ดึง isClosedAppReady
+  const isClosedAppReady = (initResponse as any)?.isClosedAppReady ?? initResponse?.isClosedAppReady;
+  const isClosedAppReadyBool = isClosedAppReady === true || isClosedAppReady === 'true';
+
+  // Log ทุกครั้งที่ function ถูกเรียก (สำคัญมาก!)
   console.log('🔍 [Main] ========== HANDLING SHUTDOWN READY ==========');
   console.log('🔍 [Main] isShutdownReady from init (raw):', isShutdownReady);
   console.log('🔍 [Main] isShutdownReady (boolean):', isShutdownReadyBool);
-  console.log('🔍 [Main] isShutdownReady type:', typeof isShutdownReady);
+  console.log('🔍 [Main] isClosedAppReady from init (raw):', isClosedAppReady);
+  console.log('🔍 [Main] isClosedAppReady (boolean):', isClosedAppReadyBool);
   console.log('🔍 [Main] Current shutdown state BEFORE:', shutdownManager.getState());
 
-  sendLog('log', '🔍 HANDLING SHUTDOWN READY', {
-    isShutdownReady,
-    isShutdownReadyBool,
+  sendLog('warn', '🔍 ========== HANDLING SHUTDOWN READY ==========');
+  sendLog('log', '🔍 isShutdownReady & isClosedAppReady', {
+    isShutdownReady: { raw: isShutdownReady, boolean: isShutdownReadyBool },
+    isClosedAppReady: { raw: isClosedAppReady, boolean: isClosedAppReadyBool },
     stateBefore: shutdownManager.getState(),
   });
 
+  // จัดการ isShutdownReady (shutdown เครื่อง)
   if (isShutdownReadyBool) {
     // ถ้า isShutdownReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
     console.log('🛑 [Main] isShutdownReady is TRUE, ensuring countdown is running');
-    console.log('🛑 [Main] Calling ensureCountdown(1, manual)...');
-    sendLog('warn', '🛑 isShutdownReady = TRUE, starting countdown');
+    sendLog('error', '🛑 isShutdownReady = TRUE, starting countdown');
     shutdownManager.ensureCountdown(1, 'manual'); // ใช้ 1 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
-    console.log('🛑 [Main] ensureCountdown() called, checking state AFTER:');
     const stateAfter = shutdownManager.getState();
     console.log('🛑 [Main] Current shutdown state AFTER:', stateAfter);
     sendLog('log', '🛑 Countdown started', { stateAfter });
   } else {
     // ถ้า isShutdownReady เป็น false, undefined, หรือ null ให้เคลียร์ shutdown ทันที
     console.log('🔄 [Main] isShutdownReady is FALSE/undefined/null, cancelling shutdown immediately');
-    sendLog('log', '🔄 isShutdownReady = FALSE, cancelling shutdown');
+    sendLog('error', '🔄 isShutdownReady = FALSE, cancelling shutdown NOW!');
     shutdownManager.cancelShutdown();
+    const stateAfter = shutdownManager.getState();
+    console.log('🔄 [Main] Current shutdown state AFTER cancel:', stateAfter);
+    sendLog('log', '🔄 Shutdown cancelled', { stateAfter });
+  }
+
+  // จัดการ isClosedAppReady (ปิดโปรแกรม)
+  if (isClosedAppReadyBool) {
+    // ถ้า isClosedAppReady เป็น true ให้ปิดโปรแกรมทันที
+    console.log('🚪 [Main] ========== CLOSING APPLICATION ==========');
+    console.log('🚪 [Main] isClosedAppReady is TRUE, closing application immediately');
+    sendLog('error', '🚪 ========== CLOSING APPLICATION ==========');
+    sendLog('error', '🚪 isClosedAppReady = TRUE, closing application NOW!');
+
+    // ตั้ง flag เพื่อบอกว่าเราต้องการปิดแอปจริงๆ
+    shouldQuit = true;
+    console.log('🚪 [Main] shouldQuit set to:', shouldQuit);
+    sendLog('error', `🚪 shouldQuit set to: ${shouldQuit}`);
+
+    // ปิด window (จะไม่ถูก preventDefault เพราะ shouldQuit = true)
+    if (mainWindow) {
+      console.log('🚪 [Main] Main window exists, closing...');
+      console.log('🚪 [Main] mainWindow.isDestroyed():', mainWindow.isDestroyed());
+      console.log('🚪 [Main] mainWindow.isVisible():', mainWindow.isVisible());
+      sendLog('error', '🚪 Main window exists, closing NOW!', {
+        isDestroyed: mainWindow.isDestroyed(),
+        isVisible: mainWindow.isVisible(),
+      });
+
+      // ปิดทันที (ไม่ต้อง setTimeout)
+      try {
+        console.log('🚪 [Main] Executing mainWindow.close() NOW...');
+        sendLog('error', '🚪 Executing mainWindow.close() NOW!');
+        mainWindow.close();
+        console.log('🚪 [Main] mainWindow.close() called successfully');
+        sendLog('error', '🚪 mainWindow.close() called successfully');
+      } catch (error) {
+        console.error('❌ [Main] Error closing window:', error);
+        sendLog('error', '❌ Error closing window', { error: error instanceof Error ? error.message : String(error) });
+      }
+    } else {
+      console.log('⚠️ [Main] Main window is null, cannot close');
+      sendLog('warn', '⚠️ Main window is null, cannot close');
+    }
+  } else {
+    // ถ้า isClosedAppReady เป็น false, undefined, หรือ null ไม่ต้องทำอะไร
+    console.log('ℹ️ [Main] isClosedAppReady is FALSE/undefined/null, no action needed');
+    sendLog('log', 'ℹ️ isClosedAppReady = FALSE, no action needed');
   }
 }
 
@@ -1108,6 +1161,9 @@ ipcMain.handle('get-machine-data', async () => {
 ipcMain.handle('force-init', async () => {
   try {
     const initResponse = await machineService.init();
+
+    // เช็ค isShutdownReady และ isClosedAppReady และจัดการ shutdown/close
+    handleShutdownReady(initResponse);
 
     // Update cache
     cachedInitData = {

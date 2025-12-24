@@ -171,22 +171,25 @@ export class ShutdownManager {
    * เริ่ม countdown timer
    */
   private startCountdownTimer(): void {
-    console.log(`⏱️ [ShutdownManager] Starting countdown timer: ${this.state.remainingSeconds} seconds remaining`);
+    this.log('log', `⏱️ Starting countdown timer: ${this.state.remainingSeconds} seconds remaining`);
     this.countdownTimer = setInterval(() => {
       // เช็คว่า countdown ยังถูก schedule อยู่หรือไม่ (ถ้ายกเลิกแล้วให้หยุดทันที)
       if (!this.state.isScheduled) {
-        console.log('🛑 [ShutdownManager] Countdown was cancelled, stopping timer');
+        this.log('warn', '🛑 Countdown was cancelled, stopping timer immediately');
         this.clearCountdownTimer();
         return;
       }
 
       if (this.state.isPaused) {
-        console.log('⏸️ [ShutdownManager] Countdown paused, skipping');
+        // ไม่ log ทุกวินาทีเมื่อ pause (จะ spam log)
         return;
       }
 
       this.state.remainingSeconds--;
-      console.log(`⏱️ [ShutdownManager] Countdown: ${this.state.remainingSeconds} seconds remaining`);
+      // Log ทุก 10 วินาที หรือเมื่อเหลือน้อยกว่า 10 วินาที
+      if (this.state.remainingSeconds % 10 === 0 || this.state.remainingSeconds <= 10) {
+        this.log('log', `⏱️ Countdown: ${this.state.remainingSeconds}s remaining`);
+      }
       this.callbacks.onCountdownUpdate?.(this.state);
 
       // แจ้ง backend 5 วินาทีก่อน shutdown

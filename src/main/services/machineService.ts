@@ -266,6 +266,7 @@ export interface InitResponse {
   frames: InitFrame[];
   paperPosition?: PaperPosition;
   isShutdownReady?: boolean;
+  isClosedAppReady?: boolean;
 }
 
 export interface PaperPosition {
@@ -469,10 +470,17 @@ export class MachineService {
       // Access paperPosition with type assertion to handle optional property
       const paperPosition = (response as any).paperPosition || response.paperPosition;
       const isShutdownReady = (response as any).isShutdownReady || response.isShutdownReady;
+      const isClosedAppReady = (response as any).isClosedAppReady || response.isClosedAppReady;
       console.log('🔍 [MachineService] Init response:', {
         isShutdownReady,
+        isShutdownReadyType: typeof isShutdownReady,
+        isShutdownReadyValue: isShutdownReady,
+        isClosedAppReady,
+        isClosedAppReadyType: typeof isClosedAppReady,
+        isClosedAppReadyValue: isClosedAppReady,
       });
-      return { ...response, isShutdownReady };
+      console.log('⚠️ [MachineService] ⚠️⚠️⚠️ IMPORTANT: handleShutdownReady() MUST be called after this! ⚠️⚠️⚠️');
+      return { ...response, isShutdownReady, isClosedAppReady };
     } catch (error) {
       console.error('❌ [MachineService] Init failed:', error);
       throw error;

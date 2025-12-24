@@ -132,7 +132,7 @@ window.electron?.ipcRenderer.sendMessage('ipc-example', ['ping']);
 (window as any).electron?.ipcRenderer.on('shutdown-log', (logData: any) => {
   const { level, message, data, timestamp } = logData;
   const logMessage = `[${timestamp}] ${message}`;
-  
+
   // แสดง log ใน console ตาม level
   switch (level) {
     case 'error':
