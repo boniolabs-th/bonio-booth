@@ -94,16 +94,26 @@ class AppUpdater {
  * Helper function สำหรับเช็คและจัดการ isShutdownReady หลังจากเรียก init()
  */
 function handleShutdownReady(initResponse: any): void {
-  const isShutdownReady = (initResponse as any).isShutdownReady || initResponse.isShutdownReady;
-  console.log('🔍 [Main] isShutdownReady from init:', isShutdownReady);
+  // ดึง isShutdownReady โดยเช็คทั้ง undefined, null, false
+  const isShutdownReady = (initResponse as any)?.isShutdownReady ?? initResponse?.isShutdownReady;
+  const isShutdownReadyBool = isShutdownReady === true || isShutdownReady === 'true';
 
-  if (isShutdownReady === true) {
+  console.log('🔍 [Main] ========== HANDLING SHUTDOWN READY ==========');
+  console.log('🔍 [Main] isShutdownReady from init (raw):', isShutdownReady);
+  console.log('🔍 [Main] isShutdownReady (boolean):', isShutdownReadyBool);
+  console.log('🔍 [Main] isShutdownReady type:', typeof isShutdownReady);
+  console.log('🔍 [Main] Current shutdown state BEFORE:', shutdownManager.getState());
+
+  if (isShutdownReadyBool) {
     // ถ้า isShutdownReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
-    console.log('🛑 [Main] isShutdownReady is true, ensuring countdown is running');
-    shutdownManager.ensureCountdown(10, 'manual'); // 10 นาที default
-  } else if (isShutdownReady === false) {
-    // ถ้า isShutdownReady เป็น false ให้เคลียร์ shutdown ทันที
-    console.log('🔄 [Main] isShutdownReady is false, cancelling shutdown');
+    console.log('🛑 [Main] isShutdownReady is TRUE, ensuring countdown is running');
+    console.log('🛑 [Main] Calling ensureCountdown(1, manual)...');
+    shutdownManager.ensureCountdown(1, 'manual'); // ใช้ 1 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
+    console.log('🛑 [Main] ensureCountdown() called, checking state AFTER:');
+    console.log('🛑 [Main] Current shutdown state AFTER:', shutdownManager.getState());
+  } else {
+    // ถ้า isShutdownReady เป็น false, undefined, หรือ null ให้เคลียร์ shutdown ทันที
+    console.log('🔄 [Main] isShutdownReady is FALSE/undefined/null, cancelling shutdown immediately');
     shutdownManager.cancelShutdown();
   }
 }

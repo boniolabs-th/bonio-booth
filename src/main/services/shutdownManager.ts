@@ -28,7 +28,7 @@ export interface ShutdownManagerCallbacks {
 }
 
 // ค่า default
-const DEFAULT_COUNTDOWN_MINUTES = 10;
+const DEFAULT_COUNTDOWN_MINUTES = 1;
 const SHUTDOWN_NOTIFY_SECONDS = 5; // แจ้ง backend 5 วินาทีก่อน shutdown
 
 export class ShutdownManager {
@@ -97,12 +97,13 @@ export class ShutdownManager {
    * เริ่ม countdown
    */
   startCountdown(minutes: number = DEFAULT_COUNTDOWN_MINUTES, reason: ShutdownReason = 'manual'): void {
-    console.log(`🛑 [ShutdownManager] Starting countdown: ${minutes} minutes, reason: ${reason}`);
+    const totalSeconds = minutes * 60;
+    console.log(`🛑 [ShutdownManager] Starting countdown: ${minutes} minutes (${totalSeconds} seconds), reason: ${reason}`);
+    console.log(`🔍 [ShutdownManager] isInTransaction: ${this.isInTransaction}`);
 
     // ยกเลิก countdown เดิมถ้ามี
     this.clearCountdownTimer();
 
-    const totalSeconds = minutes * 60;
     this.state = {
       isScheduled: true,
       isPaused: false,
@@ -115,14 +116,16 @@ export class ShutdownManager {
 
     // ถ้าอยู่ใน transaction ให้ pause ไว้ก่อน
     if (this.isInTransaction) {
-      console.log('⏳ [ShutdownManager] In transaction, pausing countdown');
+      console.log('⏳ [ShutdownManager] ⚠️ In transaction, pausing countdown (will start after transaction ends)');
       this.state.isPaused = true;
       this.callbacks.onCountdownUpdate?.(this.state);
       return;
     }
 
+    console.log('▶️ [ShutdownManager] Not in transaction, starting countdown timer immediately');
     this.startCountdownTimer();
     this.callbacks.onCountdownUpdate?.(this.state);
+    console.log(`✅ [ShutdownManager] Countdown started successfully: ${totalSeconds} seconds`);
   }
 
   /**
@@ -130,14 +133,28 @@ export class ShutdownManager {
    * ใช้สำหรับเช็คจาก isShutdownReady เพื่อไม่ให้ reset countdown ที่กำลังรันอยู่
    */
   ensureCountdown(minutes: number = DEFAULT_COUNTDOWN_MINUTES, reason: ShutdownReason = 'manual'): void {
+    console.log('🔍 [ShutdownManager] ========== ENSURE COUNTDOWN ==========');
+    console.log('🔍 [ShutdownManager] Current state:', {
+      isScheduled: this.state.isScheduled,
+      isPaused: this.state.isPaused,
+      remainingSeconds: this.state.remainingSeconds,
+      countdownTimer: this.countdownTimer !== null ? 'running' : 'null',
+      isInTransaction: this.isInTransaction,
+    });
+
     // ถ้า countdown กำลังรันอยู่แล้ว ไม่ต้อง reset
     if (this.state.isScheduled && this.countdownTimer !== null) {
       console.log('⏸️ [ShutdownManager] Countdown already running, skipping reset');
+      console.log('⏸️ [ShutdownManager] Current remaining seconds:', this.state.remainingSeconds);
       return;
     }
 
-    // ถ้ายังไม่เริ่ม ให้เริ่มใหม่
-    console.log('▶️ [ShutdownManager] Countdown not running, starting new countdown');
+    // ถ้ายังไม่เริ่ม หรือถูก cancel ไปแล้ว ให้เริ่มใหม่
+    console.log('▶️ [ShutdownManager] Countdown not running or was cancelled, starting new countdown');
+    console.log('▶️ [ShutdownManager] Previous state:', {
+      isScheduled: this.state.isScheduled,
+      countdownTimer: this.countdownTimer !== null ? 'running' : 'null',
+    });
     this.startCountdown(minutes, reason);
   }
 
@@ -145,10 +162,22 @@ export class ShutdownManager {
    * เริ่ม countdown timer
    */
   private startCountdownTimer(): void {
+    console.log(`⏱️ [ShutdownManager] Starting countdown timer: ${this.state.remainingSeconds} seconds remaining`);
     this.countdownTimer = setInterval(() => {
-      if (this.state.isPaused) return;
+      // เช็คว่า countdown ยังถูก schedule อยู่หรือไม่ (ถ้ายกเลิกแล้วให้หยุดทันที)
+      if (!this.state.isScheduled) {
+        console.log('🛑 [ShutdownManager] Countdown was cancelled, stopping timer');
+        this.clearCountdownTimer();
+        return;
+      }
+
+      if (this.state.isPaused) {
+        console.log('⏸️ [ShutdownManager] Countdown paused, skipping');
+        return;
+      }
 
       this.state.remainingSeconds--;
+      console.log(`⏱️ [ShutdownManager] Countdown: ${this.state.remainingSeconds} seconds remaining`);
       this.callbacks.onCountdownUpdate?.(this.state);
 
       // แจ้ง backend 5 วินาทีก่อน shutdown
@@ -160,6 +189,7 @@ export class ShutdownManager {
       // เวลาหมด - shutdown
       if (this.state.remainingSeconds <= 0) {
         console.log('⏰ [ShutdownManager] Countdown finished, executing shutdown');
+        this.clearCountdownTimer(); // Clear timer ก่อน execute
         this.executeShutdown();
       }
     }, 1000);
@@ -169,7 +199,14 @@ export class ShutdownManager {
    * ยกเลิก countdown
    */
   cancelShutdown(): void {
-    console.log('🔄 [ShutdownManager] Cancelling shutdown');
+    console.log('🔄 [ShutdownManager] ========== CANCELLING SHUTDOWN ==========');
+    console.log('🔄 [ShutdownManager] State before cancel:', {
+      isScheduled: this.state.isScheduled,
+      isPaused: this.state.isPaused,
+      remainingSeconds: this.state.remainingSeconds,
+      countdownTimer: this.countdownTimer !== null ? 'running' : 'null',
+    });
+
     this.clearCountdownTimer();
 
     this.state = {
@@ -180,21 +217,49 @@ export class ShutdownManager {
     };
     this.hasNotifiedBackend = false;
 
+    console.log('🔄 [ShutdownManager] State after cancel:', {
+      isScheduled: this.state.isScheduled,
+      isPaused: this.state.isPaused,
+      remainingSeconds: this.state.remainingSeconds,
+      countdownTimer: this.countdownTimer !== null ? 'running' : 'null',
+    });
+
     this.callbacks.onShutdownCancelled?.();
     this.callbacks.onCountdownUpdate?.(this.state);
+    console.log('✅ [ShutdownManager] Shutdown cancelled successfully');
   }
 
   /**
    * Reset countdown เมื่อมี activity (กดอะไรที่หน้าตู้)
+   * จะ reset เฉพาะเมื่อ countdown กำลังรันอยู่ (isScheduled = true)
+   * เพื่อป้องกันการ shutdown ต่อหน้า user
    */
   onUserActivity(): void {
-    if (!this.state.isScheduled || this.state.isPaused) return;
+    // เช็คว่า countdown กำลังรันอยู่หรือไม่ (ต้อง isScheduled = true)
+    if (!this.state.isScheduled) {
+      console.log('ℹ️ [ShutdownManager] User activity detected but no shutdown scheduled, ignoring');
+      return;
+    }
 
-    console.log('👆 [ShutdownManager] User activity detected, resetting countdown');
+    if (this.state.isPaused) {
+      console.log('ℹ️ [ShutdownManager] User activity detected but countdown is paused, ignoring');
+      return;
+    }
 
-    // Reset เป็น 10 นาทีใหม่
+    console.log('👆 [ShutdownManager] User activity detected, resetting countdown to prevent shutdown');
+    console.log('👆 [ShutdownManager] Before reset:', {
+      remainingSeconds: this.state.remainingSeconds,
+      totalSeconds: this.state.totalSeconds,
+    });
+
+    // Reset เป็น totalSeconds ใหม่ (ไม่ใช่ 10 นาที แต่ใช้ totalSeconds ที่ตั้งไว้)
     this.state.remainingSeconds = this.state.totalSeconds;
     this.hasNotifiedBackend = false;
+
+    console.log('👆 [ShutdownManager] After reset:', {
+      remainingSeconds: this.state.remainingSeconds,
+      totalSeconds: this.state.totalSeconds,
+    });
 
     this.callbacks.onActivityDetected?.();
     this.callbacks.onCountdownUpdate?.(this.state);
@@ -220,7 +285,14 @@ export class ShutdownManager {
    * ให้ reset countdown เป็น 10 นาทีใหม่
    */
   endTransaction(): void {
-    console.log('✅ [ShutdownManager] Transaction ended, returning to home');
+    console.log('✅ [ShutdownManager] ========== TRANSACTION ENDED ==========');
+    console.log('✅ [ShutdownManager] State before endTransaction:', {
+      isScheduled: this.state.isScheduled,
+      isPaused: this.state.isPaused,
+      remainingSeconds: this.state.remainingSeconds,
+      isInTransaction: this.isInTransaction,
+    });
+
     this.isInTransaction = false;
 
     if (this.state.isScheduled) {
@@ -232,8 +304,12 @@ export class ShutdownManager {
       this.state.totalSeconds = DEFAULT_COUNTDOWN_MINUTES * 60;
       this.hasNotifiedBackend = false;
 
+      console.log('▶️ [ShutdownManager] Starting countdown timer after transaction ended');
       this.startCountdownTimer();
       this.callbacks.onCountdownUpdate?.(this.state);
+      console.log('✅ [ShutdownManager] Countdown resumed after transaction');
+    } else {
+      console.log('ℹ️ [ShutdownManager] No scheduled shutdown, nothing to resume');
     }
   }
 
@@ -258,13 +334,20 @@ export class ShutdownManager {
    * Execute shutdown command
    */
   async executeShutdown(): Promise<void> {
-    console.log('🛑 [ShutdownManager] Executing shutdown...');
+    console.log('🛑 [ShutdownManager] ========== EXECUTING SHUTDOWN ==========');
+    console.log('🛑 [ShutdownManager] State:', {
+      isScheduled: this.state.isScheduled,
+      isPaused: this.state.isPaused,
+      remainingSeconds: this.state.remainingSeconds,
+      hasNotifiedBackend: this.hasNotifiedBackend,
+    });
 
     this.clearCountdownTimer();
     this.callbacks.onShutdownStarting?.();
 
     // แจ้ง backend ก่อน (ถ้ายังไม่ได้แจ้ง)
     if (!this.hasNotifiedBackend) {
+      console.log('📤 [ShutdownManager] Notifying backend before shutdown...');
       await this.notifyShutdownReady();
     }
 
@@ -288,10 +371,17 @@ export class ShutdownManager {
         shutdownCmd = 'sudo shutdown -h now';
       }
 
-      console.log(`🖥️ [ShutdownManager] Executing: ${shutdownCmd}`);
-      await execAsync(shutdownCmd);
+      console.log(`🖥️ [ShutdownManager] Platform: ${platform}`);
+      console.log(`🖥️ [ShutdownManager] Executing shutdown command: ${shutdownCmd}`);
+      const result = await execAsync(shutdownCmd);
+      console.log('✅ [ShutdownManager] Shutdown command executed successfully');
+      console.log('✅ [ShutdownManager] Result:', result);
     } catch (error) {
       console.error('❌ [ShutdownManager] Shutdown failed:', error);
+      console.error('❌ [ShutdownManager] Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       // ถ้า shutdown ไม่สำเร็จ ให้ reset state
       this.state = {
         isScheduled: false,
@@ -308,8 +398,12 @@ export class ShutdownManager {
    */
   private clearCountdownTimer(): void {
     if (this.countdownTimer) {
+      console.log('🛑 [ShutdownManager] Clearing countdown timer');
       clearInterval(this.countdownTimer);
       this.countdownTimer = null;
+      console.log('✅ [ShutdownManager] Countdown timer cleared');
+    } else {
+      console.log('ℹ️ [ShutdownManager] No countdown timer to clear');
     }
   }
 
