@@ -127,3 +127,21 @@ window.electron?.ipcRenderer.once('ipc-example', (arg) => {
   console.log(arg);
 });
 window.electron?.ipcRenderer.sendMessage('ipc-example', ['ping']);
+
+// Listen for shutdown logs from main process
+(window as any).electron?.ipcRenderer.on('shutdown-log', (logData: any) => {
+  const { level, message, data, timestamp } = logData;
+  const logMessage = `[${timestamp}] ${message}`;
+  
+  // แสดง log ใน console ตาม level
+  switch (level) {
+    case 'error':
+      console.error(logMessage, data || '');
+      break;
+    case 'warn':
+      console.warn(logMessage, data || '');
+      break;
+    default:
+      console.log(logMessage, data || '');
+  }
+});

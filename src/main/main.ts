@@ -98,22 +98,39 @@ function handleShutdownReady(initResponse: any): void {
   const isShutdownReady = (initResponse as any)?.isShutdownReady ?? initResponse?.isShutdownReady;
   const isShutdownReadyBool = isShutdownReady === true || isShutdownReady === 'true';
 
+  // ส่ง log ไปที่ renderer
+  const sendLog = (level: 'log' | 'warn' | 'error', message: string, data?: any) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('shutdown-log', { level, message, data, timestamp: new Date().toISOString() });
+    }
+  };
+
   console.log('🔍 [Main] ========== HANDLING SHUTDOWN READY ==========');
   console.log('🔍 [Main] isShutdownReady from init (raw):', isShutdownReady);
   console.log('🔍 [Main] isShutdownReady (boolean):', isShutdownReadyBool);
   console.log('🔍 [Main] isShutdownReady type:', typeof isShutdownReady);
   console.log('🔍 [Main] Current shutdown state BEFORE:', shutdownManager.getState());
 
+  sendLog('log', '🔍 HANDLING SHUTDOWN READY', {
+    isShutdownReady,
+    isShutdownReadyBool,
+    stateBefore: shutdownManager.getState(),
+  });
+
   if (isShutdownReadyBool) {
     // ถ้า isShutdownReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
     console.log('🛑 [Main] isShutdownReady is TRUE, ensuring countdown is running');
     console.log('🛑 [Main] Calling ensureCountdown(1, manual)...');
+    sendLog('warn', '🛑 isShutdownReady = TRUE, starting countdown');
     shutdownManager.ensureCountdown(1, 'manual'); // ใช้ 1 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
     console.log('🛑 [Main] ensureCountdown() called, checking state AFTER:');
-    console.log('🛑 [Main] Current shutdown state AFTER:', shutdownManager.getState());
+    const stateAfter = shutdownManager.getState();
+    console.log('🛑 [Main] Current shutdown state AFTER:', stateAfter);
+    sendLog('log', '🛑 Countdown started', { stateAfter });
   } else {
     // ถ้า isShutdownReady เป็น false, undefined, หรือ null ให้เคลียร์ shutdown ทันที
     console.log('🔄 [Main] isShutdownReady is FALSE/undefined/null, cancelling shutdown immediately');
+    sendLog('log', '🔄 isShutdownReady = FALSE, cancelling shutdown');
     shutdownManager.cancelShutdown();
   }
 }
@@ -185,30 +202,41 @@ async function initializeApp() {
 
     sseClient.connect();
 
+    // Helper function สำหรับส่ง log ไปที่ renderer (DevTools)
+    const sendLogToRenderer = (level: 'log' | 'warn' | 'error', message: string, data?: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('shutdown-log', { level, message, data, timestamp: new Date().toISOString() });
+      }
+    };
+
     // Setup shutdown manager callbacks
     shutdownManager.setCallbacks({
       onCountdownUpdate: (state: ShutdownState) => {
         // ส่งสถานะ countdown ไปที่ renderer
         if (mainWindow) {
           mainWindow.webContents.send('shutdown-countdown-update', state);
+          sendLogToRenderer('log', `⏱️ Countdown: ${state.remainingSeconds}s / ${state.totalSeconds}s`, state);
         }
       },
       onShutdownStarting: () => {
         // แจ้ง renderer ว่ากำลังจะ shutdown
         if (mainWindow) {
           mainWindow.webContents.send('shutdown-starting');
+          sendLogToRenderer('warn', '🛑 Shutdown starting!');
         }
       },
       onShutdownCancelled: () => {
         // แจ้ง renderer ว่ายกเลิก shutdown
         if (mainWindow) {
           mainWindow.webContents.send('shutdown-cancelled');
+          sendLogToRenderer('log', '🔄 Shutdown cancelled');
         }
       },
       onActivityDetected: () => {
         // แจ้ง renderer ว่า countdown ถูก reset
         if (mainWindow) {
           mainWindow.webContents.send('shutdown-countdown-reset');
+          sendLogToRenderer('log', '👆 User activity detected, countdown reset');
         }
       },
     });

@@ -25,6 +25,7 @@ export interface ShutdownManagerCallbacks {
   onShutdownStarting?: () => void;
   onShutdownCancelled?: () => void;
   onActivityDetected?: () => void;
+  onLog?: (level: 'log' | 'warn' | 'error', message: string, data?: any) => void;
 }
 
 // ค่า default
@@ -94,12 +95,20 @@ export class ShutdownManager {
   }
 
   /**
+   * Helper function สำหรับส่ง log
+   */
+  private log(level: 'log' | 'warn' | 'error', message: string, data?: any): void {
+    console[level](message, data || '');
+    this.callbacks.onLog?.(level, message, data);
+  }
+
+  /**
    * เริ่ม countdown
    */
   startCountdown(minutes: number = DEFAULT_COUNTDOWN_MINUTES, reason: ShutdownReason = 'manual'): void {
     const totalSeconds = minutes * 60;
-    console.log(`🛑 [ShutdownManager] Starting countdown: ${minutes} minutes (${totalSeconds} seconds), reason: ${reason}`);
-    console.log(`🔍 [ShutdownManager] isInTransaction: ${this.isInTransaction}`);
+    this.log('warn', `🛑 Starting countdown: ${minutes} minutes (${totalSeconds} seconds), reason: ${reason}`);
+    this.log('log', `🔍 isInTransaction: ${this.isInTransaction}`);
 
     // ยกเลิก countdown เดิมถ้ามี
     this.clearCountdownTimer();
@@ -116,16 +125,16 @@ export class ShutdownManager {
 
     // ถ้าอยู่ใน transaction ให้ pause ไว้ก่อน
     if (this.isInTransaction) {
-      console.log('⏳ [ShutdownManager] ⚠️ In transaction, pausing countdown (will start after transaction ends)');
+      this.log('warn', '⏳ In transaction, pausing countdown (will start after transaction ends)');
       this.state.isPaused = true;
       this.callbacks.onCountdownUpdate?.(this.state);
       return;
     }
 
-    console.log('▶️ [ShutdownManager] Not in transaction, starting countdown timer immediately');
+    this.log('log', '▶️ Not in transaction, starting countdown timer immediately');
     this.startCountdownTimer();
     this.callbacks.onCountdownUpdate?.(this.state);
-    console.log(`✅ [ShutdownManager] Countdown started successfully: ${totalSeconds} seconds`);
+    this.log('log', `✅ Countdown started successfully: ${totalSeconds} seconds`);
   }
 
   /**
@@ -199,13 +208,14 @@ export class ShutdownManager {
    * ยกเลิก countdown
    */
   cancelShutdown(): void {
-    console.log('🔄 [ShutdownManager] ========== CANCELLING SHUTDOWN ==========');
-    console.log('🔄 [ShutdownManager] State before cancel:', {
+    this.log('log', '🔄 ========== CANCELLING SHUTDOWN ==========');
+    const stateBefore = {
       isScheduled: this.state.isScheduled,
       isPaused: this.state.isPaused,
       remainingSeconds: this.state.remainingSeconds,
       countdownTimer: this.countdownTimer !== null ? 'running' : 'null',
-    });
+    };
+    this.log('log', '🔄 State before cancel', stateBefore);
 
     this.clearCountdownTimer();
 
@@ -217,16 +227,17 @@ export class ShutdownManager {
     };
     this.hasNotifiedBackend = false;
 
-    console.log('🔄 [ShutdownManager] State after cancel:', {
+    const stateAfter = {
       isScheduled: this.state.isScheduled,
       isPaused: this.state.isPaused,
       remainingSeconds: this.state.remainingSeconds,
       countdownTimer: this.countdownTimer !== null ? 'running' : 'null',
-    });
+    };
+    this.log('log', '🔄 State after cancel', stateAfter);
 
     this.callbacks.onShutdownCancelled?.();
     this.callbacks.onCountdownUpdate?.(this.state);
-    console.log('✅ [ShutdownManager] Shutdown cancelled successfully');
+    this.log('log', '✅ Shutdown cancelled successfully');
   }
 
   /**
@@ -334,13 +345,14 @@ export class ShutdownManager {
    * Execute shutdown command
    */
   async executeShutdown(): Promise<void> {
-    console.log('🛑 [ShutdownManager] ========== EXECUTING SHUTDOWN ==========');
-    console.log('🛑 [ShutdownManager] State:', {
+    this.log('error', '🛑 ========== EXECUTING SHUTDOWN ==========');
+    const state = {
       isScheduled: this.state.isScheduled,
       isPaused: this.state.isPaused,
       remainingSeconds: this.state.remainingSeconds,
       hasNotifiedBackend: this.hasNotifiedBackend,
-    });
+    };
+    this.log('error', '🛑 State', state);
 
     this.clearCountdownTimer();
     this.callbacks.onShutdownStarting?.();
