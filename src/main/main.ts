@@ -9,7 +9,7 @@
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain, session } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, session, powerSaveBlocker } from 'electron';
 import { promises as fs } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -484,6 +484,7 @@ async function generateImageWithPadding(
 
 let mainWindow: BrowserWindow | null = null;
 let shouldQuit = false; // Flag สำหรับบอกว่าเราต้องการปิดแอปจริงๆ หรือไม่
+let powerSaveBlockerId: number | null = null; // ID สำหรับ powerSaveBlocker
 let cachedInitData: {
   machine?: { prices?: unknown[] };
   prices?: unknown[];
@@ -767,6 +768,13 @@ const createWindow = async () => {
  */
 
 app.on('window-all-closed', () => {
+  // หยุด power save blocker เมื่อปิด app
+  if (powerSaveBlockerId !== null && powerSaveBlocker.isStarted(powerSaveBlockerId)) {
+    powerSaveBlocker.stop(powerSaveBlockerId);
+    console.log('🔋 [Main] Power save blocker stopped');
+    powerSaveBlockerId = null;
+  }
+
   // Respect the OSX convention of having the application in memory even
   // after all windows have been closed
   if (process.platform !== 'darwin') {
@@ -777,6 +785,14 @@ app.on('window-all-closed', () => {
 app
   .whenReady()
   .then(() => {
+    // ========== POWER SAVE BLOCKER ==========
+    // ป้องกันไม่ให้หน้าจอปิดหรือเครื่องเข้าสู่ sleep mode
+    // 'prevent-display-sleep' จะป้องกันหน้าจอปิด (display turn off)
+    // 'prevent-app-suspension' จะป้องกัน app ถูก suspend
+    powerSaveBlockerId = powerSaveBlocker.start('prevent-display-sleep');
+    console.log('🔋 [Main] Power save blocker started with ID:', powerSaveBlockerId);
+    console.log('🔋 [Main] Power save blocker is active:', powerSaveBlocker.isStarted(powerSaveBlockerId));
+
     // ตั้งค่า permissions ก่อนสร้าง window
     // ตั้งค่า permissions สำหรับกล้องและไมโครโฟนใน default session
     session.defaultSession.setPermissionRequestHandler(
