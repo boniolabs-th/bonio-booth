@@ -170,7 +170,10 @@
     "appId": "org.erb.BonioBooth",
     "asar": true,
     "afterSign": ".erb/scripts/notarize.js",
-    "asarUnpack": "**\\*.{node,dll}",
+    "asarUnpack": [
+      "**/*.{node,dll}",
+      "**/node_modules/@ffmpeg-installer/**/*"
+    ],
     "files": [
       "dist",
       "node_modules",

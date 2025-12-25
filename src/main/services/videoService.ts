@@ -4,7 +4,25 @@ import fs from 'fs';
 import { app } from 'electron';
 
 // @ts-ignore
-import ffmpegPath from '@ffmpeg-installer/ffmpeg';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+
+/**
+ * Get the correct FFmpeg path for both development and production
+ * In production, FFmpeg binary is unpacked from asar to app.asar.unpacked
+ */
+const getFFmpegPath = (): string => {
+  let ffmpegPath = ffmpegInstaller.path;
+
+  // In production, replace 'app.asar' with 'app.asar.unpacked' in the path
+  if (app.isPackaged && ffmpegPath.includes('app.asar')) {
+    ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+  }
+
+  console.log('🎬 [VideoService] FFmpeg path:', ffmpegPath);
+  console.log('🎬 [VideoService] FFmpeg exists:', fs.existsSync(ffmpegPath));
+
+  return ffmpegPath;
+};
 
 /**
  * Creates a boomerang effect video using FFmpeg
@@ -47,7 +65,7 @@ export const createBoomerangVideo = async (
       output,
     ];
 
-    const ffmpeg = spawn(ffmpegPath.path, args);
+    const ffmpeg = spawn(getFFmpegPath(), args);
 
     let stderrOutput = '';
 
@@ -106,7 +124,7 @@ export const createBoomerangGif = async (
       output,
     ];
 
-    const ffmpeg = spawn(ffmpegPath.path, args);
+    const ffmpeg = spawn(getFFmpegPath(), args);
 
     let stderrOutput = '';
 
@@ -174,7 +192,7 @@ export const extractFrames = async (
       outputPattern,
     ];
 
-    const ffmpeg = spawn(ffmpegPath.path, args);
+    const ffmpeg = spawn(getFFmpegPath(), args);
 
     let stderrOutput = '';
 
@@ -284,7 +302,7 @@ export const applyLutToVideo = async (
       output,
     ];
 
-    const ffmpeg = spawn(ffmpegPath.path, args);
+    const ffmpeg = spawn(getFFmpegPath(), args);
 
     let stderrOutput = '';
 
@@ -357,7 +375,7 @@ export const createBoomerangWithLut = async (
       output,
     ];
 
-    const ffmpeg = spawn(ffmpegPath.path, args);
+    const ffmpeg = spawn(getFFmpegPath(), args);
 
     let stderrOutput = '';
 
@@ -447,7 +465,7 @@ export const convertWebmToMp4 = async (
 
     console.log('🎬 [VideoService] Converting WebM to MP4 with args:', args.join(' '));
 
-    const ffmpeg = spawn(ffmpegPath.path, args);
+    const ffmpeg = spawn(getFFmpegPath(), args);
 
     let stderrOutput = '';
 
