@@ -4,7 +4,26 @@ import fs from 'fs';
 import { app } from 'electron';
 
 // @ts-ignore
-import ffmpegPath from '@ffmpeg-installer/ffmpeg';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+
+/**
+ * Get FFmpeg binary path that works in both development and production (packed app)
+ * In production, asar archive is unpacked to app.asar.unpacked folder
+ */
+const getFFmpegPath = (): string => {
+  let ffmpegPath = ffmpegInstaller.path;
+
+  // In production (packed app), the path points to inside app.asar
+  // But we unpacked ffmpeg using asarUnpack, so we need to use app.asar.unpacked
+  if (app.isPackaged && ffmpegPath.includes('app.asar')) {
+    ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+  }
+
+  console.log('🎬 [VideoService] FFmpeg path:', ffmpegPath);
+  console.log('🎬 [VideoService] FFmpeg exists:', fs.existsSync(ffmpegPath));
+
+  return ffmpegPath;
+};
 
 /**
  * Creates a boomerang effect video using FFmpeg
@@ -32,13 +51,15 @@ export const createBoomerangVideo = async (
       '-i',
       inputVideoPath,
       '-filter_complex',
-      '[0:v]reverse,fifo[r];[0:v][r]concat=n=2:v=1:a=0,scale=1080:-2,setsar=1',
+      '[0:v]fps=30,reverse,fifo[r];[0:v]fps=30[o];[o][r]concat=n=2:v=1:a=0,scale=1080:-2,setsar=1',
       '-c:v',
       'libx264',
       '-preset',
-      'fast',
+      'medium',
       '-crf',
       '20',
+      '-r',
+      '30', // Force 30fps output
       '-pix_fmt',
       'yuv420p',
       '-movflags',
@@ -47,7 +68,7 @@ export const createBoomerangVideo = async (
       output,
     ];
 
-    const ffmpeg = spawn(ffmpegPath.path, args);
+    const ffmpeg = spawn(getFFmpegPath(), args);
 
     let stderrOutput = '';
 
@@ -99,14 +120,14 @@ export const createBoomerangGif = async (
       '-i',
       inputVideoPath,
       '-filter_complex',
-      '[0:v]reverse,fifo[r];[0:v][r]concat=n=2:v=1:a=0,scale=720:-2:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3',
+      '[0:v]fps=15,reverse,fifo[r];[0:v]fps=15[o];[o][r]concat=n=2:v=1:a=0,scale=720:-2:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3',
       '-loop',
       '0', // Infinite loop
       '-y',
       output,
     ];
 
-    const ffmpeg = spawn(ffmpegPath.path, args);
+    const ffmpeg = spawn(getFFmpegPath(), args);
 
     let stderrOutput = '';
 
@@ -174,7 +195,7 @@ export const extractFrames = async (
       outputPattern,
     ];
 
-    const ffmpeg = spawn(ffmpegPath.path, args);
+    const ffmpeg = spawn(getFFmpegPath(), args);
 
     let stderrOutput = '';
 
@@ -262,20 +283,35 @@ export const applyLutToVideo = async (
       outputPath ||
       path.join(app.getPath('temp'), `lut-applied-${Date.now()}.mp4`);
 
-    // Use relative path from project root - simpler for FFmpeg
-    const relativeLutPath = `assets/filters/${lutFileName}`;
+    // Copy LUT file to temp directory and use simple filename
+    // This avoids path escaping issues with FFmpeg on Windows
+    const tempLutPath = path.join(app.getPath('temp'), lutFileName);
+    try {
+      fs.copyFileSync(lutPath, tempLutPath);
+    } catch (err) {
+      reject(new Error(`Failed to copy LUT file: ${err}`));
+      return;
+    }
+
+    console.log('🎨 [VideoService] Applying LUT from temp:', tempLutPath);
 
     const args = [
       '-i',
       inputVideoPath,
       '-vf',
-      `lut3d=${relativeLutPath}`,
+      `lut3d=${lutFileName}`,
       '-c:v',
       'libx264',
       '-preset',
-      'fast',
+      'medium', // Better compression (same as convertWebmToMp4)
       '-crf',
-      '20',
+      '20', // Good quality (same as convertWebmToMp4)
+      '-maxrate',
+      '6M', // Limit bitrate to ~6Mbps for ~15MB target
+      '-bufsize',
+      '12M', // Buffer size for rate control
+      '-r',
+      '30', // Force 30fps output
       '-pix_fmt',
       'yuv420p',
       '-movflags',
@@ -284,7 +320,10 @@ export const applyLutToVideo = async (
       output,
     ];
 
-    const ffmpeg = spawn(ffmpegPath.path, args);
+    // Run FFmpeg from temp directory so it can find the LUT file
+    const ffmpeg = spawn(getFFmpegPath(), args, {
+      cwd: app.getPath('temp'),
+    });
 
     let stderrOutput = '';
 
@@ -332,23 +371,34 @@ export const createBoomerangWithLut = async (
       outputPath ||
       path.join(app.getPath('temp'), `boomerang-lut-${Date.now()}.mp4`);
 
-    // Use relative path from project root - simpler for FFmpeg
-    const relativeLutPath = `assets/filters/${lutFileName}`;
-
     // Combine boomerang + LUT in one pass for better performance
+    // Copy LUT file to temp directory and use simple filename
+    // This avoids path escaping issues with FFmpeg on Windows
+    const tempLutPath = path.join(app.getPath('temp'), lutFileName);
+    try {
+      fs.copyFileSync(lutPath, tempLutPath);
+    } catch (err) {
+      reject(new Error(`Failed to copy LUT file: ${err}`));
+      return;
+    }
+
+    console.log('🎨 [VideoService] Creating boomerang with LUT from temp:', tempLutPath);
+
     const args = [
       '-i',
       inputVideoPath,
       '-filter_complex',
-      `[0:v]reverse,fifo[r];[0:v][r]concat=n=2:v=1:a=0,scale=1080:-2,setsar=1,lut3d=${relativeLutPath}[v]`,
+      `[0:v]fps=30,reverse,fifo[r];[0:v]fps=30[o];[o][r]concat=n=2:v=1:a=0,scale=1080:-2,setsar=1,lut3d=${lutFileName}[v]`,
       '-map',
       '[v]',
       '-c:v',
       'libx264',
       '-preset',
-      'fast',
+      'medium',
       '-crf',
       '20',
+      '-r',
+      '30', // Force 30fps output
       '-pix_fmt',
       'yuv420p',
       '-movflags',
@@ -357,7 +407,10 @@ export const createBoomerangWithLut = async (
       output,
     ];
 
-    const ffmpeg = spawn(ffmpegPath.path, args);
+    // Run FFmpeg from temp directory so it can find the LUT file
+    const ffmpeg = spawn(getFFmpegPath(), args, {
+      cwd: app.getPath('temp'),
+    });
 
     let stderrOutput = '';
 
@@ -433,9 +486,15 @@ export const convertWebmToMp4 = async (
       '-c:v',
       'libx264',
       '-preset',
-      'ultrafast', // Good balance between speed and compression
+      'medium', // Better compression than ultrafast
       '-crf',
-      '20', // Lower = better quality (18-22 is good for web, 23+ causes visible artifacts)
+      '20', // Good quality (lower = better)
+      '-maxrate',
+      '6M', // Limit bitrate to ~6Mbps for ~15MB target (18s video)
+      '-bufsize',
+      '12M', // Buffer size for rate control
+      '-r',
+      '30', // Force 30fps output (WebM from canvas has variable fps)
       '-pix_fmt',
       'yuv420p', // Required for iPhone compatibility
       '-an', // No audio (WebM from canvas usually has no audio track)
@@ -447,7 +506,7 @@ export const convertWebmToMp4 = async (
 
     console.log('🎬 [VideoService] Converting WebM to MP4 with args:', args.join(' '));
 
-    const ffmpeg = spawn(ffmpegPath.path, args);
+    const ffmpeg = spawn(getFFmpegPath(), args);
 
     let stderrOutput = '';
 
