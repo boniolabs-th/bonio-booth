@@ -54,7 +54,7 @@ export const createBoomerangVideo = async (
       '-c:v',
       'libx264',
       '-preset',
-      'fast',
+      'medium',
       '-crf',
       '20',
       '-pix_fmt',
@@ -291,9 +291,9 @@ export const applyLutToVideo = async (
       '-c:v',
       'libx264',
       '-preset',
-      'fast',
+      'ultrafast',
       '-crf',
-      '20',
+      '23',
       '-pix_fmt',
       'yuv420p',
       '-movflags',
@@ -364,7 +364,7 @@ export const createBoomerangWithLut = async (
       '-c:v',
       'libx264',
       '-preset',
-      'fast',
+      'medium',
       '-crf',
       '20',
       '-pix_fmt',
@@ -445,15 +445,18 @@ export const convertWebmToMp4 = async (
     // - libx264: Most compatible codec for all devices including iPhone
     // - an: No audio (WebM from canvas recording usually has no audio)
     // - movflags +faststart: Optimize for web streaming
+    // - scale 1080p: Good quality for mobile (~10-15MB for 15s video)
     const args = [
       '-i',
       inputVideoPath,
+      '-vf',
+      'scale=1080:-2', // 1080p width, height auto
       '-c:v',
       'libx264',
       '-preset',
-      'ultrafast', // Good balance between speed and compression
+      'medium', // Better compression than ultrafast
       '-crf',
-      '20', // Lower = better quality (18-22 is good for web, 23+ causes visible artifacts)
+      '20', // Good quality (lower = better, target ~10-15MB)
       '-pix_fmt',
       'yuv420p', // Required for iPhone compatibility
       '-an', // No audio (WebM from canvas usually has no audio track)
