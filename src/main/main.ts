@@ -640,6 +640,19 @@ const createWindow = async () => {
 
     template.push({ type: 'separator' });
 
+    // เพิ่มเมนู "ปริ้นย้อนหลัง" (เปิดหน้า request-image)
+    template.push({
+      label: 'ปริ้นย้อนหลัง',
+      click: () => {
+        if (mainWindow) {
+          // ส่ง IPC message ไปที่ renderer เพื่อ navigate ไปที่หน้า request-image
+          mainWindow.webContents.send('navigate-to', '/request-image');
+        }
+      },
+    });
+
+    template.push({ type: 'separator' });
+
     // เพิ่มเมนู "Camera Config"
     template.push({
       label: 'Camera Config',

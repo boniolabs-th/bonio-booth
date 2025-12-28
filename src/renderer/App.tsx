@@ -24,6 +24,7 @@ import {
   OutOfPaper,
   SystemMaintenance,
   PrintTest,
+  RequestImage,
   PasswordModal,
   MachineConfigModal,
   CameraConfigModal,
@@ -315,6 +316,7 @@ export default function App() {
           <Route path="/system-maintenance" element={<SystemMaintenance />} />
           <Route path="/out-of-paper" element={<OutOfPaper />} />
           <Route path="/print-test" element={<PrintTest />} />
+          <Route path="/request-image" element={<RequestImage />} />
         </Routes>
       </ErrorBoundary>
     </Router>
