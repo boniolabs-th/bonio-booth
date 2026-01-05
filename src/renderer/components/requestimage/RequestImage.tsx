@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BackButton from '../backbutton';
 import PaperPositionConfigModal from '../paperpositionconfigmodal';
+import Countdown from '../countdown';
 import './RequestImage.css';
 
 interface EnvConfig {
@@ -14,9 +15,9 @@ export default function RequestImage(): React.JSX.Element {
   const navigate = useNavigate();
   const [imageUrl, setImageUrl] = useState<string>('');
   const [copies, setCopies] = useState<number>(1);
-  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>(
-    'portrait',
-  );
+  const [orientation, setOrientation] = useState<
+    'portrait' | 'landscape' | 'portrait-cut'
+  >('portrait');
   const [isPrinting, setIsPrinting] = useState(false);
   const [printStatus, setPrintStatus] = useState<
     'idle' | 'printing' | 'success' | 'error'
@@ -94,6 +95,13 @@ export default function RequestImage(): React.JSX.Element {
     };
     loadEnvConfigAndPaperPosition();
   }, []);
+
+  const handleCountdownComplete = useCallback(() => {
+    console.log(
+      '⏰ [RequestImage] Countdown completed, auto-navigating to home',
+    );
+    navigate('/');
+  }, [navigate]);
 
   const handleBack = () => {
     navigate('/');
@@ -184,11 +192,9 @@ export default function RequestImage(): React.JSX.Element {
     );
   };
 
-  const convertImageUrlToDataUrl = async (
-    imageUrl: string,
-  ): Promise<string> => {
+  const convertImageUrlToDataUrl = async (url: string): Promise<string> => {
     try {
-      const response = await fetch(imageUrl);
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -239,11 +245,62 @@ export default function RequestImage(): React.JSX.Element {
 
       // แปลง image URL เป็น data URL
       console.log('📥 [RequestImage] Converting image URL to data URL...');
-      const imageDataUrl = await convertImageUrlToDataUrl(imageUrl);
+      let imageDataUrl = await convertImageUrlToDataUrl(imageUrl);
       console.log('✅ [RequestImage] Image converted successfully');
 
+      // ตรวจสอบว่าเป็น portrait-cut (2x6) หรือไม่
+      const isPortraitCut = orientation === 'portrait-cut';
+      const imageSize = isPortraitCut ? '1200x3600' : undefined; // 2x6 frame = 1200x3600
+
+      // ถ้าเป็น portrait-cut ให้ duplicate ภาพ 2x6 ให้เป็น 4x6
+      if (isPortraitCut) {
+        console.log('=== DUPLICATING IMAGE FOR PRINT (2x6 -> 4x6) ===');
+        const doubleCanvas = document.createElement('canvas');
+        const img = new Image();
+
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => {
+            // 2x6 frame = 1200x3600, 4x6 = 2400x3600
+            const frameWidth = 1200;
+            const frameHeight = 3600;
+
+            doubleCanvas.width = frameWidth * 2; // 2400
+            doubleCanvas.height = frameHeight; // 3600
+            const dCtx = doubleCanvas.getContext('2d');
+
+            if (dCtx) {
+              // Fill with white background
+              dCtx.fillStyle = '#ffffff';
+              dCtx.fillRect(0, 0, doubleCanvas.width, doubleCanvas.height);
+
+              // Draw image twice: left and right
+              dCtx.drawImage(img, 0, 0, frameWidth, frameHeight);
+              dCtx.drawImage(img, frameWidth, 0, frameWidth, frameHeight);
+
+              imageDataUrl = doubleCanvas.toDataURL('image/png');
+              console.log(
+                '✅ [RequestImage] Image duplicated successfully (2x6 -> 4x6)',
+              );
+              resolve();
+            } else {
+              reject(new Error('Failed to get canvas context'));
+            }
+          };
+
+          img.onerror = () => {
+            reject(new Error('Failed to load image for duplication'));
+          };
+
+          img.src = imageDataUrl;
+        });
+      }
+
       // เรียก print function
-      console.log('🖨️ [RequestImage] Calling print function...');
+      console.log('🖨️ [RequestImage] Calling print function...', {
+        orientation,
+        isPortraitCut,
+        imageSize,
+      });
       // @ts-ignore
       if (window.electron?.print?.printPhoto) {
         // @ts-ignore
@@ -266,7 +323,8 @@ export default function RequestImage(): React.JSX.Element {
             frameId: 'request-image',
             frameName: 'Request Image Print',
             copies,
-            orientation,
+            orientation: isPortraitCut ? 'portrait' : orientation, // ส่ง portrait สำหรับ portrait-cut
+            imageSize, // ส่ง imageSize เพื่อให้ระบบรู้ว่าเป็น 2x6 และจะตัดได้
           });
 
           // Timeout after 60 seconds
@@ -311,6 +369,13 @@ export default function RequestImage(): React.JSX.Element {
         <h1 className="request-image-title">ปริ้นย้อนหลัง</h1>
       </div>
 
+      {/* Countdown Timer - นับถอยหลัง 10 นาที แล้วไปหน้าแรกอัตโนมัติ */}
+      <Countdown
+        seconds={600}
+        onComplete={handleCountdownComplete}
+        visible={printStatus === 'success'}
+      />
+
       {/* Main Content */}
       <div className="request-image-content">
         {/* Image URL Input */}
@@ -325,9 +390,7 @@ export default function RequestImage(): React.JSX.Element {
               className="url-input"
               disabled={isPrinting}
             />
-            {imageError && (
-              <p className="error-message">{imageError}</p>
-            )}
+            {imageError && <p className="error-message">{imageError}</p>}
           </div>
         </div>
 
@@ -422,13 +485,16 @@ export default function RequestImage(): React.JSX.Element {
               id="orientation"
               value={orientation}
               onChange={(e) =>
-                setOrientation(e.target.value as 'portrait' | 'landscape')
+                setOrientation(
+                  e.target.value as 'portrait' | 'landscape' | 'portrait-cut',
+                )
               }
               className="orientation-select"
               disabled={isPrinting}
             >
-              <option value="portrait">Portrait (ตั้ง)</option>
-              <option value="landscape">Landscape (นอน)</option>
+              <option value="portrait">Portrait (ตั้ง) 4x6</option>
+              <option value="portrait-cut">Portrait Cut (ตั้ง-ตัด) 2x6</option>
+              <option value="landscape">Landscape (นอน) 6x4</option>
             </select>
           </div>
 
@@ -584,4 +650,3 @@ export default function RequestImage(): React.JSX.Element {
     </div>
   );
 }
-

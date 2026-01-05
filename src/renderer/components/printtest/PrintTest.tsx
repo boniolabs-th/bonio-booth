@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/label-has-associated-control */
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BackButton from '../backbutton';
@@ -17,9 +18,9 @@ interface EnvConfig {
 export default function PrintTest(): React.JSX.Element {
   const navigate = useNavigate();
   const [copies, setCopies] = useState<number>(1);
-  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>(
-    'portrait',
-  );
+  const [orientation, setOrientation] = useState<
+    'portrait' | 'landscape' | 'portrait-cut'
+  >('portrait');
   const [isPrinting, setIsPrinting] = useState(false);
   const [printStatus, setPrintStatus] = useState<
     'idle' | 'printing' | 'success' | 'error'
@@ -246,7 +247,7 @@ export default function PrintTest(): React.JSX.Element {
 
     try {
       const testImageUrl =
-        orientation === 'portrait'
+        orientation === 'portrait' || orientation === 'portrait-cut'
           ? TEST_IMAGE_PORTRAIT_URL
           : TEST_IMAGE_LANDSCAPE_URL;
       console.log('🖨️ [PrintTest] Starting print test...', {
@@ -260,8 +261,16 @@ export default function PrintTest(): React.JSX.Element {
       const imageDataUrl = await convertImageUrlToDataUrl(testImageUrl);
       console.log('✅ [PrintTest] Image converted successfully');
 
+      // ตรวจสอบว่าเป็น portrait-cut (2x6) หรือไม่ เพื่อส่ง imageSize
+      const isPortraitCut = orientation === 'portrait-cut';
+      const imageSize = isPortraitCut ? '1200x3600' : undefined; // 2x6 frame = 1200x3600
+
       // เรียก print function
-      console.log('🖨️ [PrintTest] Calling print function...');
+      console.log('🖨️ [PrintTest] Calling print function...', {
+        orientation,
+        isPortraitCut,
+        imageSize,
+      });
       // @ts-ignore
       if (window.electron?.print?.printPhoto) {
         // @ts-ignore
@@ -284,7 +293,8 @@ export default function PrintTest(): React.JSX.Element {
             frameId: 'test',
             frameName: 'Test Print',
             copies,
-            orientation, // ใช้ orientation ที่เลือก
+            orientation: isPortraitCut ? 'portrait' : orientation, // ส่ง portrait สำหรับ portrait-cut
+            imageSize, // ส่ง imageSize เพื่อให้ระบบรู้ว่าเป็น 2x6 และจะตัดได้
           });
 
           // Timeout after 60 seconds
@@ -337,7 +347,7 @@ export default function PrintTest(): React.JSX.Element {
           <div className="image-preview-container">
             <img
               src={
-                orientation === 'portrait'
+                orientation === 'portrait' || orientation === 'portrait-cut'
                   ? TEST_IMAGE_PORTRAIT_URL
                   : TEST_IMAGE_LANDSCAPE_URL
               }
@@ -419,13 +429,16 @@ export default function PrintTest(): React.JSX.Element {
               id="orientation"
               value={orientation}
               onChange={(e) =>
-                setOrientation(e.target.value as 'portrait' | 'landscape')
+                setOrientation(
+                  e.target.value as 'portrait' | 'landscape' | 'portrait-cut',
+                )
               }
               className="orientation-select"
               disabled={isPrinting}
             >
-              <option value="portrait">Portrait (ตั้ง)</option>
-              <option value="landscape">Landscape (นอน)</option>
+              <option value="portrait">Portrait (ตั้ง) 4x6</option>
+              <option value="portrait-cut">Portrait Cut (ตั้ง-ตัด) 2x6</option>
+              <option value="landscape">Landscape (นอน) 6x4</option>
             </select>
           </div>
 
