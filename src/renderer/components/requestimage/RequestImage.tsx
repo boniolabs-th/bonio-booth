@@ -373,7 +373,7 @@ export default function RequestImage(): React.JSX.Element {
       <Countdown
         seconds={600}
         onComplete={handleCountdownComplete}
-        visible={printStatus === 'success'}
+        visible={isPrinting || printStatus === 'success'}
       />
 
       {/* Main Content */}
