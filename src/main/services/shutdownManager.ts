@@ -280,6 +280,46 @@ export class ShutdownManager {
   }
 
   /**
+   * Pause countdown (เมื่อไม่อยู่หน้า home)
+   */
+  pauseCountdown(): void {
+    if (this.state.isScheduled && !this.state.isPaused) {
+      console.log('⏸️ [ShutdownManager] Pausing countdown (not on home page)');
+      this.state.isPaused = true;
+      this.clearCountdownTimer();
+      this.callbacks.onCountdownUpdate?.(this.state);
+    }
+  }
+
+  /**
+   * Resume countdown (เมื่อกลับมาหน้า home)
+   */
+  resumeCountdown(): void {
+    if (this.state.isScheduled && this.state.isPaused && !this.isInTransaction) {
+      console.log('▶️ [ShutdownManager] Resuming countdown (back to home page)');
+      this.state.isPaused = false;
+      this.startCountdownTimer();
+      this.callbacks.onCountdownUpdate?.(this.state);
+    }
+  }
+
+  /**
+   * Reset countdown เป็น 1 นาทีใหม่เมื่อกลับมาหน้า home
+   */
+  resetCountdownOnHome(): void {
+    if (this.state.isScheduled && !this.isInTransaction) {
+      console.log('🔄 [ShutdownManager] Resetting countdown to 1 minute (back to home page)');
+      this.state.isPaused = false;
+      this.state.remainingSeconds = DEFAULT_COUNTDOWN_MINUTES * 60;
+      this.state.totalSeconds = DEFAULT_COUNTDOWN_MINUTES * 60;
+      this.hasNotifiedBackend = false;
+      this.clearCountdownTimer();
+      this.startCountdownTimer();
+      this.callbacks.onCountdownUpdate?.(this.state);
+    }
+  }
+
+  /**
    * เริ่ม transaction (ไปหน้า frame selection หรือทำ payment)
    * ให้ pause countdown
    */

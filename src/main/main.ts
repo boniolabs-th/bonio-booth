@@ -52,6 +52,7 @@ import {
 import machineService from './services/machineService';
 import sseClient from './services/sseClient';
 import shutdownManager, { ShutdownState } from './services/shutdownManager';
+import appCloseManager, { AppCloseState } from './services/appCloseManager';
 import { getEnvConfig, clearEnvConfigCache, DEFAULT_PORT } from './config/env.config';
 import {
   getMachineConfig,
@@ -145,46 +146,21 @@ function handleShutdownReady(initResponse: any): void {
 
   // จัดการ isClosedAppReady (ปิดโปรแกรม)
   if (isClosedAppReadyBool) {
-    // ถ้า isClosedAppReady เป็น true ให้ปิดโปรแกรมทันที
-    console.log('🚪 [Main] ========== CLOSING APPLICATION ==========');
-    console.log('🚪 [Main] isClosedAppReady is TRUE, closing application immediately');
-    sendLog('error', '🚪 ========== CLOSING APPLICATION ==========');
-    sendLog('error', '🚪 isClosedAppReady = TRUE, closing application NOW!');
-
-    // ตั้ง flag เพื่อบอกว่าเราต้องการปิดแอปจริงๆ
-    shouldQuit = true;
-    console.log('🚪 [Main] shouldQuit set to:', shouldQuit);
-    sendLog('error', `🚪 shouldQuit set to: ${shouldQuit}`);
-
-    // ปิด window (จะไม่ถูก preventDefault เพราะ shouldQuit = true)
-    if (mainWindow) {
-      console.log('🚪 [Main] Main window exists, closing...');
-      console.log('🚪 [Main] mainWindow.isDestroyed():', mainWindow.isDestroyed());
-      console.log('🚪 [Main] mainWindow.isVisible():', mainWindow.isVisible());
-      sendLog('error', '🚪 Main window exists, closing NOW!', {
-        isDestroyed: mainWindow.isDestroyed(),
-        isVisible: mainWindow.isVisible(),
-      });
-
-      // ปิดทันที (ไม่ต้อง setTimeout)
-      try {
-        console.log('🚪 [Main] Executing mainWindow.close() NOW...');
-        sendLog('error', '🚪 Executing mainWindow.close() NOW!');
-        mainWindow.close();
-        console.log('🚪 [Main] mainWindow.close() called successfully');
-        sendLog('error', '🚪 mainWindow.close() called successfully');
-      } catch (error) {
-        console.error('❌ [Main] Error closing window:', error);
-        sendLog('error', '❌ Error closing window', { error: error instanceof Error ? error.message : String(error) });
-      }
-    } else {
-      console.log('⚠️ [Main] Main window is null, cannot close');
-      sendLog('warn', '⚠️ Main window is null, cannot close');
-    }
+    // ถ้า isClosedAppReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
+    console.log('🚪 [Main] isClosedAppReady is TRUE, ensuring app close countdown is running');
+    sendLog('error', '🚪 isClosedAppReady = TRUE, starting app close countdown');
+    appCloseManager.ensureCountdown(1); // ใช้ 1 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
+    const stateAfter = appCloseManager.getState();
+    console.log('🚪 [Main] Current app close state AFTER:', stateAfter);
+    sendLog('log', '🚪 App close countdown started', { stateAfter });
   } else {
-    // ถ้า isClosedAppReady เป็น false, undefined, หรือ null ไม่ต้องทำอะไร
-    console.log('ℹ️ [Main] isClosedAppReady is FALSE/undefined/null, no action needed');
-    sendLog('log', 'ℹ️ isClosedAppReady = FALSE, no action needed');
+    // ถ้า isClosedAppReady เป็น false, undefined, หรือ null ให้เคลียร์ app close ทันที
+    console.log('🔄 [Main] isClosedAppReady is FALSE/undefined/null, cancelling app close immediately');
+    sendLog('error', '🔄 isClosedAppReady = FALSE, cancelling app close NOW!');
+    appCloseManager.cancelAppClose();
+    const stateAfter = appCloseManager.getState();
+    console.log('🔄 [Main] Current app close state AFTER cancel:', stateAfter);
+    sendLog('log', '🔄 App close cancelled', { stateAfter });
   }
 }
 
@@ -268,7 +244,7 @@ async function initializeApp() {
         // ส่งสถานะ countdown ไปที่ renderer
         if (mainWindow) {
           mainWindow.webContents.send('shutdown-countdown-update', state);
-          sendLogToRenderer('log', `⏱️ Countdown: ${state.remainingSeconds}s / ${state.totalSeconds}s`, state);
+          sendLogToRenderer('log', `⏱️ Shutdown countdown: ${state.remainingSeconds}s / ${state.totalSeconds}s`, state);
         }
       },
       onShutdownStarting: () => {
@@ -289,7 +265,57 @@ async function initializeApp() {
         // แจ้ง renderer ว่า countdown ถูก reset
         if (mainWindow) {
           mainWindow.webContents.send('shutdown-countdown-reset');
-          sendLogToRenderer('log', '👆 User activity detected, countdown reset');
+          sendLogToRenderer('log', '👆 User activity detected, shutdown countdown reset');
+        }
+      },
+    });
+
+    // Setup app close manager callbacks
+    appCloseManager.setCallbacks({
+      onCountdownUpdate: (state: AppCloseState) => {
+        // ส่งสถานะ countdown ไปที่ renderer
+        if (mainWindow) {
+          mainWindow.webContents.send('app-close-countdown-update', state);
+          sendLogToRenderer('log', `⏱️ App close countdown: ${state.remainingSeconds}s / ${state.totalSeconds}s`, state);
+        }
+      },
+      onAppCloseStarting: () => {
+        // แจ้ง renderer ว่ากำลังจะปิดแอป
+        if (mainWindow) {
+          mainWindow.webContents.send('app-close-starting');
+          sendLogToRenderer('warn', '🚪 App close starting!');
+        }
+        // ตั้ง flag เพื่อบอกว่าเราต้องการปิดแอปจริงๆ
+        shouldQuit = true;
+        console.log('🚪 [Main] shouldQuit set to:', shouldQuit);
+        // ปิด window (จะไม่ถูก preventDefault เพราะ shouldQuit = true)
+        if (mainWindow) {
+          console.log('🚪 [Main] Main window exists, closing...');
+          console.log('🚪 [Main] mainWindow.isDestroyed():', mainWindow.isDestroyed());
+          console.log('🚪 [Main] mainWindow.isVisible():', mainWindow.isVisible());
+          try {
+            console.log('🚪 [Main] Executing mainWindow.close()...');
+            mainWindow.close();
+            console.log('🚪 [Main] mainWindow.close() called successfully');
+          } catch (error) {
+            console.error('❌ [Main] Error closing window:', error);
+          }
+        } else {
+          console.log('⚠️ [Main] Main window is null, cannot close');
+        }
+      },
+      onAppCloseCancelled: () => {
+        // แจ้ง renderer ว่ายกเลิก app close
+        if (mainWindow) {
+          mainWindow.webContents.send('app-close-cancelled');
+          sendLogToRenderer('log', '🔄 App close cancelled');
+        }
+      },
+      onActivityDetected: () => {
+        // แจ้ง renderer ว่า countdown ถูก reset
+        if (mainWindow) {
+          mainWindow.webContents.send('app-close-countdown-reset');
+          sendLogToRenderer('log', '👆 User activity detected, app close countdown reset');
         }
       },
     });
@@ -1551,21 +1577,57 @@ ipcMain.handle(
 // Handler สำหรับแจ้งว่ามี user activity ที่หน้าตู้ (reset countdown)
 ipcMain.on('user-activity', () => {
   shutdownManager.onUserActivity();
+  appCloseManager.onUserActivity();
 });
 
 // Handler สำหรับเริ่ม transaction (pause countdown)
 ipcMain.on('transaction-start', () => {
   shutdownManager.startTransaction();
+  appCloseManager.startTransaction();
 });
 
-// Handler สำหรับจบ transaction (reset countdown เป็น 10 นาที)
+// Handler สำหรับจบ transaction (reset countdown เป็น 1 นาที)
 ipcMain.on('transaction-end', () => {
   shutdownManager.endTransaction();
+  appCloseManager.endTransaction();
 });
 
 // Handler สำหรับ request shutdown state
 ipcMain.handle('get-shutdown-state', () => {
   return shutdownManager.getState();
+});
+
+// Handler สำหรับ request app close state
+ipcMain.handle('get-app-close-state', () => {
+  return appCloseManager.getState();
+});
+
+// Handler สำหรับแจ้งว่าเข้าหน้า home (reset countdown เป็น 1 นาทีใหม่)
+ipcMain.on('home-page-active', () => {
+  console.log('🏠 [Main] Home page active, resetting countdowns to 1 minute');
+  shutdownManager.resetCountdownOnHome();
+  appCloseManager.resetCountdownOnHome();
+});
+
+// Handler สำหรับแจ้งว่าออกจากหน้า home (pause countdown)
+ipcMain.on('home-page-inactive', () => {
+  console.log('🚪 [Main] Home page inactive, pausing countdowns');
+  shutdownManager.pauseCountdown();
+  appCloseManager.pauseCountdown();
+});
+
+// Handler สำหรับยกเลิก shutdown
+ipcMain.handle('cancel-shutdown', () => {
+  console.log('🔄 [Main] Cancelling shutdown');
+  shutdownManager.cancelShutdown();
+  return { success: true };
+});
+
+// Handler สำหรับยกเลิก app close
+ipcMain.handle('cancel-app-close', () => {
+  console.log('🔄 [Main] Cancelling app close');
+  appCloseManager.cancelAppClose();
+  return { success: true };
 });
 
 // Handler สำหรับ request SSE connection status
