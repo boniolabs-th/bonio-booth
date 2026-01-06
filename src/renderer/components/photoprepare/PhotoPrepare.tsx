@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import BackButton from '../backbutton';
 import Countdown from '../countdown';
 import { FrameConfig } from '../../utils/frameConfig';
@@ -24,6 +24,7 @@ export default function PhotoPrepare() {
   const [selectedFrame, setSelectedFrame] = useState<FrameConfig | undefined>(
     state.selectedFrame,
   );
+  const [cameraCountdown, setCameraCountdown] = useState(3);
 
   const handleBack = () => {
     navigate('/frame-selection', { state });
@@ -41,6 +42,51 @@ export default function PhotoPrepare() {
   const handleCountdownComplete = useCallback(() => {
     handleConfirm();
   }, [handleConfirm]);
+
+  // รับ cameraCountdown จาก machine-init event และ request ข้อมูลทันที (fallback)
+  useEffect(() => {
+    // ฟังก์ชันสำหรับ set cameraCountdown
+    const setCameraCountdownData = (countdownValue: number) => {
+      if (countdownValue && countdownValue > 0) {
+        setCameraCountdown(countdownValue);
+        console.log('📸 Camera countdown loaded:', countdownValue);
+      }
+    };
+
+    // 1. รับจาก event (ถ้า event ถูกส่งมา)
+    const handleMachineInit = (...args: unknown[]) => {
+      const data = args[0] as { machine?: { cameraCountdown?: number } };
+      if (data?.machine?.cameraCountdown) {
+        setCameraCountdownData(data.machine.cameraCountdown);
+      }
+    };
+
+    const removeListener = window.electron?.ipcRenderer.on(
+      'machine-init',
+      handleMachineInit,
+    );
+
+    // 2. Request ข้อมูลทันที (fallback ถ้า event ยังไม่มา)
+    const requestMachineData = async () => {
+      try {
+        const result = await window.electron?.payment.getMachineData();
+        if (result?.success && result?.machine?.cameraCountdown) {
+          setCameraCountdownData(result.machine.cameraCountdown);
+        }
+      } catch (error) {
+        console.error('Failed to get machine data:', error);
+      }
+    };
+
+    // Request ทันที
+    requestMachineData();
+
+    return () => {
+      if (removeListener) {
+        removeListener();
+      }
+    };
+  }, []);
 
   return (
     <div className="photo-prepare-container">
@@ -97,7 +143,7 @@ export default function PhotoPrepare() {
                     />
                   </svg>
                 </div>
-                <p className="step-title">3 Second Per Image</p>
+                <p className="step-title">{cameraCountdown} Second Per Image</p>
               </div>
             </div>
 
