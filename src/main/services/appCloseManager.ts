@@ -20,7 +20,7 @@ export interface AppCloseManagerCallbacks {
 }
 
 // ค่า default
-const DEFAULT_COUNTDOWN_MINUTES = 1;
+const DEFAULT_COUNTDOWN_MINUTES = 2;
 
 export class AppCloseManager {
   private state: AppCloseState = {

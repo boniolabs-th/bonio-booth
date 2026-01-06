@@ -29,7 +29,7 @@ export interface ShutdownManagerCallbacks {
 }
 
 // ค่า default
-const DEFAULT_COUNTDOWN_MINUTES = 1;
+const DEFAULT_COUNTDOWN_MINUTES = 2;
 const SHUTDOWN_NOTIFY_SECONDS = 5; // แจ้ง backend 5 วินาทีก่อน shutdown
 
 export class ShutdownManager {
