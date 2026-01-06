@@ -75,6 +75,11 @@ import {
   deleteCameraConfig,
 } from './services/cameraConfigService';
 import {
+  registerCanonCameraIpcHandlers,
+  terminateCanonSdk,
+  setMainWindow as setCanonMainWindow,
+} from './services/canonCameraService';
+import {
   getPrinterConfig,
   savePrinterConfig,
   hasPrinterConfig,
@@ -814,6 +819,14 @@ app.on('window-all-closed', () => {
     powerSaveBlockerId = null;
   }
 
+  // Terminate Canon SDK
+  try {
+    terminateCanonSdk();
+    console.log('📷 [Main] Canon SDK terminated');
+  } catch (error) {
+    console.error('❌ [Main] Failed to terminate Canon SDK:', error);
+  }
+
   // Respect the OSX convention of having the application in memory even
   // after all windows have been closed
   if (process.platform !== 'darwin') {
@@ -848,7 +861,17 @@ app
     // หมายเหตุ: camera และ microphone ใช้ PermissionRequestHandler แทน DevicePermissionHandler
     // DevicePermissionHandler ใช้สำหรับ HID, Serial, USB เท่านั้น
 
+    // Register Canon Camera IPC handlers
+    registerCanonCameraIpcHandlers();
+    console.log('📷 [Main] Canon Camera IPC handlers registered');
+
     createWindow();
+
+    // Set main window reference for Canon camera service
+    if (mainWindow) {
+      setCanonMainWindow(mainWindow);
+    }
+
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.

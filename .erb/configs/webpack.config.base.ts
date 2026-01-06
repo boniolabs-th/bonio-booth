@@ -8,7 +8,11 @@ import webpackPaths from './webpack.paths';
 import { dependencies as externals } from '../../release/app/package.json';
 
 const configuration: webpack.Configuration = {
-  externals: [...Object.keys(externals || {})],
+  externals: [
+    ...Object.keys(externals || {}),
+    // Native modules should not be bundled
+    /\.node$/,
+  ],
 
   stats: 'errors-only',
 
@@ -28,6 +32,11 @@ const configuration: webpack.Configuration = {
             },
           },
         },
+      },
+      {
+        // Handle native .node modules
+        test: /\.node$/,
+        loader: 'node-loader',
       },
       {
         test: /\.cube$/,

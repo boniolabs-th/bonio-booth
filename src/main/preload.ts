@@ -180,6 +180,58 @@ const electronHandler = {
       return ipcRenderer.invoke('convert-to-mp4', videoPath, returnBase64);
     },
   },
+  canonCamera: {
+    /** Initialize Canon EDSDK */
+    initialize: () => ipcRenderer.invoke('canon:initialize'),
+    /** Terminate Canon EDSDK */
+    terminate: () => ipcRenderer.invoke('canon:terminate'),
+    /** Check if SDK is initialized */
+    isInitialized: () => ipcRenderer.invoke('canon:isInitialized'),
+    /** Get list of connected Canon cameras */
+    getCameraList: () => ipcRenderer.invoke('canon:getCameraList'),
+    /** Connect to first available camera */
+    connect: () => ipcRenderer.invoke('canon:connect'),
+    /** Connect to camera by index */
+    connectByIndex: (index: number) => ipcRenderer.invoke('canon:connectByIndex', index),
+    /** Open camera session */
+    openSession: () => ipcRenderer.invoke('canon:openSession'),
+    /** Close camera session */
+    closeSession: () => ipcRenderer.invoke('canon:closeSession'),
+    /** Check if camera is connected */
+    isConnected: () => ipcRenderer.invoke('canon:isConnected'),
+    /** Check if session is open */
+    isSessionOpen: () => ipcRenderer.invoke('canon:isSessionOpen'),
+    /** Take a picture and save to path */
+    takePicture: (savePath: string) => ipcRenderer.invoke('canon:takePicture', savePath),
+    /** Capture to buffer */
+    captureToBuffer: () => ipcRenderer.invoke('canon:captureToBuffer'),
+    /** Start live view */
+    startLiveView: () => ipcRenderer.invoke('canon:startLiveView'),
+    /** Stop live view */
+    stopLiveView: () => ipcRenderer.invoke('canon:stopLiveView'),
+    /** Get live view frame */
+    getLiveViewFrame: () => ipcRenderer.invoke('canon:getLiveViewFrame'),
+    /** Get camera property */
+    getProperty: (propertyId: number) => ipcRenderer.invoke('canon:getProperty', propertyId),
+    /** Set camera property */
+    setProperty: (propertyId: number, value: number) => ipcRenderer.invoke('canon:setProperty', propertyId, value),
+    /** Get battery level */
+    getBatteryLevel: () => ipcRenderer.invoke('canon:getBatteryLevel'),
+    /** Get available shots */
+    getAvailableShots: () => ipcRenderer.invoke('canon:getAvailableShots'),
+    /** Get ISO */
+    getIso: () => ipcRenderer.invoke('canon:getIso'),
+    /** Set ISO */
+    setIso: (value: number) => ipcRenderer.invoke('canon:setIso', value),
+    /** Get SDK version */
+    getSdkVersion: () => ipcRenderer.invoke('canon:getSdkVersion'),
+    /** Get property IDs */
+    getPropertyIds: () => ipcRenderer.invoke('canon:getPropertyIds'),
+    /** Full connect flow: initialize -> get list -> connect -> open session */
+    fullConnect: () => ipcRenderer.invoke('canon:fullConnect'),
+    /** Full disconnect flow: close session -> terminate */
+    fullDisconnect: () => ipcRenderer.invoke('canon:fullDisconnect'),
+  },
 };
 
 contextBridge.exposeInMainWorld('electron', electronHandler);
