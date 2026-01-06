@@ -365,22 +365,24 @@
   top: 20px;
   right: 20px;
   z-index: 1000;
-  background: rgba(0, 0, 0, 0.8);
-  border-radius: 16px;
-  padding: 20px 30px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
-  animation: countdownFadeIn 0.3s ease;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(30, 30, 30, 0.95) 100%);
+  border-radius: 20px;
+  padding: 24px 32px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  animation: countdownFadeIn 0.4s ease;
+  min-width: 280px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 @keyframes countdownFadeIn {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-20px) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -388,37 +390,66 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+}
+
+.countdown-message {
+  font-size: 3rem;
+  color: #ffd700;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.5;
+  margin-bottom: 4px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .countdown-label {
-  font-size: 1.2rem;
+  margin-bottom: 16px;
+  font-size: 2.5rem;
   color: #ffffff;
   font-weight: 500;
   text-align: center;
+  opacity: 0.9;
+  letter-spacing: 0.5px;
 }
 
 .countdown-time {
-  font-size: 2.5rem;
+  font-size: 3rem;
   color: #ff6b6b;
   font-weight: 700;
-  font-family: 'Courier New', monospace;
+  font-family: 'Courier New', 'Monaco', monospace;
   text-align: center;
-  letter-spacing: 2px;
+  letter-spacing: 4px;
+  text-shadow: 0 0 20px rgba(255, 107, 107, 0.5), 0 2px 8px rgba(0, 0, 0, 0.5);
+  padding: 8px 16px;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 12px;
+  border: 2px solid rgba(255, 107, 107, 0.3);
+  min-width: 140px;
 }
 
 @media (max-width: 768px) {
   .countdown-overlay {
     top: 10px;
     right: 10px;
-    padding: 15px 20px;
+    padding: 20px 24px;
+    min-width: 240px;
+  }
+
+  .countdown-message {
+    font-size: 2.5rem;
   }
 
   .countdown-label {
-    font-size: 1rem;
+    margin-bottom: 16px;
+    font-size: 2.5rem;
   }
 
   .countdown-time {
-    font-size: 2rem;
+    margin-top: 10px;
+    font-size: 2.5rem;
+    letter-spacing: 2px;
+    padding: 6px 12px;
+    min-width: 120px;
   }
 }

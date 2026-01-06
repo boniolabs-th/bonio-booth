@@ -69,6 +69,11 @@ import {
   PaperPositionConfig,
 } from './services/paperPositionConfigService';
 import {
+  getPrintTestPosition,
+  savePrintTestPosition,
+  PrintTestPosition,
+} from './services/printTestPositionService';
+import {
   getCameraConfig,
   saveCameraConfig,
   hasCameraConfig,
@@ -135,7 +140,7 @@ function handleShutdownReady(initResponse: any): void {
     // ถ้า isShutdownReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
     console.log('🛑 [Main] isShutdownReady is TRUE, ensuring countdown is running');
     sendLog('error', '🛑 isShutdownReady = TRUE, starting countdown');
-    shutdownManager.ensureCountdown(1, 'manual'); // ใช้ 1 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
+    shutdownManager.ensureCountdown(2, 'manual'); // ใช้ 2 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
     const stateAfter = shutdownManager.getState();
     console.log('🛑 [Main] Current shutdown state AFTER:', stateAfter);
     sendLog('log', '🛑 Countdown started', { stateAfter });
@@ -154,7 +159,7 @@ function handleShutdownReady(initResponse: any): void {
     // ถ้า isClosedAppReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
     console.log('🚪 [Main] isClosedAppReady is TRUE, ensuring app close countdown is running');
     sendLog('error', '🚪 isClosedAppReady = TRUE, starting app close countdown');
-    appCloseManager.ensureCountdown(1); // ใช้ 1 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
+    appCloseManager.ensureCountdown(2); // ใช้ 2 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
     const stateAfter = appCloseManager.getState();
     console.log('🚪 [Main] Current app close state AFTER:', stateAfter);
     sendLog('log', '🚪 App close countdown started', { stateAfter });
@@ -345,7 +350,9 @@ async function initializeApp() {
 async function generateImageWithPadding(
   base64: string,
   paddingPercent = 0,
-  orientation: 'portrait' | 'landscape' = 'portrait'
+  orientation: 'portrait' | 'landscape' = 'portrait',
+  horizontal: number = 0,
+  vertical: number = 0
 ): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     let htmlPath: string | null = null;
@@ -436,6 +443,10 @@ async function generateImageWithPadding(
         height: auto;
         object-fit: contain;
         display: block;
+        margin-top: ${vertical < 0 ? vertical : 0}px;
+        margin-bottom: ${vertical > 0 ? -vertical : 0}px;
+        margin-left: ${horizontal < 0 ? horizontal : 0}px;
+        margin-right: ${horizontal > 0 ? -horizontal : 0}px;
         transform: ${orientation === typeTransform ? 'none' : 'rotate(90deg)'};
       }
     </style>
@@ -964,7 +975,17 @@ ipcMain.on("print-photo", async (event, printConfig) => {
       hasOrientation: !!printConfig.orientation,
     });
 
-    const paddedImageBuffer = await generateImageWithPadding(printConfig.imageDataUrl, 5, orientation);
+    // ดึงค่า horizontal และ vertical จาก printConfig หรือใช้ค่า default
+    const horizontal = printConfig.horizontal ?? 0;
+    const vertical = printConfig.vertical ?? 0;
+
+    const paddedImageBuffer = await generateImageWithPadding(
+      printConfig.imageDataUrl,
+      5,
+      orientation,
+      horizontal,
+      vertical
+    );
 
     const tempDir = app.getPath("temp");
     const pngPath = path.join(tempDir, `photo-${Date.now()}.png`);
@@ -1552,6 +1573,34 @@ ipcMain.handle('get-paper-position', async () => {
     };
   } catch (error) {
     console.error('Error in get-paper-position handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+// Print Test Position handlers
+ipcMain.handle('get-print-test-position', async () => {
+  try {
+    const position = await getPrintTestPosition();
+    return { success: true, position };
+  } catch (error) {
+    console.error('Error in get-print-test-position handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle('save-print-test-position', async (event, position: PrintTestPosition) => {
+  try {
+    const success = await savePrintTestPosition(position);
+    if (success) {
+      return { success: true };
+    }
+    return { success: false, error: 'Failed to save position' };
+  } catch (error) {
+    console.error('Error in save-print-test-position handler:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage };
