@@ -26,7 +26,7 @@ const electronHandler = {
     },
   },
   print: {
-    printPhoto: (printConfig: { imageDataUrl: string; frameId: string; frameName: string; copies?: number; orientation?: 'portrait' | 'landscape'; imageSize?: string }) => {
+    printPhoto: (printConfig: { imageDataUrl: string; frameId: string; frameName: string; copies?: number; orientation?: 'portrait' | 'landscape'; imageSize?: string; horizontal?: number; vertical?: number }) => {
       ipcRenderer.send('print-photo', printConfig);
     },
     onPrintResponse: (
@@ -147,6 +147,12 @@ const electronHandler = {
     },
     deletePrinterConfig: () => {
       return ipcRenderer.invoke('delete-printer-config');
+    },
+    getPrintTestPosition: () => {
+      return ipcRenderer.invoke('get-print-test-position');
+    },
+    savePrintTestPosition: (position: { horizontal: number; vertical: number }) => {
+      return ipcRenderer.invoke('save-print-test-position', position);
     },
   },
   video: {

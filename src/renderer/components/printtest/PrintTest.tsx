@@ -28,11 +28,48 @@ export default function PrintTest(): React.JSX.Element {
   const [isPaperPositionConfigModalOpen, setIsPaperPositionConfigModalOpen] =
     useState(false);
 
-  // Load paper position
+  // Load print test position from storage and API
   useEffect(() => {
-    const loadPaperPosition = async () => {
+    const loadPositions = async () => {
       try {
-        // ดึงค่า paperPosition จาก main process ผ่าน IPC
+        // 1. โหลดค่าจาก print test position storage ก่อน (priority สูงสุด)
+        // @ts-ignore
+        const positionResult =
+          await window.electron?.payment?.getPrintTestPosition();
+
+        let hasStorageValue = false;
+        if (positionResult?.success && positionResult.position) {
+          const { horizontal: storageHorizontal, vertical: storageVertical } =
+            positionResult.position;
+          console.log(
+            '🔍 [PrintTest] Print test position from storage:',
+            positionResult.position,
+          );
+
+          // ใช้ค่าจาก storage ถ้ามี
+          if (
+            storageHorizontal !== undefined && storageHorizontal !== null
+          ) {
+            setHorizontal(storageHorizontal);
+            hasStorageValue = true;
+          }
+          if (storageVertical !== undefined && storageVertical !== null) {
+            setVertical(storageVertical);
+            hasStorageValue = true;
+          }
+
+          if (hasStorageValue) {
+            console.log(
+              '✅ [PrintTest] Print test position loaded from storage:',
+              {
+                horizontal: storageHorizontal,
+                vertical: storageVertical,
+              },
+            );
+          }
+        }
+
+        // 2. โหลดค่าจาก API (สำหรับ scale และ fallback สำหรับ horizontal/vertical ถ้าไม่มีใน storage)
         // @ts-ignore
         const paperPositionResult =
           await window.electron?.payment?.getPaperPosition();
@@ -46,44 +83,49 @@ export default function PrintTest(): React.JSX.Element {
             paperPos.scale !== undefined && paperPos.scale !== null
               ? paperPos.scale
               : 100;
-          const finalHorizontal =
-            paperPos.horizontal !== undefined && paperPos.horizontal !== null
-              ? paperPos.horizontal
-              : 0;
-          const finalVertical =
-            paperPos.vertical !== undefined && paperPos.vertical !== null
-              ? paperPos.vertical
-              : 0;
-
-          console.log('🔍 [PrintTest] Setting values:', {
-            finalScale,
-            finalHorizontal,
-            finalVertical,
-          });
 
           setScale(finalScale);
-          setHorizontal(finalHorizontal);
-          setVertical(finalVertical);
 
-          console.log('✅ [PrintTest] Paper position loaded from IPC:', {
-            scale: finalScale,
-            horizontal: finalHorizontal,
-            vertical: finalVertical,
-          });
+          // ใช้ค่า horizontal และ vertical จาก API เฉพาะเมื่อยังไม่มีค่าจาก storage
+          if (!hasStorageValue) {
+            const finalHorizontal =
+              paperPos.horizontal !== undefined && paperPos.horizontal !== null
+                ? paperPos.horizontal
+                : 0;
+            const finalVertical =
+              paperPos.vertical !== undefined && paperPos.vertical !== null
+                ? paperPos.vertical
+                : 0;
+
+            setHorizontal(finalHorizontal);
+            setVertical(finalVertical);
+
+            console.log(
+              '✅ [PrintTest] Paper position loaded from API (fallback):',
+              {
+                scale: finalScale,
+                horizontal: finalHorizontal,
+                vertical: finalVertical,
+              },
+            );
+          } else {
+            console.log(
+              '✅ [PrintTest] Paper position loaded from API (scale only):',
+              {
+                scale: finalScale,
+              },
+            );
+          }
         } else {
           console.log(
             '⚠️ [PrintTest] No paperPosition from IPC, using defaults',
           );
         }
       } catch (error) {
-        console.error(
-          '❌ [PrintTest] Failed to load env config or paper position:',
-          error,
-        );
-        // ไม่ต้อง set fallback เพราะ env.config.ts จะมี default values อยู่แล้ว
+        console.error('❌ [PrintTest] Failed to load positions:', error);
       }
     };
-    loadPaperPosition();
+    loadPositions();
   }, []);
 
   // Debug: Log state changes
@@ -150,6 +192,21 @@ export default function PrintTest(): React.JSX.Element {
       const isPortraitCut = orientation === 'portrait-cut';
       const imageSize = isPortraitCut ? '1200x3600' : undefined; // 2x6 frame = 1200x3600
 
+      // บันทึกค่า horizontal และ vertical ไว้ที่ storage
+      try {
+        // @ts-ignore
+        await window.electron?.payment?.savePrintTestPosition({
+          horizontal,
+          vertical,
+        });
+        console.log('✅ [PrintTest] Position saved to storage:', {
+          horizontal,
+          vertical,
+        });
+      } catch (error) {
+        console.error('❌ [PrintTest] Failed to save position:', error);
+      }
+
       // เรียก print function
       console.log('🖨️ [PrintTest] Calling print function...', {
         orientation,
@@ -180,6 +237,8 @@ export default function PrintTest(): React.JSX.Element {
             copies,
             orientation: isPortraitCut ? 'portrait' : orientation, // ส่ง portrait สำหรับ portrait-cut
             imageSize, // ส่ง imageSize เพื่อให้ระบบรู้ว่าเป็น 2x6 และจะตัดได้
+            horizontal, // ส่งค่า horizontal
+            vertical, // ส่งค่า vertical
           });
 
           // Timeout after 60 seconds
@@ -325,7 +384,7 @@ export default function PrintTest(): React.JSX.Element {
             </h2>
 
             <div className="slider-group">
-              <div className="slider-item">
+              {/* <div className="slider-item">
                 <div className="slider-container-label">
                   <label htmlFor="scale-slider" className="slider-label">
                     Scale
@@ -377,7 +436,7 @@ export default function PrintTest(): React.JSX.Element {
                     +
                   </button>
                 </div>
-              </div>
+              </div> */}
 
               <div className="slider-item">
                 <div className="slider-container-label">
