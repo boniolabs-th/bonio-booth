@@ -9,12 +9,6 @@ const TEST_IMAGE_PORTRAIT_URL = '../../../assets/images/image-print-test.png';
 const TEST_IMAGE_LANDSCAPE_URL =
   '../../../assets/images/image-print-lanscape-test.jpg';
 
-interface EnvConfig {
-  apiUrl: string;
-  machinePort: string;
-  machineId: string;
-}
-
 export default function PrintTest(): React.JSX.Element {
   const navigate = useNavigate();
   const [copies, setCopies] = useState<number>(1);
@@ -27,37 +21,17 @@ export default function PrintTest(): React.JSX.Element {
   >('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  // Position Paper Modal States
-  const [isPositionModalOpen, setIsPositionModalOpen] = useState(false);
+  // Position Paper States
   const [scale, setScale] = useState<number>(100);
   const [horizontal, setHorizontal] = useState<number>(0);
   const [vertical, setVertical] = useState<number>(0);
-  const [originalScale, setOriginalScale] = useState<number>(100);
-  const [originalHorizontal, setOriginalHorizontal] = useState<number>(0);
-  const [originalVertical, setOriginalVertical] = useState<number>(0);
-  const [envConfig, setEnvConfig] = useState<EnvConfig | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
   const [isPaperPositionConfigModalOpen, setIsPaperPositionConfigModalOpen] =
     useState(false);
 
-  // Load environment config and paper position
+  // Load paper position
   useEffect(() => {
-    const loadEnvConfigAndPaperPosition = async () => {
+    const loadPaperPosition = async () => {
       try {
-        // @ts-ignore
-        const env = await window.electron?.payment?.getEnvVars();
-        if (!env) {
-          throw new Error('Failed to get environment variables');
-        }
-
-        const config: EnvConfig = {
-          apiUrl: env.API_BASE_URL,
-          machinePort: env.PORT,
-          machineId: env.MACHINE_ID,
-        };
-
-        setEnvConfig(config);
-
         // ดึงค่า paperPosition จาก main process ผ่าน IPC
         // @ts-ignore
         const paperPositionResult =
@@ -90,9 +64,6 @@ export default function PrintTest(): React.JSX.Element {
           setScale(finalScale);
           setHorizontal(finalHorizontal);
           setVertical(finalVertical);
-          setOriginalScale(finalScale);
-          setOriginalHorizontal(finalHorizontal);
-          setOriginalVertical(finalVertical);
 
           console.log('✅ [PrintTest] Paper position loaded from IPC:', {
             scale: finalScale,
@@ -112,7 +83,7 @@ export default function PrintTest(): React.JSX.Element {
         // ไม่ต้อง set fallback เพราะ env.config.ts จะมี default values อยู่แล้ว
       }
     };
-    loadEnvConfigAndPaperPosition();
+    loadPaperPosition();
   }, []);
 
   // Debug: Log state changes
@@ -121,97 +92,11 @@ export default function PrintTest(): React.JSX.Element {
       scale,
       horizontal,
       vertical,
-      originalScale,
-      originalHorizontal,
-      originalVertical,
     });
-  }, [
-    scale,
-    horizontal,
-    vertical,
-    originalScale,
-    originalHorizontal,
-    originalVertical,
-  ]);
+  }, [scale, horizontal, vertical]);
 
   const handleBack = () => {
     navigate('/');
-  };
-
-  const handleOpenPositionModal = () => {
-    console.log('🔍 [PrintTest] Opening modal with current values:', {
-      scale,
-      horizontal,
-      vertical,
-    });
-    setOriginalScale(scale);
-    setOriginalHorizontal(horizontal);
-    setOriginalVertical(vertical);
-    setIsPositionModalOpen(true);
-  };
-
-  const handleClosePositionModal = () => {
-    // Reset to original values
-    setScale(originalScale);
-    setHorizontal(originalHorizontal);
-    setVertical(originalVertical);
-    setIsPositionModalOpen(false);
-  };
-
-  const handleSavePosition = async () => {
-    if (!envConfig) {
-      console.error('❌ [PrintTest] Environment config not loaded');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const headers = new Headers();
-      headers.set('Content-Type', 'application/json');
-      headers.set('X-Machine-Port', String(envConfig.machinePort));
-      headers.set('X-Machine-Id', envConfig.machineId || '');
-
-      const response = await fetch(
-        `${envConfig.apiUrl}/api/machines-public/paperPosition`,
-        {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            scale,
-            horizontal,
-            vertical,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to update paper position: ${response.statusText}`,
-        );
-      }
-
-      const data = await response.json();
-      console.log('✅ [PrintTest] Paper position updated:', data);
-
-      // Update original values
-      setOriginalScale(scale);
-      setOriginalHorizontal(horizontal);
-      setOriginalVertical(vertical);
-      setIsPositionModalOpen(false);
-    } catch (error) {
-      console.error('❌ [PrintTest] Error updating paper position:', error);
-      alert('ไม่สามารถบันทึกการตั้งค่าได้ กรุณาลองอีกครั้ง');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const hasChanges = () => {
-    return (
-      scale !== originalScale ||
-      horizontal !== originalHorizontal ||
-      vertical !== originalVertical
-    );
   };
 
   const convertImageUrlToDataUrl = async (
@@ -362,14 +247,6 @@ export default function PrintTest(): React.JSX.Element {
           <div className="section-header">
             <h2 className="section-title">ตั้งค่าการพิมพ์</h2>
             <div>
-              {/* <button
-                type="button"
-                className="position-paper-button"
-                onClick={handleOpenPositionModal}
-                disabled={isPrinting}
-              >
-                Position Paper
-              </button> */}
               <button
                 type="button"
                 className="position-paper-button"
@@ -379,6 +256,27 @@ export default function PrintTest(): React.JSX.Element {
                 Deverper Config
               </button>
             </div>
+          </div>
+
+          <div className="setting-group">
+            <label htmlFor="orientation" className="setting-label">
+              ขนาดกระดาษ:
+            </label>
+            <select
+              id="orientation"
+              value={orientation}
+              onChange={(e) =>
+                setOrientation(
+                  e.target.value as 'portrait' | 'landscape' | 'portrait-cut',
+                )
+              }
+              className="orientation-select"
+              disabled={isPrinting}
+            >
+              <option value="portrait">Portrait (ตั้ง) 4x6</option>
+              <option value="portrait-cut">Portrait Cut (ตั้ง-ตัด) 2x6</option>
+              <option value="landscape">Landscape (นอน) 6x4</option>
+            </select>
           </div>
 
           <div className="setting-group">
@@ -421,25 +319,177 @@ export default function PrintTest(): React.JSX.Element {
             <p className="setting-hint">เลือกจำนวน 1-3 แผ่น</p>
           </div>
 
-          <div className="setting-group">
-            <label htmlFor="orientation" className="setting-label">
-              Orientation:
-            </label>
-            <select
-              id="orientation"
-              value={orientation}
-              onChange={(e) =>
-                setOrientation(
-                  e.target.value as 'portrait' | 'landscape' | 'portrait-cut',
-                )
-              }
-              className="orientation-select"
-              disabled={isPrinting}
-            >
-              <option value="portrait">Portrait (ตั้ง) 4x6</option>
-              <option value="portrait-cut">Portrait Cut (ตั้ง-ตัด) 2x6</option>
-              <option value="landscape">Landscape (นอน) 6x4</option>
-            </select>
+          <div className="position-paper-section">
+            <h2 id="position-paper-title" className="section-title">
+              Position Paper
+            </h2>
+
+            <div className="slider-group">
+              <div className="slider-item">
+                <div className="slider-container-label">
+                  <label htmlFor="scale-slider" className="slider-label">
+                    Scale
+                  </label>
+                  <input
+                    type="number"
+                    min="50"
+                    max="150"
+                    value={scale}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      if (!Number.isNaN(value) && value >= 50 && value <= 150) {
+                        setScale(value);
+                      }
+                    }}
+                    className="slider-value-input"
+                    disabled={isPrinting}
+                    aria-label="Scale value"
+                    title="Scale value"
+                  />
+                </div>
+                <div className="slider-container-with-buttons">
+                  <button
+                    type="button"
+                    className="slider-button-decrement"
+                    onClick={() => setScale(Math.max(50, scale - 1))}
+                    disabled={isPrinting}
+                    aria-label="ลดค่า"
+                  >
+                    −
+                  </button>
+
+                  <input
+                    id="scale-slider"
+                    type="range"
+                    min="50"
+                    max="150"
+                    value={scale}
+                    onChange={(e) => setScale(Number(e.target.value))}
+                    className="slider slider-horizontal"
+                  />
+                  <button
+                    type="button"
+                    className="slider-button-increment"
+                    onClick={() => setScale(Math.min(150, scale + 1))}
+                    disabled={isPrinting}
+                    aria-label="เพิ่มค่า"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="slider-item">
+                <div className="slider-container-label">
+                  <label htmlFor="horizontal-slider" className="slider-label">
+                    Horizontal position
+                  </label>
+                  <input
+                    type="number"
+                    min="-50"
+                    max="50"
+                    value={horizontal}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      if (!Number.isNaN(value) && value >= -50 && value <= 50) {
+                        setHorizontal(value);
+                      }
+                    }}
+                    className="slider-value-input"
+                    disabled={isPrinting}
+                    aria-label="Horizontal position value"
+                    title="Horizontal position value"
+                  />
+                </div>
+                <div className="slider-container-with-buttons">
+                  <button
+                    type="button"
+                    className="slider-button-decrement"
+                    onClick={() => setHorizontal(Math.max(-50, horizontal - 1))}
+                    disabled={isPrinting}
+                    aria-label="ลดค่า"
+                  >
+                    −
+                  </button>
+
+                  <input
+                    id="horizontal-slider"
+                    type="range"
+                    min="-50"
+                    max="50"
+                    value={horizontal}
+                    onChange={(e) => setHorizontal(Number(e.target.value))}
+                    className="slider slider-horizontal"
+                  />
+                  <button
+                    type="button"
+                    className="slider-button-increment"
+                    onClick={() => setHorizontal(Math.min(50, horizontal + 1))}
+                    disabled={isPrinting}
+                    aria-label="เพิ่มค่า"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="slider-item">
+                <div className="slider-container-label">
+                  <label htmlFor="vertical-slider" className="slider-label">
+                    Vertical position
+                  </label>
+
+                  <input
+                    type="number"
+                    min="-50"
+                    max="50"
+                    value={vertical}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      if (!Number.isNaN(value) && value >= -50 && value <= 50) {
+                        setVertical(value);
+                      }
+                    }}
+                    className="slider-value-input-vertical"
+                    disabled={isPrinting}
+                    aria-label="Vertical position value"
+                    title="Vertical position value"
+                  />
+                </div>
+                <div className="slider-container-vertical-with-buttons">
+                  <button
+                    type="button"
+                    className="slider-button-decrement-vertical"
+                    onClick={() => setVertical(Math.max(-50, vertical - 1))}
+                    disabled={isPrinting}
+                    aria-label="ลดค่า"
+                  >
+                    −
+                  </button>
+
+                  <div className="slider-vertical-wrapper">
+                    <input
+                      id="vertical-slider"
+                      type="range"
+                      min="-50"
+                      max="50"
+                      value={vertical}
+                      onChange={(e) => setVertical(Number(e.target.value))}
+                      className="slider slider-vertical"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="slider-button-increment-vertical"
+                    onClick={() => setVertical(Math.min(50, vertical + 1))}
+                    disabled={isPrinting}
+                    aria-label="เพิ่มค่า"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Print Status */}
@@ -474,113 +524,6 @@ export default function PrintTest(): React.JSX.Element {
           </button>
         </div>
       </div>
-
-      {/* Position Paper Modal */}
-      {isPositionModalOpen && (
-        <div
-          className="modal-overlay"
-          onClick={handleClosePositionModal}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              handleClosePositionModal();
-            }
-          }}
-          role="button"
-          tabIndex={0}
-        >
-          <div
-            className="modal-content"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-labelledby="position-paper-title"
-            aria-describedby="position-paper-description"
-          >
-            <h2 id="position-paper-title" className="modal-title">
-              Position Paper
-            </h2>
-            <p id="position-paper-description" className="modal-description">
-              Use to center your print on paper if the print out is not
-              correctly aligned or cropped.
-            </p>
-
-            <div className="slider-group">
-              <div className="slider-item">
-                <label htmlFor="scale-slider" className="slider-label">
-                  Scale
-                </label>
-                <div className="slider-container">
-                  <input
-                    id="scale-slider"
-                    type="range"
-                    min="50"
-                    max="150"
-                    value={scale}
-                    onChange={(e) => setScale(Number(e.target.value))}
-                    className="slider slider-horizontal"
-                  />
-                  <span className="slider-value">{scale}</span>
-                </div>
-              </div>
-
-              <div className="slider-item">
-                <label htmlFor="horizontal-slider" className="slider-label">
-                  Horizontal position
-                </label>
-                <div className="slider-container">
-                  <input
-                    id="horizontal-slider"
-                    type="range"
-                    min="-50"
-                    max="50"
-                    value={horizontal}
-                    onChange={(e) => setHorizontal(Number(e.target.value))}
-                    className="slider slider-horizontal"
-                  />
-                  <span className="slider-value">{horizontal}</span>
-                </div>
-              </div>
-
-              <div className="slider-item">
-                <label htmlFor="vertical-slider" className="slider-label">
-                  Vertical position
-                </label>
-                <div className="slider-container-vertical">
-                  <input
-                    id="vertical-slider"
-                    type="range"
-                    min="-50"
-                    max="50"
-                    value={vertical}
-                    onChange={(e) => setVertical(Number(e.target.value))}
-                    className="slider slider-vertical"
-                  />
-                  <span className="slider-value">{vertical}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="modal-button modal-button-cancel"
-                onClick={handleClosePositionModal}
-                disabled={isSaving}
-              >
-                ยกเลิก
-              </button>
-              <button
-                type="button"
-                className="modal-button modal-button-confirm"
-                onClick={handleSavePosition}
-                disabled={isSaving || !hasChanges()}
-              >
-                {isSaving ? 'กำลังบันทึก...' : 'ยืนยัน'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Paper Position Config Modal */}
       <PaperPositionConfigModal
