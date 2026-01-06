@@ -180,6 +180,9 @@ function Home(): React.JSX.Element {
     return (
       <div className="countdown-overlay">
         <div className="countdown-content">
+          <div className="countdown-message">
+            ขออภัยเนื่องจากอยู่นอกเวลาทำการ
+          </div>
           <div className="countdown-label">{label}</div>
           <div className="countdown-time">
             {formatTime(activeCountdown.remainingSeconds)}

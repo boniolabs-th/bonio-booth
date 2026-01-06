@@ -130,7 +130,7 @@ function handleShutdownReady(initResponse: any): void {
     // ถ้า isShutdownReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
     console.log('🛑 [Main] isShutdownReady is TRUE, ensuring countdown is running');
     sendLog('error', '🛑 isShutdownReady = TRUE, starting countdown');
-    shutdownManager.ensureCountdown(1, 'manual'); // ใช้ 1 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
+    shutdownManager.ensureCountdown(2, 'manual'); // ใช้ 2 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
     const stateAfter = shutdownManager.getState();
     console.log('🛑 [Main] Current shutdown state AFTER:', stateAfter);
     sendLog('log', '🛑 Countdown started', { stateAfter });
@@ -149,7 +149,7 @@ function handleShutdownReady(initResponse: any): void {
     // ถ้า isClosedAppReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
     console.log('🚪 [Main] isClosedAppReady is TRUE, ensuring app close countdown is running');
     sendLog('error', '🚪 isClosedAppReady = TRUE, starting app close countdown');
-    appCloseManager.ensureCountdown(1); // ใช้ 1 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
+    appCloseManager.ensureCountdown(2); // ใช้ 2 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
     const stateAfter = appCloseManager.getState();
     console.log('🚪 [Main] Current app close state AFTER:', stateAfter);
     sendLog('log', '🚪 App close countdown started', { stateAfter });
