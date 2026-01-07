@@ -859,7 +859,10 @@ export default function PhotoResult() {
               firstCapture.video,
             );
             const assets = await generateBoomerangAssets(firstCapture.video);
-            if (assets.boomerangGif && assets.boomerangGif.startsWith('data:')) {
+            if (
+              assets.boomerangGif &&
+              assets.boomerangGif.startsWith('data:')
+            ) {
               // eslint-disable-next-line no-console
               console.log(
                 '✅ [PhotoResult] Boomerang GIF generated:',
@@ -875,7 +878,10 @@ export default function PhotoResult() {
             }
           } catch (error) {
             // eslint-disable-next-line no-console
-            console.error('❌ [PhotoResult] Failed to create boomerang preview:', error);
+            console.error(
+              '❌ [PhotoResult] Failed to create boomerang preview:',
+              error,
+            );
             // Fallback to video if boomerang generation fails
             setPreviewBoomerangGif(null);
           }
@@ -932,14 +938,19 @@ export default function PhotoResult() {
         if (filter?.type === 'lut' && filter.lutFile) {
           setIsApplyingLUT(true);
           const lutFileName = filter.lutFile; // Store in local variable for type narrowing
-          console.log('🎨 [PhotoResult] Applying LUT filter to original videos:', lutFileName);
+          console.log(
+            '🎨 [PhotoResult] Applying LUT filter to original videos:',
+            lutFileName,
+          );
 
           try {
             // Apply LUT filter to each capture video
             processedCaptures = await Promise.all(
               state.selectedCaptures.map(async (capture, index) => {
                 try {
-                  console.log(`🎨 [PhotoResult] Processing capture ${index + 1}...`);
+                  console.log(
+                    `🎨 [PhotoResult] Processing capture ${index + 1}...`,
+                  );
 
                   // Convert blob URL to ArrayBuffer
                   const response = await fetch(capture.video);
@@ -962,9 +973,8 @@ export default function PhotoResult() {
 
                   if (lutResult.success && lutResult.path) {
                     // Read the processed file via IPC
-                    const fileResult = await window.electron.video.readVideoFile(
-                      lutResult.path,
-                    );
+                    const fileResult =
+                      await window.electron.video.readVideoFile(lutResult.path);
 
                     if (fileResult.success && fileResult.data) {
                       const processedBlob = new Blob([fileResult.data], {
@@ -998,7 +1008,9 @@ export default function PhotoResult() {
               }),
             );
 
-            console.log('✅ [PhotoResult] All captures processed with LUT filter');
+            console.log(
+              '✅ [PhotoResult] All captures processed with LUT filter',
+            );
           } catch (lutError) {
             console.error(
               '❌ [PhotoResult] Failed to apply LUT filters:',
@@ -1306,16 +1318,25 @@ export default function PhotoResult() {
             });
 
             // Step 2: Save WebM to temp file
-            const saveResult = await window.electron.video.saveTempVideo(arrayBuffer);
+            const saveResult =
+              await window.electron.video.saveTempVideo(arrayBuffer);
             if (!saveResult.success) {
               throw new Error(`Failed to save temp video: ${saveResult.error}`);
             }
-            console.log('📤 [PhotoResult] WebM saved to temp:', saveResult.path);
+            console.log(
+              '📤 [PhotoResult] WebM saved to temp:',
+              saveResult.path,
+            );
 
             // Step 3: Convert WebM to MP4 using FFmpeg (returns base64 data URL)
-            const convertResult = await window.electron.video.convertToMp4(saveResult.path, true);
+            const convertResult = await window.electron.video.convertToMp4(
+              saveResult.path,
+              true,
+            );
             if (!convertResult.success) {
-              throw new Error(`Failed to convert to MP4: ${convertResult.error}`);
+              throw new Error(
+                `Failed to convert to MP4: ${convertResult.error}`,
+              );
             }
 
             const mp4DataUrl = convertResult.dataUrl;
@@ -1744,40 +1765,71 @@ export default function PhotoResult() {
               if (compiledVideoUrl) {
                 try {
                   const convertStartTime = Date.now();
-                  console.log('📤 [PhotoResult] Converting WebM to MP4 (useEffect)...');
+                  console.log(
+                    '📤 [PhotoResult] Converting WebM to MP4 (useEffect)...',
+                  );
 
                   // Fetch blob from blob URL
                   const response = await fetch(compiledVideoUrl);
                   const blob = await response.blob();
                   const webmSizeMB = (blob.size / 1024 / 1024).toFixed(2);
-                  console.log(`📊 [PhotoResult] WebM blob size: ${webmSizeMB} MB`);
+                  console.log(
+                    `📊 [PhotoResult] WebM blob size: ${webmSizeMB} MB`,
+                  );
 
                   const arrayBuffer = await blob.arrayBuffer();
 
                   // Save WebM to temp file
-                  const saveResult = await window.electron.video.saveTempVideo(arrayBuffer);
+                  const saveResult =
+                    await window.electron.video.saveTempVideo(arrayBuffer);
                   if (!saveResult.success) {
-                    throw new Error(`Failed to save temp video: ${saveResult.error}`);
+                    throw new Error(
+                      `Failed to save temp video: ${saveResult.error}`,
+                    );
                   }
-                  console.log(`📁 [PhotoResult] Temp WebM saved: ${saveResult.path}`);
+                  console.log(
+                    `📁 [PhotoResult] Temp WebM saved: ${saveResult.path}`,
+                  );
 
                   // Convert WebM to MP4
-                  const convertResult = await window.electron.video.convertToMp4(saveResult.path, true);
+                  const convertResult =
+                    await window.electron.video.convertToMp4(
+                      saveResult.path,
+                      true,
+                    );
                   if (!convertResult.success) {
-                    throw new Error(`Failed to convert to MP4: ${convertResult.error}`);
+                    throw new Error(
+                      `Failed to convert to MP4: ${convertResult.error}`,
+                    );
                   }
 
                   const convertEndTime = Date.now();
-                  const convertDuration = ((convertEndTime - convertStartTime) / 1000).toFixed(1);
-                  const mp4SizeMB = convertResult.dataUrl ? ((convertResult.dataUrl.length * 0.75) / 1024 / 1024).toFixed(2) : 'N/A';
-                  console.log(`✅ [PhotoResult] MP4 conversion done in ${convertDuration}s, size: ~${mp4SizeMB} MB`);
+                  const convertDuration = (
+                    (convertEndTime - convertStartTime) /
+                    1000
+                  ).toFixed(1);
+                  const mp4SizeMB = convertResult.dataUrl
+                    ? (
+                        (convertResult.dataUrl.length * 0.75) /
+                        1024 /
+                        1024
+                      ).toFixed(2)
+                    : 'N/A';
+                  console.log(
+                    `✅ [PhotoResult] MP4 conversion done in ${convertDuration}s, size: ~${mp4SizeMB} MB`,
+                  );
 
                   videos.push(convertResult.dataUrl);
-                  console.log('✅ [PhotoResult] Added MP4 video to upload (useEffect)');
+                  console.log(
+                    '✅ [PhotoResult] Added MP4 video to upload (useEffect)',
+                  );
 
                   // Note: Temp file cleanup is handled by OS temp folder cleanup
                 } catch (error) {
-                  console.error('❌ [PhotoResult] MP4 conversion failed (useEffect):', error);
+                  console.error(
+                    '❌ [PhotoResult] MP4 conversion failed (useEffect):',
+                    error,
+                  );
                   // ไม่ fallback ไป WebM เพราะ iPhone/Safari ไม่รองรับ
                   console.error(
                     '⚠️ [PhotoResult] Skipping video upload because MP4 conversion failed. iPhone/Safari will not be able to play WebM.',
@@ -2091,8 +2143,11 @@ export default function PhotoResult() {
           className="finish-button"
           onClick={handleFinish}
           disabled={printStatus !== 'success' || !qrcodeStorageUrl}
+          style={{
+            opacity: printStatus !== 'success' || !qrcodeStorageUrl ? 0.5 : 1,
+          }}
         >
-          เสร็จสิ้น
+          Done
         </button>
       </div>
 

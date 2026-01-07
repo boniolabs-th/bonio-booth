@@ -957,14 +957,14 @@ export default function PhotoFilter() {
               <rect x="6" y="14" width="12" height="8" />
             </svg>
             {isProcessing
-              ? 'กำลังประมวลผล...'
+              ? 'Processing...'
               : printStatus === 'printing'
-                ? 'กำลังพิมพ์...'
+                ? 'Printing...'
                 : printStatus === 'success'
-                  ? 'พิมพ์สำเร็จ ✓'
+                  ? 'Printed ✓'
                   : printStatus === 'error'
-                    ? 'พิมพ์ไม่สำเร็จ ✗'
-                    : 'พิมพ์รูปภาพ'}
+                    ? 'Print failed ✗'
+                    : 'Print'}
           </button>
         </div>
       </div>

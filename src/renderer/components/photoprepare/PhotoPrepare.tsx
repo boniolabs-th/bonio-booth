@@ -184,7 +184,7 @@ export default function PhotoPrepare() {
             className="start-shooting-button"
             onClick={handleConfirm}
           >
-            เริ่มถ่าย
+            Start
           </button>
         </div>
       </div>

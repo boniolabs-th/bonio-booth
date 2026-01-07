@@ -653,7 +653,7 @@ export default function PhotoDecorate() {
           onClick={handleConfirm}
           disabled={selectedPhotos.length !== selectedFrame?.slots.length}
         >
-          ต่อไป
+          Next
         </button>
       </div>
 

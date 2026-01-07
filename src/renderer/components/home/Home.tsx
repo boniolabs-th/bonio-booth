@@ -69,7 +69,10 @@ function Home(): React.JSX.Element {
           className="terms-link"
           aria-label="Open Terms and Services"
         >
-          ข้อตกลงในการใช้บริการ
+          <div className="extend-btn-text">
+            <p>ข้อตกลงการให้บริการ</p>
+            <p style={{ fontSize: '1.2rem' }}>Terms & Conditions</p>
+          </div>
         </button>
         <button
           type="button"
@@ -77,7 +80,10 @@ function Home(): React.JSX.Element {
           className="terms-link"
           aria-label="Open Help"
         >
-          ขอความช่วยเหลือ
+          <div className="extend-btn-text">
+            <p>ขอความช่วยเหลือ</p>
+            <p style={{ fontSize: '1.2rem' }}>Need Help?</p>
+          </div>
         </button>
       </footer>
     </main>

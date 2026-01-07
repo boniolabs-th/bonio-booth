@@ -257,7 +257,7 @@ export default function DiscountCoupon() {
               onClick={handleConfirm}
               disabled={code.length === 0 || isLoading}
             >
-              {isLoading ? 'กำลังตรวจสอบ...' : 'ยืนยัน'}
+              {isLoading ? 'Validating...' : 'Confirm'}
             </button>
           </div>
         </div>
@@ -281,7 +281,7 @@ export default function DiscountCoupon() {
                 className="coupon-error-close-button"
                 onClick={() => setError(null)}
               >
-                ปิด
+                Close
               </button>
             </div>
           </div>

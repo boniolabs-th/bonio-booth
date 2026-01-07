@@ -474,18 +474,31 @@ export default function PaymentQR() {
             className="cancel-payment-button"
             onClick={handleCancelClick}
           >
-            ยกเลิกการชำระเงิน
+            Cancel Payment
           </button>
         )}
       </div>
 
       <ConfirmationModal
         isOpen={isCancelModalOpen}
-        message="ต้องการยกเลิกการชำระเงิน?"
+        message={
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+          >
+            <p style={{ margin: 0 }}>ต้องการยกเลิกการชำระเงิน?</p>
+            <p style={{ margin: 0, fontSize: '1rem' }}>
+              Are you sure you want to cancel the payment?
+            </p>
+          </div>
+        }
         onConfirm={handleConfirmCancel}
         onCancel={() => setIsCancelModalOpen(false)}
-        confirmText="ยืนยัน"
-        cancelText="ยกเลิก"
+        confirmText="Confirm"
+        cancelText="Cancel"
       />
     </div>
   );

@@ -286,14 +286,16 @@
 }
 
 .thumbnails-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  max-width: 400px;
-  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 0 20px;
+  box-sizing: border-box;
 }
 
 .thumbnail-slot {
+  width: calc(25% - 10px);
   position: relative;
   border-radius: 8px;
   overflow: hidden;
