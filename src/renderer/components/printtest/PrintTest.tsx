@@ -296,8 +296,6 @@ export default function PrintTest(): React.JSX.Element {
                   : orientation === 'portrait-cut'
                     ? TEST_IMAGE_PORTRAIT_URL_2X6
                     : TEST_IMAGE_LANDSCAPE_URL
-                      ? TEST_IMAGE_PORTRAIT_URL
-                      : TEST_IMAGE_LANDSCAPE_URL
               }
               alt="Test print"
               className="test-image"
