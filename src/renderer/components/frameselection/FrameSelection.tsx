@@ -348,7 +348,7 @@ export default function FrameSelection() {
             className="next-button-frame"
             onClick={handleConfirm}
           >
-            ต่อไป
+            Next
           </button>
         </div>
       </div>

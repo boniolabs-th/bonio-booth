@@ -101,12 +101,10 @@ export default function GetHelp() {
         <p className="help-title-en">GET HELP</p>
 
         <p className="help-instruction-thai">
-          กรุณาติดต่อเจ้าหน้าที่ใกล้เคียง หรือ สแกน Line QR
-          ด้านล่างเพื่อขอความช่วยเหลือเพิ่มเติม
+          สแกน Line QR ด้านล่างเพื่อขอความช่วยเหลือเพิ่มเติม
         </p>
         <p className="help-instruction-en">
-          Please contact nearby staff or scan the Line QR code below for
-          support.
+          Scan the Line QR code below for support.
         </p>
 
         <div className="help-qr-section">
@@ -118,7 +116,6 @@ export default function GetHelp() {
             />
           </div>
         </div>
-
       </div>
 
       {/* Password Modal */}

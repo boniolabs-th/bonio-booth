@@ -129,12 +129,16 @@
 }
 
 .photo-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 10px;
-  width: 100%;
   padding: 0 20px;
   box-sizing: border-box;
+}
+
+.photo-grid button {
+  width: calc(25% - 10px);
 }
 
 /* Photo Card */

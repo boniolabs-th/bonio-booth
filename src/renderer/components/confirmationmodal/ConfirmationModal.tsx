@@ -3,7 +3,7 @@ import './ConfirmationModal.css';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
-  message: string;
+  message: string | React.ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
   confirmText?: string;

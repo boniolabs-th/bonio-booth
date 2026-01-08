@@ -302,6 +302,18 @@
   transform: translateY(-1px);
 }
 
+.extend-btn-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.extend-btn-text p {
+  margin: 0;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .home-container {
