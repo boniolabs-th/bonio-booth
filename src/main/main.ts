@@ -241,6 +241,14 @@ async function initializeApp() {
 
     sseClient.connect();
 
+    // ตรวจสอบ devices ที่ตั้งค่าไว้ (camera/printer) หลังจาก init สำเร็จ
+    // ทำแบบ async เพื่อไม่ให้บล็อกการโหลด app
+    setTimeout(() => {
+      checkConfiguredDevices().catch(err => {
+        console.error('❌ [Main] Error in checkConfiguredDevices:', err);
+      });
+    }, 3000); // รอ 3 วินาทีหลัง init เสร็จ
+
     // Helper function สำหรับส่ง log ไปที่ renderer (DevTools)
     const sendLogToRenderer = (level: 'log' | 'warn' | 'error', message: string, data?: any) => {
       if (mainWindow) {
@@ -339,6 +347,88 @@ async function initializeApp() {
     console.error('❌ Failed to initialize app:', error);
     // ยังคงสร้าง window แม้ API จะล้มเหลว
     throw error;
+  }
+}
+
+
+/**
+ * ตรวจสอบว่า device (camera/printer) ที่เคยตั้งค่าไว้ยังมีอยู่หรือไม่
+ * ถ้าไม่พบจะส่งแจ้งเตือนไปยัง Telegram ผ่าน API
+ */
+async function checkConfiguredDevices(): Promise<void> {
+  console.log('🔍 [Main] Checking configured devices...');
+
+  // 1. เช็ค Camera
+  try {
+    const cameraConfig = await getCameraConfig();
+    if (cameraConfig) {
+      console.log(`📷 [Main] Camera config found: ${cameraConfig.label} (${cameraConfig.deviceId})`);
+
+      // ดึงรายการกล้องที่เชื่อมต่ออยู่ผ่าน renderer process
+      // เนื่องจาก navigator.mediaDevices ใช้ได้เฉพาะใน renderer process
+      // เราจะส่ง event ไปให้ renderer เช็คแทน
+      if (mainWindow) {
+        mainWindow.webContents.send('check-camera-availability', {
+          configuredDeviceId: cameraConfig.deviceId,
+          configuredLabel: cameraConfig.label,
+        });
+      }
+    } else {
+      console.log('ℹ️ [Main] No camera config found');
+    }
+  } catch (error) {
+    console.error('❌ [Main] Error checking camera config:', error);
+  }
+
+  // 2. เช็ค Printer
+  try {
+    const printerConfig = await getPrinterConfig();
+    if (printerConfig && mainWindow) {
+      console.log(`🖨️ [Main] Printer config found - Main: ${printerConfig.main.printerName}`);
+      if (printerConfig.secondary) {
+        console.log(`🖨️ [Main] Secondary printer: ${printerConfig.secondary.printerName}`);
+      }
+
+      // ดึงรายการ printers ที่เชื่อมต่ออยู่
+      const printers = await mainWindow.webContents.getPrintersAsync();
+      const printerNames = printers.map(p => p.name);
+
+      console.log('🖨️ [Main] Available printers:', printerNames);
+
+      // เช็ค Main printer
+      const mainPrinterFound = printers.some(p => p.name === printerConfig.main.printerName);
+      if (!mainPrinterFound) {
+        console.warn(`⚠️ [Main] Main printer not found: ${printerConfig.main.printerName}`);
+        // ส่งแจ้งเตือน
+        machineService.sendDeviceAlert(
+          'printer',
+          `Main: ${printerConfig.main.printerName}`,
+          printerNames,
+        ).catch(err => console.error('❌ [Main] Failed to send printer alert:', err));
+      } else {
+        console.log(`✅ [Main] Main printer found: ${printerConfig.main.printerName}`);
+      }
+
+      // เช็ค Secondary printer (ถ้ามี)
+      if (printerConfig.secondary) {
+        const secondaryPrinterFound = printers.some(p => p.name === printerConfig.secondary!.printerName);
+        if (!secondaryPrinterFound) {
+          console.warn(`⚠️ [Main] Secondary printer not found: ${printerConfig.secondary.printerName}`);
+          // ส่งแจ้งเตือน
+          machineService.sendDeviceAlert(
+            'printer',
+            `Secondary: ${printerConfig.secondary.printerName}`,
+            printerNames,
+          ).catch(err => console.error('❌ [Main] Failed to send printer alert:', err));
+        } else {
+          console.log(`✅ [Main] Secondary printer found: ${printerConfig.secondary.printerName}`);
+        }
+      }
+    } else {
+      console.log('ℹ️ [Main] No printer config found');
+    }
+  } catch (error) {
+    console.error('❌ [Main] Error checking printer config:', error);
   }
 }
 
@@ -1737,6 +1827,26 @@ ipcMain.handle('get-camera-config', async () => {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage };
+  }
+});
+
+// Handler สำหรับรับผลการเช็ค camera availability จาก renderer
+ipcMain.on('camera-availability-result', async (event, result: {
+  found: boolean;
+  configuredDeviceId: string;
+  configuredLabel: string;
+  availableDevices: string[];
+}) => {
+  if (!result.found) {
+    console.warn(`⚠️ [Main] Configured camera not found: ${result.configuredLabel} (${result.configuredDeviceId})`);
+    // ส่งแจ้งเตือน
+    machineService.sendDeviceAlert(
+      'camera',
+      result.configuredLabel,
+      result.availableDevices,
+    ).catch(err => console.error('❌ [Main] Failed to send camera alert:', err));
+  } else {
+    console.log(`✅ [Main] Configured camera found: ${result.configuredLabel}`);
   }
 });
 

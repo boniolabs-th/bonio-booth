@@ -974,6 +974,48 @@ export class MachineService {
       throw error;
     }
   }
+
+  /**
+   * ส่งแจ้งเตือนเมื่อไม่พบ device (camera หรือ printer) ที่เคยตั้งค่าไว้
+   * @param deviceType - ประเภท device ('camera' หรือ 'printer')
+   * @param deviceName - ชื่อ device ที่เคยตั้งค่าไว้
+   * @param availableDevices - รายการ device ที่พบในระบบ (optional)
+   * @param machineId - Machine ID (optional)
+   */
+  async sendDeviceAlert(
+    deviceType: 'camera' | 'printer',
+    deviceName: string,
+    availableDevices?: string[],
+    machineId?: string,
+  ): Promise<{ success: boolean; message: string; notificationSent: boolean }> {
+    try {
+      const response = await this.makeRequest<{
+        success: boolean;
+        message: string;
+        notificationSent: boolean;
+      }>(
+        '/api/machines-public/device-alert',
+        'POST',
+        {
+          deviceType,
+          deviceName,
+          availableDevices,
+        },
+        machineId ? { machineId } : undefined,
+      );
+
+      console.log(`✅ [MachineService] Device alert sent: ${deviceType} "${deviceName}" not found`);
+      return response;
+    } catch (error) {
+      console.error('❌ [MachineService] Send device alert failed:', error);
+      // Don't throw - just log and return failure
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        notificationSent: false,
+      };
+    }
+  }
 }
 
 // ==================== Default Instance ====================

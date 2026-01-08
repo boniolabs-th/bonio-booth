@@ -2,7 +2,7 @@
 /* eslint no-unused-vars: off */
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
-export type Channels = 'ipc-example' | 'print-photo' | 'print-response' | 'theme-loaded' | 'machine-init' | 'navigate-to' | 'show-print-test-password-modal' | 'show-quit-app-password-modal' | 'show-clear-config-password-modal' | 'show-camera-config-modal' | 'show-printer-config-modal' | 'quit-app' | 'sse-status-502' | 'shutdown-log' | 'shutdown-countdown-update' | 'shutdown-starting' | 'shutdown-cancelled' | 'shutdown-countdown-reset' | 'app-close-countdown-update' | 'app-close-starting' | 'app-close-cancelled' | 'app-close-countdown-reset' | 'home-page-active' | 'home-page-inactive';
+export type Channels = 'ipc-example' | 'print-photo' | 'print-response' | 'theme-loaded' | 'machine-init' | 'navigate-to' | 'show-print-test-password-modal' | 'show-quit-app-password-modal' | 'show-clear-config-password-modal' | 'show-camera-config-modal' | 'show-printer-config-modal' | 'quit-app' | 'sse-status-502' | 'shutdown-log' | 'shutdown-countdown-update' | 'shutdown-starting' | 'shutdown-cancelled' | 'shutdown-countdown-reset' | 'app-close-countdown-update' | 'app-close-starting' | 'app-close-cancelled' | 'app-close-countdown-reset' | 'home-page-active' | 'home-page-inactive' | 'check-camera-availability' | 'camera-availability-result';
 
 const electronHandler = {
   ipcRenderer: {

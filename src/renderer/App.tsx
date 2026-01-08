@@ -142,6 +142,43 @@ function MaintenanceListener() {
       },
     );
 
+    // Listen for camera availability check request from main process
+    const unsubscribeCameraCheck = (window as any).electron.ipcRenderer.on(
+      'check-camera-availability',
+      async (data: { configuredDeviceId: string; configuredLabel: string }) => {
+        try {
+          console.log('📷 [Renderer] Checking camera availability:', data);
+
+          // ดึงรายการกล้องที่เชื่อมต่ออยู่
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter(device => device.kind === 'videoinput');
+          const availableDevices = videoDevices.map(d => d.label || d.deviceId);
+
+          console.log('📷 [Renderer] Available cameras:', availableDevices);
+
+          // เช็คว่ากล้องที่ตั้งค่าไว้ยังมีอยู่หรือไม่
+          const found = videoDevices.some(d => d.deviceId === data.configuredDeviceId);
+
+          // ส่งผลกลับไป main process
+          (window as any).electron.ipcRenderer.sendMessage('camera-availability-result', {
+            found,
+            configuredDeviceId: data.configuredDeviceId,
+            configuredLabel: data.configuredLabel,
+            availableDevices,
+          });
+        } catch (error) {
+          console.error('❌ [Renderer] Error checking camera availability:', error);
+          // ส่งผลกลับไป main process (ไม่พบกล้อง)
+          (window as any).electron.ipcRenderer.sendMessage('camera-availability-result', {
+            found: false,
+            configuredDeviceId: data.configuredDeviceId,
+            configuredLabel: data.configuredLabel,
+            availableDevices: [],
+          });
+        }
+      },
+    );
+
     return () => {
       unsubscribe();
       unsubscribeNavigate();
@@ -151,6 +188,7 @@ function MaintenanceListener() {
       unsubscribeCameraConfigModal();
       unsubscribePrinterConfigModal();
       unsubscribeSse502();
+      unsubscribeCameraCheck();
     };
   }, [navigate]);
 
