@@ -759,7 +759,7 @@ export default function MainShooting() {
           )}
 
           {showCountdown && !isCameraLoading && (
-            <div className="countdown-overlay">
+            <div className="countdown-overlay-shooting">
               <div className="countdown-number">{countdown}</div>
             </div>
           )}

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import './PasswordModal.css';
 
-const TEST_PRINT_PASSWORD = '1212312121';
+const TEST_PRINT_PASSWORD = '7053';
 
 interface PasswordModalProps {
   isOpen: boolean;

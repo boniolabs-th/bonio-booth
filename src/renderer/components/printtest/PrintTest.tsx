@@ -5,9 +5,9 @@ import BackButton from '../backbutton';
 import PaperPositionConfigModal from '../paperpositionconfigmodal';
 import './PrintTest.css';
 
-const TEST_IMAGE_PORTRAIT_URL = '../../../assets/images/image-print-test.png';
-const TEST_IMAGE_LANDSCAPE_URL =
-  '../../../assets/images/image-print-lanscape-test.jpg';
+const TEST_IMAGE_PORTRAIT_URL = '../../../assets/images/print-test-4x6.png';
+const TEST_IMAGE_PORTRAIT_URL_2X6 = '../../../assets/images/print-test-2x6.png';
+const TEST_IMAGE_LANDSCAPE_URL = '../../../assets/images/print-test-6x4.png';
 
 export default function PrintTest(): React.JSX.Element {
   const navigate = useNavigate();
@@ -47,9 +47,7 @@ export default function PrintTest(): React.JSX.Element {
           );
 
           // ใช้ค่าจาก storage ถ้ามี
-          if (
-            storageHorizontal !== undefined && storageHorizontal !== null
-          ) {
+          if (storageHorizontal !== undefined && storageHorizontal !== null) {
             setHorizontal(storageHorizontal);
             hasStorageValue = true;
           }
@@ -174,9 +172,11 @@ export default function PrintTest(): React.JSX.Element {
 
     try {
       const testImageUrl =
-        orientation === 'portrait' || orientation === 'portrait-cut'
+        orientation === 'portrait'
           ? TEST_IMAGE_PORTRAIT_URL
-          : TEST_IMAGE_LANDSCAPE_URL;
+          : orientation === 'portrait-cut'
+            ? TEST_IMAGE_PORTRAIT_URL_2X6
+            : TEST_IMAGE_LANDSCAPE_URL;
       console.log('🖨️ [PrintTest] Starting print test...', {
         copies,
         orientation,
@@ -291,9 +291,13 @@ export default function PrintTest(): React.JSX.Element {
           <div className="image-preview-container">
             <img
               src={
-                orientation === 'portrait' || orientation === 'portrait-cut'
+                orientation === 'portrait'
                   ? TEST_IMAGE_PORTRAIT_URL
-                  : TEST_IMAGE_LANDSCAPE_URL
+                  : orientation === 'portrait-cut'
+                    ? TEST_IMAGE_PORTRAIT_URL_2X6
+                    : TEST_IMAGE_LANDSCAPE_URL
+                      ? TEST_IMAGE_PORTRAIT_URL
+                      : TEST_IMAGE_LANDSCAPE_URL
               }
               alt="Test print"
               className="test-image"

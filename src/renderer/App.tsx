@@ -262,14 +262,14 @@ function MaintenanceListener() {
         onSuccess={handleQuitPasswordSuccess}
         onCancel={handleQuitPasswordCancel}
         title="กรอกรหัสผ่านเพื่อปิดแอป"
-        password="1212312121"
+        password="7053"
       />
       <PasswordModal
         isOpen={showClearConfigPasswordModal}
         onSuccess={handleClearConfigPasswordSuccess}
         onCancel={handleClearConfigPasswordCancel}
         title="กรอกรหัสผ่านเพื่อล้างค่า Config"
-        password="1212312121"
+        password="7053"
       />
       <CameraConfigModal
         isOpen={showCameraConfigModal}

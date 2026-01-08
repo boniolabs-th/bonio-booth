@@ -91,7 +91,7 @@ export default function PhotoPrepare() {
   return (
     <div className="photo-prepare-container">
       {/* Back Button */}
-      <BackButton onBackClick={handleBack} />
+      {/* <BackButton onBackClick={handleBack} /> */}
 
       {/* Countdown Timer - นับถอยหลัง 30 วินาที แล้วไปหน้าถัดไปอัตโนมัติ */}
       <Countdown
