@@ -148,18 +148,24 @@ export default function CameraConfigModal({
     setCanonError('');
 
     try {
+      console.log('[CameraConfigModal] Starting Canon camera detection...');
+
       // @ts-ignore - canonCamera API from preload
-      const initResult = await window.canonCamera?.initializeSdk();
-      if (!initResult?.success) {
-        setCanonError(initResult?.error || 'ไม่สามารถเริ่มต้น Canon SDK ได้');
+      const initResult = await window.electron?.canonCamera?.initialize();
+      console.log('[CameraConfigModal] SDK initialize result:', initResult);
+
+      if (!initResult) {
+        setCanonError('ไม่สามารถเริ่มต้น Canon SDK ได้');
         return;
       }
 
       // @ts-ignore
-      const listResult = await window.canonCamera?.getCameraList();
-      if (listResult?.success && listResult.cameras) {
-        setCanonCameras(listResult.cameras);
-        if (listResult.cameras.length > 0) {
+      const cameras = await window.electron?.canonCamera?.getCameraList();
+      console.log('[CameraConfigModal] Camera list:', cameras);
+
+      if (cameras && Array.isArray(cameras)) {
+        setCanonCameras(cameras);
+        if (cameras.length > 0) {
           setSelectedCanonIndex(0);
         }
       } else {
@@ -168,13 +174,15 @@ export default function CameraConfigModal({
 
       // Check connection status
       // @ts-ignore
-      const statusResult = await window.canonCamera?.getStatus();
-      if (statusResult?.success) {
-        setCanonConnected(statusResult.isConnected);
-        setCanonSessionOpen(statusResult.isSessionOpen);
-      }
+      const isConnected = await window.electron?.canonCamera?.isConnected();
+      // @ts-ignore
+      const isSessionOpen = await window.electron?.canonCamera?.isSessionOpen();
+      console.log('[CameraConfigModal] Status - connected:', isConnected, 'session:', isSessionOpen);
+
+      setCanonConnected(!!isConnected);
+      setCanonSessionOpen(!!isSessionOpen);
     } catch (err: any) {
-      console.error('Failed to load Canon cameras:', err);
+      console.error('[CameraConfigModal] Failed to load Canon cameras:', err);
       setCanonError(
         'ไม่สามารถโหลดกล้อง Canon ได้: ' + (err.message || 'Unknown error'),
       );
@@ -188,12 +196,14 @@ export default function CameraConfigModal({
     setIsSaving(true);
 
     try {
+      console.log('[CameraConfigModal] Connecting to camera index:', selectedCanonIndex);
+
       // @ts-ignore
-      const connectResult = await window.canonCamera?.connectCamera(
-        selectedCanonIndex,
-      );
-      if (!connectResult?.success) {
-        setCanonError(connectResult?.error || 'ไม่สามารถเชื่อมต่อกล้องได้');
+      const camera = await window.electron?.canonCamera?.connectByIndex(selectedCanonIndex);
+      console.log('[CameraConfigModal] Connect result:', camera);
+
+      if (!camera) {
+        setCanonError('ไม่สามารถเชื่อมต่อกล้องได้');
         return;
       }
 
@@ -201,19 +211,22 @@ export default function CameraConfigModal({
 
       // Open session
       // @ts-ignore
-      const sessionResult = await window.canonCamera?.openSession();
-      if (sessionResult?.success) {
+      const sessionOpened = await window.electron?.canonCamera?.openSession();
+      console.log('[CameraConfigModal] Session opened:', sessionOpened);
+
+      if (sessionOpened) {
         setCanonSessionOpen(true);
 
         // Get battery level
         // @ts-ignore
-        const batteryResult = await window.canonCamera?.getBatteryLevel();
-        if (batteryResult?.success && batteryResult.level !== null) {
-          setCanonBatteryLevel(batteryResult.level);
+        const batteryLevel = await window.electron?.canonCamera?.getBatteryLevel();
+        console.log('[CameraConfigModal] Battery level:', batteryLevel);
+        if (batteryLevel !== null) {
+          setCanonBatteryLevel(batteryLevel);
         }
       }
     } catch (err: any) {
-      console.error('Failed to connect Canon camera:', err);
+      console.error('[CameraConfigModal] Failed to connect Canon camera:', err);
       setCanonError('เกิดข้อผิดพลาด: ' + (err.message || 'Unknown error'));
     } finally {
       setIsSaving(false);
@@ -222,13 +235,14 @@ export default function CameraConfigModal({
 
   const disconnectCanonCamera = useCallback(async () => {
     try {
+      console.log('[CameraConfigModal] Disconnecting Canon camera...');
       // @ts-ignore
-      await window.canonCamera?.disconnectCamera();
+      await window.electron?.canonCamera?.fullDisconnect();
       setCanonConnected(false);
       setCanonSessionOpen(false);
       setCanonBatteryLevel(null);
     } catch (err) {
-      console.error('Failed to disconnect Canon camera:', err);
+      console.error('[CameraConfigModal] Failed to disconnect Canon camera:', err);
     }
   }, []);
 
