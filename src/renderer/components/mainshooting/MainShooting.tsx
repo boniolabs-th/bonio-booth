@@ -528,60 +528,30 @@ export default function MainShooting() {
   }, [canonCamera]);
 
   const takeCanonPhoto = useCallback(async (): Promise<string> => {
-    console.log('📷 [Canon] Taking picture (full resolution)...');
+    console.log('📷 [Canon] Taking photo from Live View...');
 
     // Flash effect
     setShowFlash(true);
     setTimeout(() => setShowFlash(false), 150);
 
-    try {
-      // IMPORTANT: Stop Live View before taking picture to avoid camera lock
-      // Canon cameras cannot take high-res photos while Live View is active
-      console.log('📷 [Canon] Stopping live view for capture...');
-      await canonCamera.stopLiveView();
-
-      // Small delay to ensure camera is ready
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Take the actual high-resolution photo
-      console.log('📷 [Canon] Calling takePicture...');
-      const result = await canonCamera.takePicture();
-
-      console.log('📷 [Canon] Capture result:', result);
-
-      // Restart Live View after capture
-      console.log('📷 [Canon] Restarting live view...');
-      await canonCamera.startLiveView();
-
-      if (result.success && result.imageData) {
-        console.log('✅ [Canon] Photo captured successfully (full resolution)');
-        return result.imageData;
-      } else {
-        console.error('❌ [Canon] Capture failed:', result.error);
-        // Fallback to live view frame if available
-        const currentFrame = canonCamera.getCurrentFrame();
-        if (currentFrame) {
-          console.log('⚠️ [Canon] Using live view frame as fallback');
-          return currentFrame;
-        }
-        return '';
-      }
-    } catch (err) {
-      console.error('❌ [Canon] Error taking picture:', err);
-      // Try to restart live view on error
-      try {
-        await canonCamera.startLiveView();
-      } catch {
-        /* ignore */
-      }
-      // Fallback to live view frame
-      const currentFrame = canonCamera.getCurrentFrame();
-      if (currentFrame) {
-        console.log('⚠️ [Canon] Using live view frame as fallback after error');
-        return currentFrame;
-      }
-      return '';
+    // Use Live View frame directly - keeps Live View running smoothly
+    // Live View resolution (~1920x1280) is sufficient for 4x6" prints at 300 DPI
+    // and provides instant capture without camera shutter delay
+    const currentFrame = canonCamera.getCurrentFrame();
+    if (currentFrame) {
+      console.log('✅ [Canon] Photo captured from Live View');
+      return currentFrame;
     }
+
+    // Fallback: try liveViewFrame state
+    const liveViewFrame = canonCamera.liveViewFrame;
+    if (liveViewFrame) {
+      console.log('✅ [Canon] Photo captured from liveViewFrame state');
+      return liveViewFrame;
+    }
+
+    console.error('❌ [Canon] No Live View frame available');
+    return '';
   }, [canonCamera]);
 
   // ===========================================================================
