@@ -516,16 +516,117 @@ export default function MainShooting() {
     setIsRecording(true);
   }, [canonCamera]);
 
-  const stopCanonFrameRecording = useCallback((): string => {
+  /**
+   * Create a video blob URL from an array of JPEG base64 frames
+   * Uses canvas + MediaRecorder to generate WebM video
+   */
+  const createVideoFromFrames = useCallback(async (frames: string[], fps: number = 30): Promise<string> => {
+    if (frames.length === 0) {
+      console.warn('📷 [Canon] No frames to create video from');
+      return '';
+    }
+
+    console.log(`📷 [Canon] Creating video from ${frames.length} frames at ${fps}fps`);
+
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Cannot create canvas context'));
+        return;
+      }
+
+      // Load first frame to get dimensions
+      const firstImg = new Image();
+      firstImg.onload = () => {
+        canvas.width = firstImg.naturalWidth;
+        canvas.height = firstImg.naturalHeight;
+
+        // Setup MediaRecorder
+        const stream = canvas.captureStream(fps);
+        const mediaRecorder = new MediaRecorder(stream, {
+          mimeType: 'video/webm;codecs=vp9',
+          videoBitsPerSecond: 5000000, // 5 Mbps
+        });
+
+        const chunks: Blob[] = [];
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            chunks.push(e.data);
+          }
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          console.log(`✅ [Canon] Video created: ${url} (${(blob.size / 1024).toFixed(1)} KB)`);
+          resolve(url);
+        };
+
+        mediaRecorder.onerror = (e) => {
+          console.error('❌ [Canon] MediaRecorder error:', e);
+          reject(e);
+        };
+
+        mediaRecorder.start();
+
+        // Draw frames sequentially
+        let frameIndex = 0;
+        const frameInterval = 1000 / fps;
+
+        const drawNextFrame = () => {
+          if (frameIndex >= frames.length) {
+            // All frames drawn, stop recording
+            setTimeout(() => {
+              mediaRecorder.stop();
+            }, frameInterval); // Wait one more frame interval before stopping
+            return;
+          }
+
+          const img = new Image();
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            frameIndex++;
+            setTimeout(drawNextFrame, frameInterval);
+          };
+          img.onerror = () => {
+            console.warn(`⚠️ [Canon] Failed to load frame ${frameIndex}`);
+            frameIndex++;
+            setTimeout(drawNextFrame, frameInterval);
+          };
+          img.src = frames[frameIndex];
+        };
+
+        drawNextFrame();
+      };
+
+      firstImg.onerror = () => {
+        reject(new Error('Failed to load first frame'));
+      };
+      firstImg.src = frames[0];
+    });
+  }, []);
+
+  const stopCanonFrameRecording = useCallback(async (): Promise<string> => {
     console.log('📷 [Canon] Stopping frame recording...');
     const recording = canonCamera.stopFrameRecording();
     setIsRecording(false);
 
-    // For Canon, we don't have a video URL, but we have frames
-    // Return empty string for video, frames will be used for boomerang
     console.log(`📷 [Canon] Captured ${recording.frames.length} frames`);
+
+    // Create video from recorded frames for boomerang
+    if (recording.frames.length > 0) {
+      try {
+        const videoUrl = await createVideoFromFrames(recording.frames, 30);
+        return videoUrl;
+      } catch (error) {
+        console.error('❌ [Canon] Failed to create video from frames:', error);
+        return '';
+      }
+    }
+
     return '';
-  }, [canonCamera]);
+  }, [canonCamera, createVideoFromFrames]);
 
   const takeCanonPhoto = useCallback(async (): Promise<string> => {
     console.log('📷 [Canon] Taking photo from Live View...');
@@ -569,14 +670,14 @@ export default function MainShooting() {
     }
   }, [startWebcamRecording, startCanonFrameRecording]);
 
-  const stopRecording = useCallback((): Promise<string> => {
+  const stopRecording = useCallback(async (): Promise<string> => {
     const currentType = cameraTypeRef.current;
     console.log(`📷 [stopRecording] cameraType: ${currentType}`);
     if (currentType === 'webcam') {
       return stopWebcamRecording();
     } else {
-      const result = stopCanonFrameRecording();
-      return Promise.resolve(result);
+      // stopCanonFrameRecording now returns a Promise (creates video from frames)
+      return stopCanonFrameRecording();
     }
   }, [stopWebcamRecording, stopCanonFrameRecording]);
 
