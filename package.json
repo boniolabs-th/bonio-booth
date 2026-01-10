@@ -175,7 +175,7 @@
     "asarUnpack": [
       "**/*.{node,dll}",
       "**/node_modules/@ffmpeg-installer/**/*",
-      "**/native/canon-edsdk-rs/**"
+      "**/dist/main/native/**"
     ],
     "files": [
       "dist",

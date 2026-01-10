@@ -115,11 +115,44 @@ interface CanonEdsdkModule {
 // Lazy load native module
 let canonModule: CanonEdsdkModule | null = null;
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const fs = require('fs');
+
+/**
+ * Get native module path - tries multiple locations for dev/production
+ */
+function getNativeModulePath(): string {
+  const nodeFileName = 'canon-edsdk.win32-x64-msvc.node';
+
+  const possiblePaths = [
+    // Development: src/main/native/
+    path.join(__dirname, '..', 'native', nodeFileName),
+    // Production (asar unpacked): resources/app.asar.unpacked/dist/main/native/
+    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'dist', 'main', 'native', nodeFileName),
+    // Production alternative: next to exe
+    path.join(path.dirname(app.getPath('exe')), 'resources', 'app.asar.unpacked', 'dist', 'main', 'native', nodeFileName),
+    // Portable: same directory as exe
+    path.join(path.dirname(app.getPath('exe')), nodeFileName),
+  ];
+
+  for (const nodePath of possiblePaths) {
+    console.log(`🔍 [CanonCameraService] Checking native module at: ${nodePath}`);
+    if (fs.existsSync(nodePath)) {
+      console.log(`✅ [CanonCameraService] Found native module at: ${nodePath}`);
+      return nodePath;
+    }
+  }
+
+  // Return first path as fallback (will throw error on load)
+  console.warn('⚠️ [CanonCameraService] Native module not found in any location');
+  return possiblePaths[0];
+}
+
 function getCanonModule(): CanonEdsdkModule {
   if (!canonModule) {
     try {
       // Load .node file directly
-      const nodeFilePath = path.join(__dirname, '..', 'native', 'canon-edsdk.win32-x64-msvc.node');
+      const nodeFilePath = getNativeModulePath();
       // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
       canonModule = require(nodeFilePath) as CanonEdsdkModule;
       console.log('✅ [CanonCameraService] Native module loaded from:', nodeFilePath);
@@ -147,16 +180,18 @@ function getEdsdkDllPath(): string {
   const possiblePaths = [
     // Development: assets folder in project root
     path.join(process.cwd(), 'assets', 'EDSDK', 'Dll', 'EDSDK.dll'),
-    // Production: resources folder
+    // Production: resources/assets folder (extraResources)
     path.join(process.resourcesPath || '', 'assets', 'EDSDK', 'Dll', 'EDSDK.dll'),
+    // Production alternative: next to exe
+    path.join(path.dirname(app.getPath('exe')), 'resources', 'assets', 'EDSDK', 'Dll', 'EDSDK.dll'),
     // User data folder
     path.join(app.getPath('userData'), 'EDSDK', 'Dll', 'EDSDK.dll'),
     // Executable directory
     path.join(path.dirname(app.getPath('exe')), 'assets', 'EDSDK', 'Dll', 'EDSDK.dll'),
   ];
 
-  const fs = require('fs');
   for (const dllPath of possiblePaths) {
+    console.log(`🔍 [CanonCameraService] Checking EDSDK.dll at: ${dllPath}`);
     if (fs.existsSync(dllPath)) {
       console.log(`✅ [CanonCameraService] Found EDSDK.dll at: ${dllPath}`);
       return dllPath;
