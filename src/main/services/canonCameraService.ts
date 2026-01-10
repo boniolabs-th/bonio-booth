@@ -665,9 +665,16 @@ export function registerCanonCameraIpcHandlers(): void {
     return takePicture(savePath);
   });
 
-  // Capture to buffer
+  // Capture to buffer (convert Buffer to base64 for IPC transfer)
   ipcMain.handle('canon:captureToBuffer', async () => {
-    return captureToBuffer();
+    const result = await captureToBuffer();
+    if (result.success && result.imageData) {
+      return {
+        ...result,
+        imageData: result.imageData.toString('base64'),
+      };
+    }
+    return result;
   });
 
   // Start live view

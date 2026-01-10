@@ -535,12 +535,19 @@ export default function MainShooting() {
 
     // Use current live view frame as preview immediately
     const previewFrame = canonCamera.getCurrentFrame();
+    console.log('📷 [Canon] Preview frame available:', !!previewFrame);
 
     // Take actual picture (this will be high resolution from Canon)
     const result = await canonCamera.takePicture();
+    console.log('📷 [Canon] takePicture result:', {
+      success: result.success,
+      hasImageData: !!result.imageData,
+      imageDataLength: result.imageData?.length,
+      error: result.error
+    });
 
     if (result.success && result.imageData) {
-      console.log('✅ [Canon] Picture captured successfully');
+      console.log('✅ [Canon] Picture captured successfully, returning imageData');
       return result.imageData;
     } else if (previewFrame) {
       // Fallback to live view frame if capture failed
@@ -776,6 +783,8 @@ export default function MainShooting() {
             // eslint-disable-next-line no-await-in-loop
             const photoData = await takePhoto();
 
+            console.log(`📷 [Capture ${i + 1}] photoData received:`, photoData ? `${photoData.substring(0, 50)}...` : 'EMPTY');
+
             // Add capture to array (for Canon, videoUrl will be empty)
             if (photoData) {
               newCaptures.push({
@@ -784,7 +793,9 @@ export default function MainShooting() {
               });
               // Update state to show progress
               setCaptures([...newCaptures]);
-              console.log(`✅ Capture ${i + 1} completed`);
+              console.log(`✅ Capture ${i + 1} completed, total captures: ${newCaptures.length}`);
+            } else {
+              console.error(`❌ Capture ${i + 1} FAILED - no photoData`);
             }
 
             // Wait 1 second before next capture (unless it's the last one)
