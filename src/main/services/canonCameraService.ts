@@ -680,9 +680,17 @@ export function registerCanonCameraIpcHandlers(): void {
     return stopLiveView();
   });
 
-  // Get live view frame
+  // Get live view frame (convert Buffer to base64 for IPC transfer)
   ipcMain.handle('canon:getLiveViewFrame', () => {
-    return getLiveViewFrame();
+    const frame = getLiveViewFrame();
+    if (frame && frame.data) {
+      return {
+        width: frame.width,
+        height: frame.height,
+        data: frame.data.toString('base64'), // Convert Buffer to base64 string
+      };
+    }
+    return null;
   });
 
   // Get property
