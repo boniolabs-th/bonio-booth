@@ -64,6 +64,10 @@ export default function useCanonCamera(): UseCanonCameraReturn {
   const liveViewIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isCleanedUpRef = useRef(false);
 
+  // Latest frame ref - always holds the most recent live view frame
+  // This is more reliable than React state for instant capture
+  const latestFrameRef = useRef<string | null>(null);
+
   // Frame recording refs
   const recordedFramesRef = useRef<string[]>([]);
   const recordedTimestampsRef = useRef<number[]>([]);
@@ -202,6 +206,11 @@ export default function useCanonCamera(): UseCanonCameraReturn {
             if (frame?.data) {
               // Convert buffer to base64
               const base64 = `data:image/jpeg;base64,${frame.data}`;
+
+              // Always update latest frame ref (for instant capture)
+              latestFrameRef.current = base64;
+
+              // Update React state for UI display
               setLiveViewFrame(base64);
 
               // If recording, save frame
@@ -321,9 +330,11 @@ export default function useCanonCamera(): UseCanonCameraReturn {
 
   /**
    * Get current live view frame (for snapshot during countdown)
+   * Uses ref instead of state for more reliable instant capture
    */
   const getCurrentFrame = useCallback((): string | null => {
-    return liveViewFrame;
+    // Use ref first (most up-to-date), fallback to state
+    return latestFrameRef.current || liveViewFrame;
   }, [liveViewFrame]);
 
   /**
