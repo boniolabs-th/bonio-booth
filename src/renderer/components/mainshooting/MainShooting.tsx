@@ -528,36 +528,60 @@ export default function MainShooting() {
   }, [canonCamera]);
 
   const takeCanonPhoto = useCallback(async (): Promise<string> => {
-    console.log('📷 [Canon] Taking picture...');
+    console.log('📷 [Canon] Taking picture (full resolution)...');
 
     // Flash effect
     setShowFlash(true);
     setTimeout(() => setShowFlash(false), 150);
 
-    // Use current live view frame as preview immediately
-    const previewFrame = canonCamera.getCurrentFrame();
-    console.log('📷 [Canon] Preview frame available:', !!previewFrame);
+    try {
+      // IMPORTANT: Stop Live View before taking picture to avoid camera lock
+      // Canon cameras cannot take high-res photos while Live View is active
+      console.log('📷 [Canon] Stopping live view for capture...');
+      await canonCamera.stopLiveView();
 
-    // Take actual picture (this will be high resolution from Canon)
-    const result = await canonCamera.takePicture();
-    console.log('📷 [Canon] takePicture result:', {
-      success: result.success,
-      hasImageData: !!result.imageData,
-      imageDataLength: result.imageData?.length,
-      error: result.error
-    });
+      // Small delay to ensure camera is ready
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
-    if (result.success && result.imageData) {
-      console.log('✅ [Canon] Picture captured successfully, returning imageData');
-      return result.imageData;
-    } else if (previewFrame) {
-      // Fallback to live view frame if capture failed
-      console.warn('⚠️ [Canon] Using live view frame as fallback');
-      return previewFrame;
+      // Take the actual high-resolution photo
+      console.log('📷 [Canon] Calling takePicture...');
+      const result = await canonCamera.takePicture();
+
+      console.log('📷 [Canon] Capture result:', result);
+
+      // Restart Live View after capture
+      console.log('📷 [Canon] Restarting live view...');
+      await canonCamera.startLiveView();
+
+      if (result.success && result.imageData) {
+        console.log('✅ [Canon] Photo captured successfully (full resolution)');
+        return result.imageData;
+      } else {
+        console.error('❌ [Canon] Capture failed:', result.error);
+        // Fallback to live view frame if available
+        const currentFrame = canonCamera.getCurrentFrame();
+        if (currentFrame) {
+          console.log('⚠️ [Canon] Using live view frame as fallback');
+          return currentFrame;
+        }
+        return '';
+      }
+    } catch (err) {
+      console.error('❌ [Canon] Error taking picture:', err);
+      // Try to restart live view on error
+      try {
+        await canonCamera.startLiveView();
+      } catch {
+        /* ignore */
+      }
+      // Fallback to live view frame
+      const currentFrame = canonCamera.getCurrentFrame();
+      if (currentFrame) {
+        console.log('⚠️ [Canon] Using live view frame as fallback after error');
+        return currentFrame;
+      }
+      return '';
     }
-
-    console.error('❌ [Canon] Failed to capture:', result.error);
-    return '';
   }, [canonCamera]);
 
   // ===========================================================================
