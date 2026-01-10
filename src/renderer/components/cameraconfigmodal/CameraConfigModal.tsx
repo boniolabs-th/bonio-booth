@@ -1,9 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './CameraConfigModal.css';
 
-interface CameraDevice {
+// =============================================================================
+// Types
+// =============================================================================
+
+type CameraTab = 'webcam' | 'canon';
+
+interface WebcamDevice {
   deviceId: string;
   label: string;
+}
+
+interface CanonCamera {
+  name: string;
+  portName: string;
+  deviceSubType: number;
+  bodyId?: string;
 }
 
 interface CameraConfigModalProps {
@@ -12,28 +25,54 @@ interface CameraConfigModalProps {
   onSuccess?: () => void;
 }
 
+// =============================================================================
+// Component
+// =============================================================================
+
 export default function CameraConfigModal({
   isOpen,
   onClose,
   onSuccess,
 }: CameraConfigModalProps): React.JSX.Element | null {
-  const [cameras, setCameras] = useState<CameraDevice[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
-  const [currentConfig, setCurrentConfig] = useState<CameraDevice | null>(null);
+  // Tab state
+  const [activeTab, setActiveTab] = useState<CameraTab>('webcam');
+
+  // Webcam state
+  const [webcams, setWebcams] = useState<WebcamDevice[]>([]);
+  const [selectedWebcamId, setSelectedWebcamId] = useState<string>('');
+  const [currentWebcamConfig, setCurrentWebcamConfig] =
+    useState<WebcamDevice | null>(null);
+  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const [webcamError, setWebcamError] = useState('');
+
+  // Canon state
+  const [canonCameras, setCanonCameras] = useState<CanonCamera[]>([]);
+  const [selectedCanonIndex, setSelectedCanonIndex] = useState<number>(-1);
+  const [canonConnected, setCanonConnected] = useState(false);
+  const [canonSessionOpen, setCanonSessionOpen] = useState(false);
+  const [canonError, setCanonError] = useState('');
+  const [canonBatteryLevel, setCanonBatteryLevel] = useState<number | null>(
+    null,
+  );
+
+  // Common state
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
-  // โหลดรายการกล้องและ config ปัจจุบัน
-  const loadCameras = useCallback(async () => {
-    setIsLoading(true);
-    setError('');
+  // ===========================================================================
+  // Webcam Functions
+  // ===========================================================================
+
+  const loadWebcams = useCallback(async () => {
+    setWebcamError('');
 
     try {
       // ขอสิทธิ์เข้าถึงกล้องก่อนเพื่อให้ได้ label ของกล้อง
-      const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const tempStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+      });
       tempStream.getTracks().forEach((track) => track.stop());
 
       // ดึงรายการกล้อง
@@ -45,93 +84,178 @@ export default function CameraConfigModal({
           label: device.label || `Camera ${index + 1}`,
         }));
 
-      setCameras(videoDevices);
+      setWebcams(videoDevices);
 
       // ดึง config ปัจจุบัน
       // @ts-ignore
       const configResult = await window.electron?.payment?.getCameraConfig();
       if (configResult?.success && configResult.config) {
-        setCurrentConfig(configResult.config);
-        setSelectedDeviceId(configResult.config.deviceId);
+        setCurrentWebcamConfig(configResult.config);
+        setSelectedWebcamId(configResult.config.deviceId);
       } else if (videoDevices.length > 0) {
-        // ถ้าไม่มี config ให้เลือกกล้องตัวสุดท้าย (external camera)
-        setSelectedDeviceId(videoDevices[videoDevices.length - 1].deviceId);
+        setSelectedWebcamId(videoDevices[videoDevices.length - 1].deviceId);
       }
-    } catch (err) {
-      console.error('Failed to load cameras:', err);
-      setError('ไม่สามารถเข้าถึงกล้องได้ กรุณาตรวจสอบสิทธิ์การใช้งาน');
-    } finally {
-      setIsLoading(false);
+    } catch (err: any) {
+      console.error('Failed to load webcams:', err);
+      if (err.name === 'NotFoundError') {
+        setWebcamError('ไม่พบ Webcam ที่เชื่อมต่ออยู่');
+      } else if (err.name === 'NotAllowedError') {
+        setWebcamError('ไม่ได้รับอนุญาตให้เข้าถึงกล้อง');
+      } else {
+        setWebcamError('ไม่สามารถเข้าถึงกล้องได้');
+      }
     }
   }, []);
 
-  // เริ่ม preview เมื่อเลือกกล้อง
-  const startPreview = useCallback(async (deviceId: string) => {
-    // หยุด stream เดิม
+  const startWebcamPreview = useCallback(
+    async (deviceId: string) => {
+      if (previewStream) {
+        previewStream.getTracks().forEach((track) => track.stop());
+      }
+
+      if (!deviceId) return;
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: deviceId } },
+        });
+        setPreviewStream(stream);
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        console.error('Failed to start webcam preview:', err);
+      }
+    },
+    [previewStream],
+  );
+
+  const stopWebcamPreview = useCallback(() => {
     if (previewStream) {
       previewStream.getTracks().forEach((track) => track.stop());
+      setPreviewStream(null);
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, [previewStream]);
 
-    if (!deviceId) return;
+  // ===========================================================================
+  // Canon EDSDK Functions
+  // ===========================================================================
+
+  const loadCanonCameras = useCallback(async () => {
+    setCanonError('');
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: deviceId } },
-      });
-      setPreviewStream(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+      // @ts-ignore - canonCamera API from preload
+      const initResult = await window.canonCamera?.initializeSdk();
+      if (!initResult?.success) {
+        setCanonError(initResult?.error || 'ไม่สามารถเริ่มต้น Canon SDK ได้');
+        return;
       }
+
+      // @ts-ignore
+      const listResult = await window.canonCamera?.getCameraList();
+      if (listResult?.success && listResult.cameras) {
+        setCanonCameras(listResult.cameras);
+        if (listResult.cameras.length > 0) {
+          setSelectedCanonIndex(0);
+        }
+      } else {
+        setCanonCameras([]);
+      }
+
+      // Check connection status
+      // @ts-ignore
+      const statusResult = await window.canonCamera?.getStatus();
+      if (statusResult?.success) {
+        setCanonConnected(statusResult.isConnected);
+        setCanonSessionOpen(statusResult.isSessionOpen);
+      }
+    } catch (err: any) {
+      console.error('Failed to load Canon cameras:', err);
+      setCanonError(
+        'ไม่สามารถโหลดกล้อง Canon ได้: ' + (err.message || 'Unknown error'),
+      );
+    }
+  }, []);
+
+  const connectCanonCamera = useCallback(async () => {
+    if (selectedCanonIndex < 0) return;
+
+    setCanonError('');
+    setIsSaving(true);
+
+    try {
+      // @ts-ignore
+      const connectResult = await window.canonCamera?.connectCamera(
+        selectedCanonIndex,
+      );
+      if (!connectResult?.success) {
+        setCanonError(connectResult?.error || 'ไม่สามารถเชื่อมต่อกล้องได้');
+        return;
+      }
+
+      setCanonConnected(true);
+
+      // Open session
+      // @ts-ignore
+      const sessionResult = await window.canonCamera?.openSession();
+      if (sessionResult?.success) {
+        setCanonSessionOpen(true);
+
+        // Get battery level
+        // @ts-ignore
+        const batteryResult = await window.canonCamera?.getBatteryLevel();
+        if (batteryResult?.success && batteryResult.level !== null) {
+          setCanonBatteryLevel(batteryResult.level);
+        }
+      }
+    } catch (err: any) {
+      console.error('Failed to connect Canon camera:', err);
+      setCanonError('เกิดข้อผิดพลาด: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsSaving(false);
+    }
+  }, [selectedCanonIndex]);
+
+  const disconnectCanonCamera = useCallback(async () => {
+    try {
+      // @ts-ignore
+      await window.canonCamera?.disconnectCamera();
+      setCanonConnected(false);
+      setCanonSessionOpen(false);
+      setCanonBatteryLevel(null);
     } catch (err) {
-      console.error('Failed to start preview:', err);
+      console.error('Failed to disconnect Canon camera:', err);
     }
-  }, [previewStream]);
+  }, []);
 
-  // โหลดกล้องเมื่อ modal เปิด
-  useEffect(() => {
-    if (isOpen) {
-      loadCameras();
-    } else {
-      // หยุด preview เมื่อปิด modal
-      if (previewStream) {
-        previewStream.getTracks().forEach((track) => track.stop());
-        setPreviewStream(null);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  const refreshCanonCameras = useCallback(async () => {
+    setIsLoading(true);
+    await loadCanonCameras();
+    setIsLoading(false);
+  }, [loadCanonCameras]);
 
-  // เริ่ม preview เมื่อเลือกกล้อง
-  useEffect(() => {
-    if (isOpen && selectedDeviceId) {
-      startPreview(selectedDeviceId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDeviceId, isOpen]);
+  // ===========================================================================
+  // Save Functions
+  // ===========================================================================
 
-  // Cleanup เมื่อ unmount
-  useEffect(() => {
-    return () => {
-      if (previewStream) {
-        previewStream.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, [previewStream]);
-
-  const handleSave = useCallback(async () => {
-    if (!selectedDeviceId) {
-      setError('กรุณาเลือกกล้อง');
+  const handleSaveWebcam = useCallback(async () => {
+    if (!selectedWebcamId) {
+      setWebcamError('กรุณาเลือกกล้อง');
       return;
     }
 
-    const selectedCamera = cameras.find((c) => c.deviceId === selectedDeviceId);
+    const selectedCamera = webcams.find((c) => c.deviceId === selectedWebcamId);
     if (!selectedCamera) {
-      setError('ไม่พบกล้องที่เลือก');
+      setWebcamError('ไม่พบกล้องที่เลือก');
       return;
     }
 
     setIsSaving(true);
-    setError('');
+    setWebcamError('');
 
     try {
       // @ts-ignore
@@ -141,32 +265,76 @@ export default function CameraConfigModal({
       });
 
       if (result?.success) {
-        // หยุด preview
-        if (previewStream) {
-          previewStream.getTracks().forEach((track) => track.stop());
-          setPreviewStream(null);
-        }
+        stopWebcamPreview();
         onSuccess?.();
         onClose();
       } else {
-        setError(result?.error || 'ไม่สามารถบันทึกการตั้งค่าได้');
+        setWebcamError(result?.error || 'ไม่สามารถบันทึกการตั้งค่าได้');
       }
     } catch (err) {
-      console.error('Failed to save camera config:', err);
-      setError('เกิดข้อผิดพลาดในการบันทึกการตั้งค่า');
+      console.error('Failed to save webcam config:', err);
+      setWebcamError('เกิดข้อผิดพลาดในการบันทึกการตั้งค่า');
     } finally {
       setIsSaving(false);
     }
-  }, [selectedDeviceId, cameras, previewStream, onSuccess, onClose]);
+  }, [selectedWebcamId, webcams, stopWebcamPreview, onSuccess, onClose]);
+
+  // ===========================================================================
+  // Effects
+  // ===========================================================================
+
+  // Load cameras when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setIsLoading(true);
+      Promise.all([loadWebcams(), loadCanonCameras()]).finally(() => {
+        setIsLoading(false);
+      });
+    } else {
+      stopWebcamPreview();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // Start webcam preview when selected
+  useEffect(() => {
+    if (isOpen && activeTab === 'webcam' && selectedWebcamId) {
+      startWebcamPreview(selectedWebcamId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedWebcamId, isOpen, activeTab]);
+
+  // Stop webcam preview when switching to Canon tab
+  useEffect(() => {
+    if (activeTab === 'canon') {
+      stopWebcamPreview();
+    }
+  }, [activeTab, stopWebcamPreview]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopWebcamPreview();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ===========================================================================
+  // Handlers
+  // ===========================================================================
 
   const handleClose = useCallback(() => {
-    // หยุด preview
-    if (previewStream) {
-      previewStream.getTracks().forEach((track) => track.stop());
-      setPreviewStream(null);
-    }
+    stopWebcamPreview();
     onClose();
-  }, [previewStream, onClose]);
+  }, [stopWebcamPreview, onClose]);
+
+  const handleTabChange = (tab: CameraTab) => {
+    setActiveTab(tab);
+  };
+
+  // ===========================================================================
+  // Render
+  // ===========================================================================
 
   if (!isOpen) return null;
 
@@ -178,6 +346,26 @@ export default function CameraConfigModal({
           เลือกกล้องที่ต้องการใช้ในการถ่ายภาพ
         </p>
 
+        {/* Tabs */}
+        <div className="camera-config-tabs">
+          <button
+            type="button"
+            className={`camera-config-tab ${activeTab === 'webcam' ? 'active' : ''}`}
+            onClick={() => handleTabChange('webcam')}
+          >
+            <span className="tab-icon">📷</span>
+            Webcam
+          </button>
+          <button
+            type="button"
+            className={`camera-config-tab ${activeTab === 'canon' ? 'active' : ''}`}
+            onClick={() => handleTabChange('canon')}
+          >
+            <span className="tab-icon">📸</span>
+            Canon DSLR/Mirrorless
+          </button>
+        </div>
+
         {isLoading ? (
           <div className="camera-config-loading">
             <div className="camera-config-spinner" />
@@ -185,79 +373,219 @@ export default function CameraConfigModal({
           </div>
         ) : (
           <>
-            {/* Preview */}
-            <div className="camera-config-preview">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="camera-config-video"
-              />
-              {!previewStream && (
-                <div className="camera-config-no-preview">
-                  <span>ไม่มี Preview</span>
+            {/* ============= Webcam Tab ============= */}
+            {activeTab === 'webcam' && (
+              <div className="camera-config-tab-content">
+                {/* Preview */}
+                <div className="camera-config-preview">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="camera-config-video"
+                  />
+                  {!previewStream && (
+                    <div className="camera-config-no-preview">
+                      <span>ไม่มี Preview</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Camera Selection */}
-            <div className="camera-config-form">
-              <label htmlFor="camera-select" className="camera-config-label">
-                เลือกกล้อง
-              </label>
-              <select
-                id="camera-select"
-                className="camera-config-select"
-                value={selectedDeviceId}
-                onChange={(e) => setSelectedDeviceId(e.target.value)}
-                disabled={isSaving}
-              >
-                <option value="">-- เลือกกล้อง --</option>
-                {cameras.map((camera) => (
-                  <option key={camera.deviceId} value={camera.deviceId}>
-                    {camera.label}
-                    {currentConfig?.deviceId === camera.deviceId
-                      ? ' (ปัจจุบัน)'
-                      : ''}
-                  </option>
-                ))}
-              </select>
+                {/* Camera Selection */}
+                <div className="camera-config-form">
+                  <label
+                    htmlFor="webcam-select"
+                    className="camera-config-label"
+                  >
+                    เลือก Webcam
+                  </label>
+                  <select
+                    id="webcam-select"
+                    className="camera-config-select"
+                    value={selectedWebcamId}
+                    onChange={(e) => setSelectedWebcamId(e.target.value)}
+                    disabled={isSaving}
+                  >
+                    <option value="">-- เลือกกล้อง --</option>
+                    {webcams.map((camera) => (
+                      <option key={camera.deviceId} value={camera.deviceId}>
+                        {camera.label}
+                        {currentWebcamConfig?.deviceId === camera.deviceId
+                          ? ' (ปัจจุบัน)'
+                          : ''}
+                      </option>
+                    ))}
+                  </select>
 
-              {cameras.length === 0 && (
-                <p className="camera-config-warning">
-                  ไม่พบกล้องที่เชื่อมต่ออยู่
-                </p>
-              )}
+                  {webcams.length === 0 && !webcamError && (
+                    <p className="camera-config-warning">
+                      ไม่พบ Webcam ที่เชื่อมต่ออยู่
+                    </p>
+                  )}
 
-              {currentConfig && (
-                <p className="camera-config-current">
-                  กล้องปัจจุบัน: <strong>{currentConfig.label}</strong>
-                </p>
-              )}
-            </div>
+                  {currentWebcamConfig && (
+                    <p className="camera-config-current">
+                      กล้องปัจจุบัน:{' '}
+                      <strong>{currentWebcamConfig.label}</strong>
+                    </p>
+                  )}
+                </div>
 
-            {error && <p className="camera-config-error">{error}</p>}
+                {webcamError && (
+                  <p className="camera-config-error">{webcamError}</p>
+                )}
 
-            {/* Actions */}
-            <div className="camera-config-actions">
-              <button
-                type="button"
-                className="camera-config-btn camera-config-btn-cancel"
-                onClick={handleClose}
-                disabled={isSaving}
-              >
-                ยกเลิก
-              </button>
-              <button
-                type="button"
-                className="camera-config-btn camera-config-btn-save"
-                onClick={handleSave}
-                disabled={isSaving || !selectedDeviceId}
-              >
-                {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
-              </button>
-            </div>
+                {/* Actions */}
+                <div className="camera-config-actions">
+                  <button
+                    type="button"
+                    className="camera-config-btn camera-config-btn-cancel"
+                    onClick={handleClose}
+                    disabled={isSaving}
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="button"
+                    className="camera-config-btn camera-config-btn-save"
+                    onClick={handleSaveWebcam}
+                    disabled={isSaving || !selectedWebcamId}
+                  >
+                    {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ============= Canon Tab ============= */}
+            {activeTab === 'canon' && (
+              <div className="camera-config-tab-content">
+                {/* Canon Status Card */}
+                <div className="canon-status-card">
+                  <div className="canon-status-header">
+                    <span className="canon-status-title">
+                      สถานะการเชื่อมต่อ
+                    </span>
+                    <button
+                      type="button"
+                      className="canon-refresh-btn"
+                      onClick={refreshCanonCameras}
+                      disabled={isLoading}
+                      title="รีเฟรช"
+                    >
+                      🔄
+                    </button>
+                  </div>
+                  <div className="canon-status-items">
+                    <div className="canon-status-item">
+                      <span className="status-label">SDK:</span>
+                      <span
+                        className={`status-badge ${canonCameras.length >= 0 ? 'success' : 'error'}`}
+                      >
+                        พร้อมใช้งาน
+                      </span>
+                    </div>
+                    <div className="canon-status-item">
+                      <span className="status-label">กล้อง:</span>
+                      <span
+                        className={`status-badge ${canonConnected ? 'success' : 'warning'}`}
+                      >
+                        {canonConnected ? 'เชื่อมต่อแล้ว' : 'ไม่ได้เชื่อมต่อ'}
+                      </span>
+                    </div>
+                    <div className="canon-status-item">
+                      <span className="status-label">Session:</span>
+                      <span
+                        className={`status-badge ${canonSessionOpen ? 'success' : 'warning'}`}
+                      >
+                        {canonSessionOpen ? 'เปิดอยู่' : 'ปิดอยู่'}
+                      </span>
+                    </div>
+                    {canonBatteryLevel !== null && (
+                      <div className="canon-status-item">
+                        <span className="status-label">แบตเตอรี่:</span>
+                        <span
+                          className={`status-badge ${canonBatteryLevel > 20 ? 'success' : 'error'}`}
+                        >
+                          {canonBatteryLevel}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Canon Camera Selection */}
+                <div className="camera-config-form">
+                  <label htmlFor="canon-select" className="camera-config-label">
+                    เลือกกล้อง Canon
+                  </label>
+                  <select
+                    id="canon-select"
+                    className="camera-config-select"
+                    value={selectedCanonIndex}
+                    onChange={(e) =>
+                      setSelectedCanonIndex(Number(e.target.value))
+                    }
+                    disabled={isSaving || canonConnected}
+                  >
+                    <option value={-1}>-- เลือกกล้อง --</option>
+                    {canonCameras.map((camera, index) => (
+                      <option key={camera.portName} value={index}>
+                        {camera.name} ({camera.portName})
+                      </option>
+                    ))}
+                  </select>
+
+                  {canonCameras.length === 0 && !canonError && (
+                    <p className="camera-config-warning">
+                      ไม่พบกล้อง Canon ที่เชื่อมต่อผ่าน USB
+                      <br />
+                      <small>• ตรวจสอบว่าเปิดกล้องแล้ว</small>
+                      <br />
+                      <small>• ต่อสาย USB เข้ากับคอมพิวเตอร์</small>
+                      <br />
+                      <small>• ติดตั้ง Canon EOS Utility แล้ว</small>
+                    </p>
+                  )}
+                </div>
+
+                {canonError && (
+                  <p className="camera-config-error">{canonError}</p>
+                )}
+
+                {/* Actions */}
+                <div className="camera-config-actions">
+                  <button
+                    type="button"
+                    className="camera-config-btn camera-config-btn-cancel"
+                    onClick={handleClose}
+                    disabled={isSaving}
+                  >
+                    ยกเลิก
+                  </button>
+                  {canonConnected ? (
+                    <button
+                      type="button"
+                      className="camera-config-btn camera-config-btn-disconnect"
+                      onClick={disconnectCanonCamera}
+                      disabled={isSaving}
+                    >
+                      ยกเลิกการเชื่อมต่อ
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="camera-config-btn camera-config-btn-save"
+                      onClick={connectCanonCamera}
+                      disabled={isSaving || selectedCanonIndex < 0}
+                    >
+                      {isSaving ? 'กำลังเชื่อมต่อ...' : 'เชื่อมต่อ'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
