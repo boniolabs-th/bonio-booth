@@ -274,6 +274,7 @@ export default function CameraConfigModal({
     try {
       // @ts-ignore
       const result = await window.electron?.payment?.saveCameraConfig({
+        type: 'webcam',
         deviceId: selectedCamera.deviceId,
         label: selectedCamera.label,
       });
@@ -292,6 +293,51 @@ export default function CameraConfigModal({
       setIsSaving(false);
     }
   }, [selectedWebcamId, webcams, stopWebcamPreview, onSuccess, onClose]);
+
+  const handleSaveCanon = useCallback(async () => {
+    if (selectedCanonIndex < 0) {
+      setCanonError('กรุณาเลือกกล้อง Canon');
+      return;
+    }
+
+    const selectedCamera = canonCameras[selectedCanonIndex];
+    if (!selectedCamera) {
+      setCanonError('ไม่พบกล้อง Canon ที่เลือก');
+      return;
+    }
+
+    // ต้อง connect และ open session ก่อน
+    if (!canonConnected || !canonSessionOpen) {
+      setCanonError('กรุณาเชื่อมต่อกล้องและเปิด Session ก่อนบันทึก');
+      return;
+    }
+
+    setIsSaving(true);
+    setCanonError('');
+
+    try {
+      // @ts-ignore
+      const result = await window.electron?.payment?.saveCameraConfig({
+        type: 'canon',
+        cameraIndex: selectedCanonIndex,
+        cameraName: selectedCamera.name,
+        portName: selectedCamera.portName,
+        bodyId: selectedCamera.bodyId,
+      });
+
+      if (result?.success) {
+        onSuccess?.();
+        onClose();
+      } else {
+        setCanonError(result?.error || 'ไม่สามารถบันทึกการตั้งค่าได้');
+      }
+    } catch (err) {
+      console.error('Failed to save Canon camera config:', err);
+      setCanonError('เกิดข้อผิดพลาดในการบันทึกการตั้งค่า');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [selectedCanonIndex, canonCameras, canonConnected, canonSessionOpen, onSuccess, onClose]);
 
   // ===========================================================================
   // Effects
@@ -579,14 +625,26 @@ export default function CameraConfigModal({
                     ยกเลิก
                   </button>
                   {canonConnected ? (
-                    <button
-                      type="button"
-                      className="camera-config-btn camera-config-btn-disconnect"
-                      onClick={disconnectCanonCamera}
-                      disabled={isSaving}
-                    >
-                      ยกเลิกการเชื่อมต่อ
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="camera-config-btn camera-config-btn-disconnect"
+                        onClick={disconnectCanonCamera}
+                        disabled={isSaving}
+                      >
+                        ยกเลิกการเชื่อมต่อ
+                      </button>
+                      {canonSessionOpen && (
+                        <button
+                          type="button"
+                          className="camera-config-btn camera-config-btn-save"
+                          onClick={handleSaveCanon}
+                          disabled={isSaving}
+                        >
+                          {isSaving ? 'กำลังบันทึก...' : 'บันทึก'}
+                        </button>
+                      )}
+                    </>
                   ) : (
                     <button
                       type="button"

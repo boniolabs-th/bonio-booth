@@ -3,7 +3,20 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BackButton } from '..';
 import { FrameConfig } from '../../utils/frameConfig';
+import useCanonCamera from '../../hooks/useCanonCamera';
 import './MainShooting.css';
+
+type CameraType = 'webcam' | 'canon';
+
+interface CameraConfig {
+  type: CameraType;
+  // Webcam fields
+  deviceId?: string;
+  label?: string;
+  // Canon fields
+  cameraIndex?: number;
+  cameraName?: string;
+}
 
 interface LocationState {
   quantity: number;
@@ -13,7 +26,7 @@ interface LocationState {
 }
 
 interface Capture {
-  video: string; // Blob URL of the raw recording
+  video: string; // Blob URL of the raw recording (webcam) or empty (canon)
   photo: string; // Base64 data URL
   boomerangGif?: string; // Base64 GIF with boomerang effect
   boomerangFrames?: string[]; // Captured frames used for boomerang playback
@@ -123,6 +136,10 @@ export default function MainShooting() {
   const location = useLocation();
   const state = location.state as LocationState;
 
+  // Camera type and config state
+  const [cameraType, setCameraType] = useState<CameraType>('webcam');
+  const [cameraConfig, setCameraConfigState] = useState<CameraConfig | null>(null);
+
   const [, setCameraCountdown] = useState(3);
   const [countdown, setCountdown] = useState(3);
   const [captures, setCaptures] = useState<Capture[]>([]);
@@ -140,6 +157,7 @@ export default function MainShooting() {
     height: number;
   }>({ width: 800, height: 600 });
 
+  // Webcam refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cameraContainerRef = useRef<HTMLDivElement>(null);
@@ -150,15 +168,27 @@ export default function MainShooting() {
   const cameraCountdownRef = useRef<number>(3);
   const isInitializedRef = useRef<boolean>(false);
 
+  // Canon camera ref for live view image
+  const canonLiveViewRef = useRef<HTMLImageElement>(null);
+
+  // Canon camera hook
+  const canonCamera = useCanonCamera();
+
   const handleBack = () => {
     // Stop camera when going back
-    if (streamRef.current) {
+    if (cameraType === 'webcam' && streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
+    } else if (cameraType === 'canon') {
+      canonCamera.cleanup();
     }
     navigate('/photo-prepare', { state });
   };
 
-  const startCamera = async (): Promise<void> => {
+  // ===========================================================================
+  // WEBCAM Functions
+  // ===========================================================================
+
+  const startWebcam = async (): Promise<void> => {
     try {
       setIsCameraLoading(true);
       setCameraError('');
@@ -170,30 +200,20 @@ export default function MainShooting() {
         );
       }
 
-      console.log('📹 [Camera] Requesting camera access...');
+      console.log('📹 [Webcam] Requesting camera access...');
 
-      // ดึง camera config จากที่บันทึกไว้
-      let configuredDeviceId: string | null = null;
-      try {
-        // @ts-ignore
-        const configResult = await window.electron?.payment?.getCameraConfig();
-        if (configResult?.success && configResult.config?.deviceId) {
-          configuredDeviceId = configResult.config.deviceId;
-          console.log('📹 [Camera] Using configured camera:', configResult.config);
-        }
-      } catch (configError) {
-        console.warn('⚠️ [Camera] Failed to get camera config:', configError);
-      }
+      // ใช้ deviceId จาก config ที่โหลดมาแล้ว
+      const targetDeviceId = cameraConfig?.type === 'webcam' ? cameraConfig.deviceId : null;
 
       // List available devices ก่อน
-      let targetDeviceId = configuredDeviceId;
+      let finalDeviceId = targetDeviceId;
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(
           (device) => device.kind === 'videoinput',
         );
         console.log(
-          `📹 [Camera] Found ${videoDevices.length} camera device(s):`,
+          `📹 [Webcam] Found ${videoDevices.length} camera device(s):`,
           videoDevices.map((d) => ({
             id: d.deviceId,
             label: d.label || 'Unknown',
@@ -207,25 +227,25 @@ export default function MainShooting() {
         }
 
         // ถ้ามี config แต่ไม่พบกล้องที่ตั้งค่าไว้ ให้ใช้กล้องตัวสุดท้าย
-        if (targetDeviceId && !videoDevices.find(d => d.deviceId === targetDeviceId)) {
-          console.warn('⚠️ [Camera] Configured camera not found, using last camera');
-          targetDeviceId = videoDevices[videoDevices.length - 1].deviceId;
+        if (finalDeviceId && !videoDevices.find(d => d.deviceId === finalDeviceId)) {
+          console.warn('⚠️ [Webcam] Configured camera not found, using last camera');
+          finalDeviceId = videoDevices[videoDevices.length - 1].deviceId;
         }
 
         // ถ้าไม่มี config ให้ใช้กล้องตัวสุดท้าย (มักเป็น external camera)
-        if (!targetDeviceId) {
-          targetDeviceId = videoDevices[videoDevices.length - 1].deviceId;
-          console.log('📹 [Camera] No config, using last camera (external):', targetDeviceId);
+        if (!finalDeviceId) {
+          finalDeviceId = videoDevices[videoDevices.length - 1].deviceId;
+          console.log('📹 [Webcam] No config, using last camera (external):', finalDeviceId);
         }
       } catch (enumError) {
-        console.warn('⚠️ [Camera] Failed to enumerate devices:', enumError);
+        console.warn('⚠️ [Webcam] Failed to enumerate devices:', enumError);
         // ยังคงลองต่อไปแม้จะ enumerate ไม่ได้
       }
 
       // Request camera access with specific device
       const constraints: MediaStreamConstraints = {
-        video: targetDeviceId ? {
-          deviceId: { exact: targetDeviceId },
+        video: finalDeviceId ? {
+          deviceId: { exact: finalDeviceId },
           width: { ideal: 1920 },
           height: { ideal: 1080 },
         } : {
@@ -236,7 +256,7 @@ export default function MainShooting() {
       };
 
       console.log(
-        '📹 [Camera] Requesting stream with constraints:',
+        '📹 [Webcam] Requesting stream with constraints:',
         constraints,
       );
 
@@ -246,7 +266,7 @@ export default function MainShooting() {
         throw new Error('Failed to get camera stream');
       }
 
-      console.log('✅ [Camera] Stream obtained:', {
+      console.log('✅ [Webcam] Stream obtained:', {
         tracks: stream.getTracks().map((t) => ({
           kind: t.kind,
           label: t.label,
@@ -355,12 +375,12 @@ export default function MainShooting() {
       }
 
       setCameraError(errorMessage);
-      console.error('❌ [Camera] Camera initialization failed:', error);
+      console.error('❌ [Webcam] Camera initialization failed:', error);
       throw error;
     }
   };
 
-  const startRecording = useCallback(() => {
+  const startWebcamRecording = useCallback(() => {
     if (!videoRef.current || !streamRef.current) return;
 
     try {
@@ -388,7 +408,7 @@ export default function MainShooting() {
     }
   }, []);
 
-  const stopRecording = useCallback((): Promise<string> => {
+  const stopWebcamRecording = useCallback((): Promise<string> => {
     return new Promise((resolve) => {
       if (!mediaRecorderRef.current) {
         resolve('');
@@ -414,7 +434,7 @@ export default function MainShooting() {
     });
   }, []);
 
-  const takePhoto = (): string => {
+  const takeWebcamPhoto = (): string => {
     if (!videoRef.current || !canvasRef.current) return '';
 
     const canvas = canvasRef.current;
@@ -436,6 +456,129 @@ export default function MainShooting() {
     }
 
     return '';
+  };
+
+  // ===========================================================================
+  // CANON CAMERA Functions
+  // ===========================================================================
+
+  const startCanonCamera = async (): Promise<void> => {
+    try {
+      setIsCameraLoading(true);
+      setCameraError('');
+
+      console.log('📷 [Canon] Initializing Canon camera...');
+
+      // Initialize SDK
+      const initialized = await canonCamera.initialize();
+      if (!initialized) {
+        throw new Error('ไม่สามารถเริ่มต้น Canon SDK ได้');
+      }
+
+      // Connect to camera
+      const connected = await canonCamera.connect();
+      if (!connected) {
+        throw new Error('ไม่สามารถเชื่อมต่อกล้อง Canon ได้');
+      }
+
+      console.log('📷 [Canon] Camera connected, starting Live View...');
+
+      // Start live view
+      const liveViewStarted = await canonCamera.startLiveView();
+      if (!liveViewStarted) {
+        throw new Error('ไม่สามารถเริ่ม Live View ได้');
+      }
+
+      console.log('✅ [Canon] Camera initialized successfully with Live View');
+
+      // Set default dimensions for Canon (Live View is usually 1920x1280 or similar)
+      setVideoDimensions({ width: 1920, height: 1280 });
+      setIsCameraLoading(false);
+
+    } catch (error) {
+      setIsCameraLoading(false);
+
+      let errorMessage = 'ไม่สามารถเชื่อมต่อกล้อง Canon ได้';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        console.error('❌ [Canon] Error:', error.message);
+      }
+
+      setCameraError(errorMessage);
+      throw error;
+    }
+  };
+
+  const startCanonFrameRecording = useCallback(() => {
+    console.log('📷 [Canon] Starting frame recording...');
+    canonCamera.startFrameRecording();
+    setIsRecording(true);
+  }, [canonCamera]);
+
+  const stopCanonFrameRecording = useCallback((): string => {
+    console.log('📷 [Canon] Stopping frame recording...');
+    const recording = canonCamera.stopFrameRecording();
+    setIsRecording(false);
+
+    // For Canon, we don't have a video URL, but we have frames
+    // Return empty string for video, frames will be used for boomerang
+    console.log(`📷 [Canon] Captured ${recording.frames.length} frames`);
+    return '';
+  }, [canonCamera]);
+
+  const takeCanonPhoto = async (): Promise<string> => {
+    console.log('📷 [Canon] Taking picture...');
+
+    // Flash effect
+    setShowFlash(true);
+    setTimeout(() => setShowFlash(false), 150);
+
+    // Use current live view frame as preview immediately
+    const previewFrame = canonCamera.getCurrentFrame();
+
+    // Take actual picture (this will be high resolution from Canon)
+    const result = await canonCamera.takePicture();
+
+    if (result.success && result.imageData) {
+      console.log('✅ [Canon] Picture captured successfully');
+      return result.imageData;
+    } else if (previewFrame) {
+      // Fallback to live view frame if capture failed
+      console.warn('⚠️ [Canon] Using live view frame as fallback');
+      return previewFrame;
+    }
+
+    console.error('❌ [Canon] Failed to capture:', result.error);
+    return '';
+  };
+
+  // ===========================================================================
+  // GENERIC Functions (work for both camera types)
+  // ===========================================================================
+
+  const startRecording = useCallback(() => {
+    if (cameraType === 'webcam') {
+      startWebcamRecording();
+    } else {
+      startCanonFrameRecording();
+    }
+  }, [cameraType, startWebcamRecording, startCanonFrameRecording]);
+
+  const stopRecording = useCallback((): Promise<string> => {
+    if (cameraType === 'webcam') {
+      return stopWebcamRecording();
+    } else {
+      const result = stopCanonFrameRecording();
+      return Promise.resolve(result);
+    }
+  }, [cameraType, stopWebcamRecording, stopCanonFrameRecording]);
+
+  const takePhoto = async (): Promise<string> => {
+    if (cameraType === 'webcam') {
+      return takeWebcamPhoto();
+    } else {
+      return takeCanonPhoto();
+    }
   };
 
   const startCountdown = (
@@ -550,8 +693,37 @@ export default function MainShooting() {
       try {
         isInitializedRef.current = true;
 
-        // Wait for camera to load before starting
-        await startCamera();
+        // ========================================
+        // Step 1: Load camera config to determine type
+        // ========================================
+        let loadedCameraType: CameraType = 'webcam'; // default
+        let loadedConfig: CameraConfig | null = null;
+
+        try {
+          // @ts-ignore
+          const configResult = await window.electron?.payment?.getCameraConfig();
+          console.log('📷 [MainShooting] Camera config result:', configResult);
+
+          if (configResult?.success && configResult.config) {
+            loadedConfig = configResult.config;
+            loadedCameraType = configResult.config.type || 'webcam';
+            console.log(`📷 [MainShooting] Using ${loadedCameraType} camera`);
+          }
+        } catch (configError) {
+          console.warn('⚠️ [MainShooting] Failed to get camera config, using webcam:', configError);
+        }
+
+        setCameraType(loadedCameraType);
+        setCameraConfigState(loadedConfig);
+
+        // ========================================
+        // Step 2: Start the appropriate camera
+        // ========================================
+        if (loadedCameraType === 'canon') {
+          await startCanonCamera();
+        } else {
+          await startWebcam();
+        }
 
         // Wait for cameraCountdown to be loaded from API
         let countdownValue = cameraCountdownRef.current;
@@ -576,7 +748,9 @@ export default function MainShooting() {
           }
         }
 
-        // Capture loop for required captures
+        // ========================================
+        // Step 3: Capture loop for required captures
+        // ========================================
         const captureLoop = async () => {
           const newCaptures: Capture[] = [];
 
@@ -584,14 +758,7 @@ export default function MainShooting() {
           for (let i = 0; i < requiredCaptures; i += 1) {
             console.log(`📷 Starting capture ${i + 1}/${requiredCaptures}`);
 
-            // Wait 3 seconds before first capture
-            // if (i === 0) {
-            //   console.log('⏳ Waiting 3 seconds before first capture...');
-            //   // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
-            //   await new Promise((resolve) => setTimeout(resolve, 3000));
-            // }
-
-            // Start recording video
+            // Start recording video/frames
             startRecording();
 
             // Countdown using cameraCountdown from API
@@ -601,17 +768,18 @@ export default function MainShooting() {
               console.log(`✅ Countdown finished for capture ${i + 1}`);
             });
 
-            // Stop recording and get video URL
+            // Stop recording and get video URL (or empty for Canon)
             // eslint-disable-next-line no-await-in-loop
             const videoUrl = await stopRecording();
 
             // Take photo immediately after countdown
-            const photoData = takePhoto();
+            // eslint-disable-next-line no-await-in-loop
+            const photoData = await takePhoto();
 
-            // Add capture to array
-            if (videoUrl && photoData) {
+            // Add capture to array (for Canon, videoUrl will be empty)
+            if (photoData) {
               newCaptures.push({
-                video: videoUrl,
+                video: videoUrl || '',
                 photo: photoData,
               });
               // Update state to show progress
@@ -646,13 +814,15 @@ export default function MainShooting() {
         clearInterval(countdownTimerRef.current);
         countdownTimerRef.current = null;
       }
+      // Cleanup webcam
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
-      // Stop recording if still recording
+      // Stop webcam recording if still recording
       if (mediaRecorderRef.current && isRecording) {
         mediaRecorderRef.current.stop();
       }
+      // Cleanup Canon camera (will be handled by hook cleanup if needed)
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -693,13 +863,34 @@ export default function MainShooting() {
       {/* Main Content */}
       <div className="main-content">
         <div className="camera-container" ref={cameraContainerRef}>
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="camera-feed"
-          />
+          {/* Webcam video feed */}
+          {cameraType === 'webcam' && (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="camera-feed"
+            />
+          )}
+
+          {/* Canon Live View feed */}
+          {cameraType === 'canon' && canonCamera.liveViewFrame && (
+            <img
+              ref={canonLiveViewRef}
+              src={canonCamera.liveViewFrame}
+              alt="Canon Live View"
+              className="camera-feed canon-live-view"
+            />
+          )}
+
+          {/* Canon waiting for live view */}
+          {cameraType === 'canon' && !canonCamera.liveViewFrame && !isCameraLoading && (
+            <div className="camera-feed canon-waiting">
+              <div className="waiting-text">Waiting for Canon Live View...</div>
+            </div>
+          )}
+
           <canvas ref={canvasRef} style={{ display: 'none' }} />
 
           {/* Crop Overlay - shows the crop area based on current slot pixel size */}

@@ -121,7 +121,17 @@ const electronHandler = {
     getCameraConfig: () => {
       return ipcRenderer.invoke('get-camera-config');
     },
-    saveCameraConfig: (config: { deviceId: string; label: string }) => {
+    saveCameraConfig: (config: {
+      type: 'webcam' | 'canon';
+      // Webcam fields
+      deviceId?: string;
+      label?: string;
+      // Canon fields
+      cameraIndex?: number;
+      cameraName?: string;
+      portName?: string;
+      bodyId?: string;
+    }) => {
       return ipcRenderer.invoke('save-camera-config', config);
     },
     hasCameraConfig: () => {

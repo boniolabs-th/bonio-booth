@@ -97,6 +97,26 @@
   transform-origin: center;
 }
 
+/* Canon Live View specific styles */
+.camera-feed.canon-live-view {
+  /* Canon cameras don't need mirroring typically */
+  transform: none;
+}
+
+/* Canon waiting for live view */
+.canon-waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a1a;
+  color: white;
+  font-size: 1.2rem;
+}
+
+.waiting-text {
+  color: #888;
+}
+
 /* Crop Overlay - darkens area outside the crop zone */
 .crop-overlay {
   position: absolute;

@@ -3,12 +3,32 @@
  *
  * บริการสำหรับจัดการ camera configuration
  * เก็บ deviceId ของกล้องที่เลือกไว้ในไฟล์ JSON ใน userData directory
+ * รองรับทั้ง Webcam (WebRTC) และ Canon DSLR/Mirrorless (EDSDK)
  */
 import { app } from 'electron';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-export interface CameraConfig {
+export type CameraType = 'webcam' | 'canon';
+
+export interface WebcamConfig {
+  type: 'webcam';
+  deviceId: string;
+  label: string;
+}
+
+export interface CanonCameraConfig {
+  type: 'canon';
+  cameraIndex: number;
+  cameraName: string;
+  portName?: string;
+  bodyId?: string;
+}
+
+export type CameraConfig = WebcamConfig | CanonCameraConfig;
+
+// Legacy format for backward compatibility
+export interface LegacyCameraConfig {
   deviceId: string;
   label: string;
 }
@@ -25,21 +45,33 @@ function getConfigPath(): string {
 
 /**
  * อ่าน camera config จากไฟล์
+ * รองรับทั้ง format เก่า (deviceId/label) และ format ใหม่ (type-based)
  */
 export async function getCameraConfig(): Promise<CameraConfig | null> {
   try {
     const configPath = getConfigPath();
     const configContent = await fs.readFile(configPath, 'utf-8');
-    const config: CameraConfig = JSON.parse(configContent);
+    const rawConfig = JSON.parse(configContent);
 
-    // Validate config
-    if (!config.deviceId) {
-      console.warn('⚠️ [cameraConfigService] Invalid config format');
-      return null;
+    // Check if it's the new format (has 'type' field)
+    if (rawConfig.type === 'webcam' || rawConfig.type === 'canon') {
+      console.log('✅ [cameraConfigService] Config loaded (new format):', rawConfig);
+      return rawConfig as CameraConfig;
     }
 
-    console.log('✅ [cameraConfigService] Config loaded:', config);
-    return config;
+    // Legacy format migration - treat as webcam
+    if (rawConfig.deviceId) {
+      const migratedConfig: WebcamConfig = {
+        type: 'webcam',
+        deviceId: rawConfig.deviceId,
+        label: rawConfig.label || 'Unknown Camera',
+      };
+      console.log('✅ [cameraConfigService] Config loaded (legacy, migrated to webcam):', migratedConfig);
+      return migratedConfig;
+    }
+
+    console.warn('⚠️ [cameraConfigService] Invalid config format');
+    return null;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       // ไฟล์ยังไม่มี (ครั้งแรกที่เปิด app)

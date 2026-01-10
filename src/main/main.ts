@@ -78,6 +78,7 @@ import {
   saveCameraConfig,
   hasCameraConfig,
   deleteCameraConfig,
+  CameraConfig,
 } from './services/cameraConfigService';
 import {
   registerCanonCameraIpcHandlers,
@@ -1852,7 +1853,7 @@ ipcMain.on('camera-availability-result', async (event, result: {
   }
 });
 
-ipcMain.handle('save-camera-config', async (event, config: { deviceId: string; label: string }) => {
+ipcMain.handle('save-camera-config', async (event, config: CameraConfig) => {
   try {
     const success = await saveCameraConfig(config);
     return { success };
