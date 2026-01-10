@@ -916,16 +916,16 @@ app.on('window-all-closed', () => {
   // หยุด power save blocker เมื่อปิด app
   if (powerSaveBlockerId !== null && powerSaveBlocker.isStarted(powerSaveBlockerId)) {
     powerSaveBlocker.stop(powerSaveBlockerId);
-    console.log('🔋 [Main] Power save blocker stopped');
+    log.info('[Main] Power save blocker stopped');
     powerSaveBlockerId = null;
   }
 
   // Terminate Canon SDK
   try {
     terminateCanonSdk();
-    console.log('📷 [Main] Canon SDK terminated');
+    log.info('[Main] Canon SDK terminated');
   } catch (error) {
-    console.error('❌ [Main] Failed to terminate Canon SDK:', error);
+    log.error('[Main] Failed to terminate Canon SDK:', error);
   }
 
   // Respect the OSX convention of having the application in memory even
@@ -938,13 +938,15 @@ app.on('window-all-closed', () => {
 app
   .whenReady()
   .then(() => {
+    log.info('[Main] App ready - starting initialization');
+
     // ========== POWER SAVE BLOCKER ==========
     // ป้องกันไม่ให้หน้าจอปิดหรือเครื่องเข้าสู่ sleep mode
     // 'prevent-display-sleep' จะป้องกันหน้าจอปิด (display turn off)
     // 'prevent-app-suspension' จะป้องกัน app ถูก suspend
     powerSaveBlockerId = powerSaveBlocker.start('prevent-display-sleep');
-    console.log('🔋 [Main] Power save blocker started with ID:', powerSaveBlockerId);
-    console.log('🔋 [Main] Power save blocker is active:', powerSaveBlocker.isStarted(powerSaveBlockerId));
+    log.info('[Main] Power save blocker started with ID:', powerSaveBlockerId);
+    log.info('[Main] Power save blocker is active:', powerSaveBlocker.isStarted(powerSaveBlockerId));
 
     // ตั้งค่า permissions ก่อนสร้าง window
     // ตั้งค่า permissions สำหรับกล้องและไมโครโฟนใน default session
@@ -964,7 +966,7 @@ app
 
     // Register Canon Camera IPC handlers
     registerCanonCameraIpcHandlers();
-    console.log('📷 [Main] Canon Camera IPC handlers registered');
+    log.info('[Main] Canon Camera IPC handlers registered');
 
     createWindow();
 

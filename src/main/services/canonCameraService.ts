@@ -6,6 +6,10 @@
  */
 import { app, ipcMain, BrowserWindow } from 'electron';
 import path from 'path';
+import log from 'electron-log';
+
+// Configure log prefix
+const canonLog = log.scope('CanonCamera');
 
 // =============================================================================
 // Types (ต้อง define เองเพราะไม่มี TypeScript source แล้ว)
@@ -136,15 +140,15 @@ function getNativeModulePath(): string {
   ];
 
   for (const nodePath of possiblePaths) {
-    console.log(`🔍 [CanonCameraService] Checking native module at: ${nodePath}`);
+    canonLog.info(`Checking native module at: ${nodePath}`);
     if (fs.existsSync(nodePath)) {
-      console.log(`✅ [CanonCameraService] Found native module at: ${nodePath}`);
+      canonLog.info(`Found native module at: ${nodePath}`);
       return nodePath;
     }
   }
 
   // Return first path as fallback (will throw error on load)
-  console.warn('⚠️ [CanonCameraService] Native module not found in any location');
+  canonLog.warn('Native module not found in any location');
   return possiblePaths[0];
 }
 
@@ -155,9 +159,9 @@ function getCanonModule(): CanonEdsdkModule {
       const nodeFilePath = getNativeModulePath();
       // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
       canonModule = require(nodeFilePath) as CanonEdsdkModule;
-      console.log('✅ [CanonCameraService] Native module loaded from:', nodeFilePath);
+      canonLog.info('Native module loaded from:', nodeFilePath);
     } catch (error) {
-      console.error('❌ [CanonCameraService] Failed to load native module:', error);
+      canonLog.error('Failed to load native module:', error);
       throw error;
     }
   }
@@ -191,15 +195,15 @@ function getEdsdkDllPath(): string {
   ];
 
   for (const dllPath of possiblePaths) {
-    console.log(`🔍 [CanonCameraService] Checking EDSDK.dll at: ${dllPath}`);
+    canonLog.info(`Checking EDSDK.dll at: ${dllPath}`);
     if (fs.existsSync(dllPath)) {
-      console.log(`✅ [CanonCameraService] Found EDSDK.dll at: ${dllPath}`);
+      canonLog.info(`Found EDSDK.dll at: ${dllPath}`);
       return dllPath;
     }
   }
 
   // Default fallback
-  console.warn('⚠️ [CanonCameraService] EDSDK.dll not found, using default path');
+  canonLog.warn('EDSDK.dll not found, using default path');
   return possiblePaths[0];
 }
 
@@ -208,7 +212,7 @@ function getEdsdkDllPath(): string {
  */
 export async function initializeCanonSdk(): Promise<boolean> {
   if (isInitialized) {
-    console.log('ℹ️ [CanonCameraService] SDK already initialized');
+    canonLog.info('SDK already initialized');
     return true;
   }
 
@@ -216,18 +220,18 @@ export async function initializeCanonSdk(): Promise<boolean> {
     const canon = getCanonModule();
     const dllPath = getEdsdkDllPath();
 
-    console.log(`🔧 [CanonCameraService] Initializing SDK with DLL: ${dllPath}`);
+    canonLog.info(`Initializing SDK with DLL: ${dllPath}`);
     const result = canon.initializeSdk(dllPath);
 
     if (result) {
       isInitialized = true;
-      console.log('✅ [CanonCameraService] SDK initialized successfully');
+      canonLog.info('SDK initialized successfully');
       startEventPolling();
     }
 
     return result;
   } catch (error) {
-    console.error('❌ [CanonCameraService] Failed to initialize SDK:', error);
+    canonLog.error('Failed to initialize SDK:', error);
     return false;
   }
 }
@@ -237,7 +241,7 @@ export async function initializeCanonSdk(): Promise<boolean> {
  */
 export function terminateCanonSdk(): boolean {
   if (!isInitialized) {
-    console.log('ℹ️ [CanonCameraService] SDK not initialized');
+    canonLog.info('SDK not initialized');
     return true;
   }
 
@@ -248,12 +252,12 @@ export function terminateCanonSdk(): boolean {
 
     if (result) {
       isInitialized = false;
-      console.log('✅ [CanonCameraService] SDK terminated successfully');
+      canonLog.info('SDK terminated successfully');
     }
 
     return result;
   } catch (error) {
-    console.error('❌ [CanonCameraService] Failed to terminate SDK:', error);
+    canonLog.error('Failed to terminate SDK:', error);
     return false;
   }
 }
@@ -273,10 +277,10 @@ export function getCameraList(): CameraInfo[] {
   try {
     const canon = getCanonModule();
     const cameras = canon.getCameraList();
-    console.log(`📷 [CanonCameraService] Found ${cameras.length} camera(s)`);
+    canonLog.info(`Found ${cameras.length} camera(s)`);
     return cameras;
   } catch (error) {
-    console.error('❌ [CanonCameraService] Failed to get camera list:', error);
+    canonLog.error('Failed to get camera list:', error);
     return [];
   }
 }
@@ -288,10 +292,10 @@ export function connectCamera(): CameraInfo | null {
   try {
     const canon = getCanonModule();
     const camera = canon.connectCamera();
-    console.log(`✅ [CanonCameraService] Connected to: ${camera.name}`);
+    canonLog.info(`Connected to: ${camera.name}`);
     return camera;
   } catch (error) {
-    console.error('❌ [CanonCameraService] Failed to connect camera:', error);
+    canonLog.error('Failed to connect camera:', error);
     return null;
   }
 }
@@ -303,10 +307,10 @@ export function connectCameraByIndex(index: number): CameraInfo | null {
   try {
     const canon = getCanonModule();
     const camera = canon.connectCameraByIndex(index);
-    console.log(`✅ [CanonCameraService] Connected to camera ${index}: ${camera.name}`);
+    canonLog.info(`Connected to camera ${index}: ${camera.name}`);
     return camera;
   } catch (error) {
-    console.error(`❌ [CanonCameraService] Failed to connect camera at index ${index}:`, error);
+    canonLog.error(`Failed to connect camera at index ${index}:`, error);
     return null;
   }
 }
@@ -319,11 +323,11 @@ export function openSession(): boolean {
     const canon = getCanonModule();
     const result = canon.openSession();
     if (result) {
-      console.log('✅ [CanonCameraService] Session opened');
+      canonLog.info('Session opened');
     }
     return result;
   } catch (error) {
-    console.error('❌ [CanonCameraService] Failed to open session:', error);
+    canonLog.error('Failed to open session:', error);
     return false;
   }
 }
@@ -336,11 +340,11 @@ export function closeSession(): boolean {
     const canon = getCanonModule();
     const result = canon.closeSession();
     if (result) {
-      console.log('✅ [CanonCameraService] Session closed');
+      canonLog.info('Session closed');
     }
     return result;
   } catch (error) {
-    console.error('❌ [CanonCameraService] Failed to close session:', error);
+    canonLog.error('Failed to close session:', error);
     return false;
   }
 }
@@ -367,18 +371,18 @@ export function isSessionOpen(): boolean {
 export async function takePicture(savePath: string): Promise<CaptureResult> {
   try {
     const canon = getCanonModule();
-    console.log(`📸 [CanonCameraService] Taking picture, saving to: ${savePath}`);
+    canonLog.info(`Taking picture, saving to: ${savePath}`);
     const result = await canon.takePicture(savePath);
 
     if (result.success) {
-      console.log('✅ [CanonCameraService] Picture taken successfully');
+      canonLog.info('Picture taken successfully');
     } else {
-      console.error('❌ [CanonCameraService] Picture failed:', result.error);
+      canonLog.error('Picture failed:', result.error);
     }
 
     return result;
   } catch (error) {
-    console.error('❌ [CanonCameraService] Failed to take picture:', error);
+    canonLog.error('Failed to take picture:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
@@ -392,18 +396,18 @@ export async function takePicture(savePath: string): Promise<CaptureResult> {
 export async function captureToBuffer(): Promise<CaptureResult> {
   try {
     const canon = getCanonModule();
-    console.log('📸 [CanonCameraService] Capturing to buffer');
+    canonLog.info('Capturing to buffer');
     const result = await canon.captureToBuffer();
 
     if (result.success) {
-      console.log('✅ [CanonCameraService] Captured to buffer successfully');
+      canonLog.info('Captured to buffer successfully');
     } else {
-      console.error('❌ [CanonCameraService] Capture to buffer failed:', result.error);
+      canonLog.error('Capture to buffer failed:', result.error);
     }
 
     return result;
   } catch (error) {
-    console.error('❌ [CanonCameraService] Failed to capture to buffer:', error);
+    canonLog.error('Failed to capture to buffer:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
@@ -419,11 +423,11 @@ export function startLiveView(): boolean {
     const canon = getCanonModule();
     const result = canon.startLiveView();
     if (result) {
-      console.log('✅ [CanonCameraService] Live view started');
+      canonLog.info('Live view started');
     }
     return result;
   } catch (error) {
-    console.error('❌ [CanonCameraService] Failed to start live view:', error);
+    canonLog.error('Failed to start live view:', error);
     return false;
   }
 }
@@ -436,11 +440,11 @@ export function stopLiveView(): boolean {
     const canon = getCanonModule();
     const result = canon.stopLiveView();
     if (result) {
-      console.log('✅ [CanonCameraService] Live view stopped');
+      canonLog.info('Live view stopped');
     }
     return result;
   } catch (error) {
-    console.error('❌ [CanonCameraService] Failed to stop live view:', error);
+    canonLog.error('Failed to stop live view:', error);
     return false;
   }
 }
@@ -466,7 +470,7 @@ export function getProperty(propertyId: number): number | null {
     const canon = getCanonModule();
     return canon.getProperty(propertyId);
   } catch (error) {
-    console.error(`❌ [CanonCameraService] Failed to get property ${propertyId}:`, error);
+    canonLog.error(`Failed to get property ${propertyId}:`, error);
     return null;
   }
 }
@@ -479,7 +483,7 @@ export function setProperty(propertyId: number, value: number): boolean {
     const canon = getCanonModule();
     return canon.setProperty(propertyId, value);
   } catch (error) {
-    console.error(`❌ [CanonCameraService] Failed to set property ${propertyId}:`, error);
+    canonLog.error(`Failed to set property ${propertyId}:`, error);
     return false;
   }
 }
@@ -559,7 +563,7 @@ function startEventPolling(): void {
     }
   }, 100); // Poll every 100ms
 
-  console.log('✅ [CanonCameraService] Event polling started');
+  canonLog.info('Event polling started');
 }
 
 /**
@@ -569,7 +573,7 @@ function stopEventPolling(): void {
   if (eventPollingInterval) {
     clearInterval(eventPollingInterval);
     eventPollingInterval = null;
-    console.log('✅ [CanonCameraService] Event polling stopped');
+    canonLog.info('Event polling stopped');
   }
 }
 
@@ -772,5 +776,5 @@ export function registerCanonCameraIpcHandlers(): void {
     }
   });
 
-  console.log('✅ [CanonCameraService] IPC handlers registered');
+  canonLog.info('IPC handlers registered');
 }
