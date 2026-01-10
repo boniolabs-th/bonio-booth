@@ -152,14 +152,20 @@ function getNativeModulePath(): string {
   return possiblePaths[0];
 }
 
+// Use __non_webpack_require__ to bypass webpack's module resolution
+// This is necessary for native modules that are unpacked from asar
+declare const __non_webpack_require__: NodeRequire;
+const nativeRequire = typeof __non_webpack_require__ !== 'undefined' ? __non_webpack_require__ : require;
+
 function getCanonModule(): CanonEdsdkModule {
   if (!canonModule) {
     try {
-      // Load .node file directly
+      // Load .node file directly using native require (bypass webpack)
       const nodeFilePath = getNativeModulePath();
+      canonLog.info('Loading native module with nativeRequire from:', nodeFilePath);
       // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
-      canonModule = require(nodeFilePath) as CanonEdsdkModule;
-      canonLog.info('Native module loaded from:', nodeFilePath);
+      canonModule = nativeRequire(nodeFilePath) as CanonEdsdkModule;
+      canonLog.info('Native module loaded successfully');
     } catch (error) {
       canonLog.error('Failed to load native module:', error);
       throw error;
