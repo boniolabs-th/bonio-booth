@@ -139,6 +139,7 @@ export default function MainShooting() {
   // Camera type and config state
   const [cameraType, setCameraType] = useState<CameraType>('webcam');
   const [cameraConfig, setCameraConfigState] = useState<CameraConfig | null>(null);
+  const cameraTypeRef = useRef<CameraType>('webcam'); // Ref to track current camera type for capture loop
 
   const [, setCameraCountdown] = useState(3);
   const [countdown, setCountdown] = useState(3);
@@ -434,7 +435,7 @@ export default function MainShooting() {
     });
   }, []);
 
-  const takeWebcamPhoto = (): string => {
+  const takeWebcamPhoto = useCallback((): string => {
     if (!videoRef.current || !canvasRef.current) return '';
 
     const canvas = canvasRef.current;
@@ -456,7 +457,7 @@ export default function MainShooting() {
     }
 
     return '';
-  };
+  }, []);
 
   // ===========================================================================
   // CANON CAMERA Functions
@@ -526,7 +527,7 @@ export default function MainShooting() {
     return '';
   }, [canonCamera]);
 
-  const takeCanonPhoto = async (): Promise<string> => {
+  const takeCanonPhoto = useCallback(async (): Promise<string> => {
     console.log('📷 [Canon] Taking picture...');
 
     // Flash effect
@@ -557,36 +558,43 @@ export default function MainShooting() {
 
     console.error('❌ [Canon] Failed to capture:', result.error);
     return '';
-  };
+  }, [canonCamera]);
 
   // ===========================================================================
   // GENERIC Functions (work for both camera types)
+  // Uses cameraTypeRef to get the current camera type (avoids stale closure)
   // ===========================================================================
 
   const startRecording = useCallback(() => {
-    if (cameraType === 'webcam') {
+    const currentType = cameraTypeRef.current;
+    console.log(`📷 [startRecording] cameraType: ${currentType}`);
+    if (currentType === 'webcam') {
       startWebcamRecording();
     } else {
       startCanonFrameRecording();
     }
-  }, [cameraType, startWebcamRecording, startCanonFrameRecording]);
+  }, [startWebcamRecording, startCanonFrameRecording]);
 
   const stopRecording = useCallback((): Promise<string> => {
-    if (cameraType === 'webcam') {
+    const currentType = cameraTypeRef.current;
+    console.log(`📷 [stopRecording] cameraType: ${currentType}`);
+    if (currentType === 'webcam') {
       return stopWebcamRecording();
     } else {
       const result = stopCanonFrameRecording();
       return Promise.resolve(result);
     }
-  }, [cameraType, stopWebcamRecording, stopCanonFrameRecording]);
+  }, [stopWebcamRecording, stopCanonFrameRecording]);
 
-  const takePhoto = async (): Promise<string> => {
-    if (cameraType === 'webcam') {
+  const takePhoto = useCallback(async (): Promise<string> => {
+    const currentType = cameraTypeRef.current;
+    console.log(`📷 [takePhoto] cameraType: ${currentType}`);
+    if (currentType === 'webcam') {
       return takeWebcamPhoto();
     } else {
       return takeCanonPhoto();
     }
-  };
+  }, [takeWebcamPhoto, takeCanonPhoto]);
 
   const startCountdown = (
     duration: number,
@@ -720,8 +728,11 @@ export default function MainShooting() {
           console.warn('⚠️ [MainShooting] Failed to get camera config, using webcam:', configError);
         }
 
+        // Update both state and ref
         setCameraType(loadedCameraType);
+        cameraTypeRef.current = loadedCameraType; // Important: set ref for capture loop
         setCameraConfigState(loadedConfig);
+        console.log(`📷 [MainShooting] cameraTypeRef set to: ${cameraTypeRef.current}`);
 
         // ========================================
         // Step 2: Start the appropriate camera
