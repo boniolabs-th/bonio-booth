@@ -179,6 +179,16 @@ function MaintenanceListener() {
       },
     );
 
+    // Listen for device not found event from main process
+    const unsubscribeDeviceNotFound = (window as any).electron.ipcRenderer.on(
+      'device-not-found',
+      (data: { deviceType: 'camera' | 'printer'; deviceName: string }) => {
+        console.warn(`⚠️ [Renderer] Device not found: ${data.deviceType} - ${data.deviceName}`);
+        // Navigate to maintenance page
+        navigate('/system-maintenance', { state: { maintenance: true, deviceType: data.deviceType, deviceName: data.deviceName } });
+      },
+    );
+
     return () => {
       unsubscribe();
       unsubscribeNavigate();
@@ -189,6 +199,7 @@ function MaintenanceListener() {
       unsubscribePrinterConfigModal();
       unsubscribeSse502();
       unsubscribeCameraCheck();
+      unsubscribeDeviceNotFound();
     };
   }, [navigate]);
 

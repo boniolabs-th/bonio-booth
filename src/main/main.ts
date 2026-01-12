@@ -84,6 +84,7 @@ import {
   registerCanonCameraIpcHandlers,
   terminateCanonSdk,
   setMainWindow as setCanonMainWindow,
+  isCameraConnected as isCanonCameraConnected,
 } from './services/canonCameraService';
 import {
   getPrinterConfig,
@@ -363,16 +364,44 @@ async function checkConfiguredDevices(): Promise<void> {
   try {
     const cameraConfig = await getCameraConfig();
     if (cameraConfig) {
-      console.log(`📷 [Main] Camera config found: ${cameraConfig.label} (${cameraConfig.deviceId})`);
+      // เช็คว่าเป็น webcam หรือ canon
+      if (cameraConfig.type === 'webcam') {
+        console.log(`📷 [Main] Webcam config found: ${cameraConfig.label} (${cameraConfig.deviceId})`);
 
-      // ดึงรายการกล้องที่เชื่อมต่ออยู่ผ่าน renderer process
-      // เนื่องจาก navigator.mediaDevices ใช้ได้เฉพาะใน renderer process
-      // เราจะส่ง event ไปให้ renderer เช็คแทน
-      if (mainWindow) {
-        mainWindow.webContents.send('check-camera-availability', {
-          configuredDeviceId: cameraConfig.deviceId,
-          configuredLabel: cameraConfig.label,
-        });
+        // ดึงรายการกล้องที่เชื่อมต่ออยู่ผ่าน renderer process
+        // เนื่องจาก navigator.mediaDevices ใช้ได้เฉพาะใน renderer process
+        // เราจะส่ง event ไปให้ renderer เช็คแทน
+        if (mainWindow) {
+          mainWindow.webContents.send('check-camera-availability', {
+            configuredDeviceId: cameraConfig.deviceId,
+            configuredLabel: cameraConfig.label,
+          });
+        }
+      } else if (cameraConfig.type === 'canon') {
+        console.log(`📷 [Main] Canon camera config found: ${cameraConfig.cameraName}`);
+
+        // เช็คว่า Canon camera ยังเชื่อมต่ออยู่หรือไม่
+        const isConnected = isCanonCameraConnected();
+
+        if (!isConnected) {
+          console.warn(`⚠️ [Main] Canon camera not connected: ${cameraConfig.cameraName}`);
+          // ส่งแจ้งเตือน
+          machineService.sendDeviceAlert(
+            'camera',
+            cameraConfig.cameraName,
+            [],
+          ).catch(err => console.error('❌ [Main] Failed to send camera alert:', err));
+
+          // ส่ง event ไปที่ renderer เพื่อแสดงหน้า maintenance
+          if (mainWindow) {
+            mainWindow.webContents.send('device-not-found', {
+              deviceType: 'camera',
+              deviceName: cameraConfig.cameraName,
+            });
+          }
+        } else {
+          console.log(`✅ [Main] Canon camera connected: ${cameraConfig.cameraName}`);
+        }
       }
     } else {
       console.log('ℹ️ [Main] No camera config found');
@@ -406,6 +435,14 @@ async function checkConfiguredDevices(): Promise<void> {
           `Main: ${printerConfig.main.printerName}`,
           printerNames,
         ).catch(err => console.error('❌ [Main] Failed to send printer alert:', err));
+
+        // ส่ง event ไปที่ renderer เพื่อแสดงหน้า maintenance
+        if (mainWindow) {
+          mainWindow.webContents.send('device-not-found', {
+            deviceType: 'printer',
+            deviceName: `Main: ${printerConfig.main.printerName}`,
+          });
+        }
       } else {
         console.log(`✅ [Main] Main printer found: ${printerConfig.main.printerName}`);
       }
@@ -421,6 +458,14 @@ async function checkConfiguredDevices(): Promise<void> {
             `Secondary: ${printerConfig.secondary.printerName}`,
             printerNames,
           ).catch(err => console.error('❌ [Main] Failed to send printer alert:', err));
+
+          // ส่ง event ไปที่ renderer เพื่อแสดงหน้า maintenance
+          if (mainWindow) {
+            mainWindow.webContents.send('device-not-found', {
+              deviceType: 'printer',
+              deviceName: `Secondary: ${printerConfig.secondary.printerName}`,
+            });
+          }
         } else {
           console.log(`✅ [Main] Secondary printer found: ${printerConfig.secondary.printerName}`);
         }
@@ -1848,6 +1893,14 @@ ipcMain.on('camera-availability-result', async (event, result: {
       result.configuredLabel,
       result.availableDevices,
     ).catch(err => console.error('❌ [Main] Failed to send camera alert:', err));
+
+    // ส่ง event ไปที่ renderer เพื่อแสดงหน้า maintenance
+    if (mainWindow) {
+      mainWindow.webContents.send('device-not-found', {
+        deviceType: 'camera',
+        deviceName: result.configuredLabel,
+      });
+    }
   } else {
     console.log(`✅ [Main] Configured camera found: ${result.configuredLabel}`);
   }
