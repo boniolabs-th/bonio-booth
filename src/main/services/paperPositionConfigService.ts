@@ -13,6 +13,8 @@ export interface PaperPositionConfig {
   landscapeHeight: number;
   portraitWidth: number;
   portraitHeight: number;
+  landscapeScale?: number; // เปอร์เซ็นต์ (100 = 100%, 50 = 50%, 150 = 150%)
+  portraitScale?: number; // เปอร์เซ็นต์ (100 = 100%, 50 = 50%, 150 = 150%)
   type: number;
 }
 
@@ -22,6 +24,8 @@ export const DEFAULT_PAPER_POSITION_CONFIG: PaperPositionConfig = {
   landscapeHeight: 1,
   portraitWidth: -4.5,
   portraitHeight: -12,
+  landscapeScale: 100, // Default 100% (ไม่ zoom)
+  portraitScale: 100, // Default 100% (ไม่ zoom)
   type: 2, // 1: landscape, 2: portrait for set transform print
 };
 
@@ -55,6 +59,14 @@ export async function getPaperPositionConfig(): Promise<PaperPositionConfig> {
         '⚠️ [paperPositionConfigService] Invalid config format, using defaults',
       );
       return DEFAULT_PAPER_POSITION_CONFIG;
+    }
+
+    // ตั้งค่า default สำหรับ scale ถ้ายังไม่มี
+    if (typeof config.landscapeScale !== 'number') {
+      config.landscapeScale = DEFAULT_PAPER_POSITION_CONFIG.landscapeScale;
+    }
+    if (typeof config.portraitScale !== 'number') {
+      config.portraitScale = DEFAULT_PAPER_POSITION_CONFIG.portraitScale;
     }
 
     console.log('✅ [paperPositionConfigService] Config loaded:', config);

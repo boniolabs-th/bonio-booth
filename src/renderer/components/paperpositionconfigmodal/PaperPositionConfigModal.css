@@ -254,3 +254,55 @@
   cursor: not-allowed;
 }
 
+/* Sync Controls - ปุ่มปรับพร้อมกัน */
+.paper-position-config-sync-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.paper-position-config-sync-buttons {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+}
+
+.paper-position-config-button-sync-decrement,
+.paper-position-config-button-sync-increment {
+  flex: 1;
+  padding: 12px 20px;
+  font-size: 16px;
+  font-weight: 500;
+  border: 2px solid #e0e0e0;
+  background: white;
+  color: #333;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.paper-position-config-button-sync-decrement:hover:not(:disabled),
+.paper-position-config-button-sync-increment:hover:not(:disabled) {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.paper-position-config-button-sync-decrement:active:not(:disabled),
+.paper-position-config-button-sync-increment:active:not(:disabled) {
+  background: #5568d3;
+  transform: scale(0.95);
+}
+
+.paper-position-config-button-sync-decrement:disabled,
+.paper-position-config-button-sync-increment:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

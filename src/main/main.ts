@@ -488,7 +488,8 @@ async function generateImageWithPadding(
   paddingPercent = 0,
   orientation: 'portrait' | 'landscape' = 'portrait',
   horizontal: number = 0,
-  vertical: number = 0
+  vertical: number = 0,
+  scale: number = 100
 ): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     let htmlPath: string | null = null;
@@ -528,8 +529,16 @@ async function generateImageWithPadding(
       const widthPercent = orientation === 'landscape' ? landscapeWidth : portraitWidth;
       const heightPercent = orientation === 'landscape' ? landscapeHeight : portraitHeight;
 
+      // ดึง scale จาก config ตาม orientation (ถ้าไม่มีใน config ให้ใช้ค่าจาก parameter หรือ default 100)
+      const configScale = orientation === 'landscape'
+        ? (paperPositionConfig.landscapeScale ?? scale ?? 100)
+        : (paperPositionConfig.portraitScale ?? scale ?? 100);
+
       // ตรวจสอบว่าต้องหมุนภาพหรือไม่
       const willRotate = orientation !== typeTransform;
+
+      // แปลง scale จากเปอร์เซ็นต์ (100 = 100%) เป็นตัวเลข (1.0 = 100%)
+      const scaleValue = configScale / 100;
 
       // Log สำหรับ debug
       console.log('🖼️ [generateImageWithPadding] Orientation calculation:', {
@@ -538,6 +547,8 @@ async function generateImageWithPadding(
         willRotate,
         widthPercent,
         heightPercent,
+        configScale,
+        scaleValue,
         note: 'Using original orientation for size adjustment, typeTransform only for rotation',
       });
 
@@ -573,8 +584,10 @@ async function generateImageWithPadding(
         align-items: center;
       }
       img {
-        max-width: calc(100% + ${widthPercent}%);
-        max-height: calc(100% + ${heightPercent}%);
+        // max-width: calc(100% + ${widthPercent}%);
+        // max-height: calc(100% + ${heightPercent}%);
+        max-width: 100%;
+        max-height: 100%;
         width: auto;
         height: auto;
         object-fit: contain;
@@ -583,7 +596,16 @@ async function generateImageWithPadding(
         margin-bottom: ${vertical > 0 ? -vertical : 0}px;
         margin-left: ${horizontal < 0 ? horizontal : 0}px;
         margin-right: ${horizontal > 0 ? -horizontal : 0}px;
-        transform: ${orientation === typeTransform ? 'none' : 'rotate(90deg)'};
+        transform: ${(() => {
+          const transforms = [];
+          if (scaleValue !== 1) {
+            transforms.push(`scale(${scaleValue})`);
+          }
+          if (orientation !== typeTransform) {
+            transforms.push('rotate(90deg)');
+          }
+          return transforms.length > 0 ? transforms.join(' ') : 'none';
+        })()};
       }
     </style>
   </head>
@@ -1038,6 +1060,9 @@ interface PrintConfig {
   copies?: number;
   orientation?: 'portrait' | 'landscape';
   imageSize?: string; // เช่น "1200x3600", "3600x2400", "2400x3600"
+  horizontal?: number;
+  vertical?: number;
+  scale?: number; // เปอร์เซ็นต์ (100 = 100%, 50 = 50%, 150 = 150%)
 }
 
 let isPrinting = false;
@@ -1113,16 +1138,18 @@ ipcMain.on("print-photo", async (event, printConfig) => {
       hasOrientation: !!printConfig.orientation,
     });
 
-    // ดึงค่า horizontal และ vertical จาก printConfig หรือใช้ค่า default
+    // ดึงค่า horizontal, vertical และ scale จาก printConfig หรือใช้ค่า default
     const horizontal = printConfig.horizontal ?? 0;
     const vertical = printConfig.vertical ?? 0;
+    const scale = printConfig.scale ?? 100; // Default 100% (ไม่ zoom)
 
     const paddedImageBuffer = await generateImageWithPadding(
       printConfig.imageDataUrl,
       5,
       orientation,
       horizontal,
-      vertical
+      vertical,
+      scale
     );
 
     const tempDir = app.getPath("temp");

@@ -2,10 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import './PaperPositionConfigModal.css';
 
 export interface PaperPositionConfig {
-  landscapeWidth: number;
-  landscapeHeight: number;
-  portraitWidth: number;
-  portraitHeight: number;
+  landscapeScale: number; // เปอร์เซ็นต์ (100 = 100%, 50 = 50%, 150 = 150%)
+  portraitScale: number; // เปอร์เซ็นต์ (100 = 100%, 50 = 50%, 150 = 150%)
   type: number; // 1: landscape, 2: portrait
 }
 
@@ -15,20 +13,13 @@ interface PaperPositionConfigModalProps {
   onCancel: () => void;
 }
 
-// Helper function สำหรับปัดเศษเป็นทศนิยม 1 ตำแหน่ง
-const roundToDecimal = (value: number, decimals: number = 1): number => {
-  return Math.round(value * 10 ** decimals) / 10 ** decimals;
-};
-
 export default function PaperPositionConfigModal({
   isOpen,
   onSave,
   onCancel,
 }: PaperPositionConfigModalProps): React.JSX.Element | null {
-  const [landscapeWidth, setLandscapeWidth] = useState<number>(0);
-  const [landscapeHeight, setLandscapeHeight] = useState<number>(0);
-  const [portraitWidth, setPortraitWidth] = useState<number>(0);
-  const [portraitHeight, setPortraitHeight] = useState<number>(0);
+  const [landscapeScale, setLandscapeScale] = useState<number>(100);
+  const [portraitScale, setPortraitScale] = useState<number>(100);
   const [type, setType] = useState<number>(2); // 1: landscape, 2: portrait
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -39,11 +30,9 @@ export default function PaperPositionConfigModal({
       // @ts-ignore
       const result = await window.electron?.payment?.getPaperPositionConfig();
       if (result?.success && result.config) {
-        setLandscapeWidth(roundToDecimal(result.config.landscapeWidth));
-        setLandscapeHeight(roundToDecimal(result.config.landscapeHeight));
-        setPortraitWidth(roundToDecimal(result.config.portraitWidth));
-        setPortraitHeight(roundToDecimal(result.config.portraitHeight));
-        setType(result.config.type);
+        setLandscapeScale(result.config.landscapeScale ?? 100);
+        setPortraitScale(result.config.portraitScale ?? 100);
+        setType(result.config.type ?? 2);
       }
     } catch (err) {
       console.error(
@@ -85,11 +74,9 @@ export default function PaperPositionConfigModal({
           '✅ [PaperPositionConfigModal] Setting default values:',
           result.config,
         );
-        setLandscapeWidth(roundToDecimal(result.config.landscapeWidth));
-        setLandscapeHeight(roundToDecimal(result.config.landscapeHeight));
-        setPortraitWidth(roundToDecimal(result.config.portraitWidth));
-        setPortraitHeight(roundToDecimal(result.config.portraitHeight));
-        setType(result.config.type);
+        setLandscapeScale(result.config.landscapeScale ?? 100);
+        setPortraitScale(result.config.portraitScale ?? 100);
+        setType(result.config.type ?? 2);
       } else {
         const errorMsg = result?.error || 'ไม่สามารถโหลดค่าเริ่มต้นได้';
         console.error(
@@ -141,14 +128,16 @@ export default function PaperPositionConfigModal({
   }, [isOpen, handleCancel]);
 
   const handleSave = async () => {
-    // Validate values - อนุญาตให้มีค่าติดลบได้
+    // Validate values
     if (
-      Number.isNaN(landscapeWidth) ||
-      Number.isNaN(landscapeHeight) ||
-      Number.isNaN(portraitWidth) ||
-      Number.isNaN(portraitHeight)
+      Number.isNaN(landscapeScale) ||
+      Number.isNaN(portraitScale) ||
+      landscapeScale < 50 ||
+      landscapeScale > 150 ||
+      portraitScale < 50 ||
+      portraitScale > 150
     ) {
-      setError('ค่าต้องเป็นตัวเลขที่ถูกต้อง');
+      setError('ค่า Scale ต้องอยู่ระหว่าง 50-150%');
       return;
     }
 
@@ -157,16 +146,19 @@ export default function PaperPositionConfigModal({
       setError('');
 
       const config: PaperPositionConfig = {
-        landscapeWidth: roundToDecimal(landscapeWidth),
-        landscapeHeight: roundToDecimal(landscapeHeight),
-        portraitWidth: roundToDecimal(portraitWidth),
-        portraitHeight: roundToDecimal(portraitHeight),
+        landscapeScale: Math.round(landscapeScale),
+        portraitScale: Math.round(portraitScale),
         type,
       };
 
-      // @ts-ignore
-      const result =
-        await window.electron?.payment?.savePaperPositionConfig(config);
+      // @ts-ignore - Service ยังต้องการ width/height แต่เราไม่ใช้แล้ว ส่งค่า default
+      const result = await window.electron?.payment?.savePaperPositionConfig({
+        ...config,
+        landscapeWidth: 0,
+        landscapeHeight: 0,
+        portraitWidth: 0,
+        portraitHeight: 0,
+      });
       if (result?.success) {
         onSave(config);
       } else {
@@ -198,10 +190,12 @@ export default function PaperPositionConfigModal({
         // onKeyDown={(e) => e.stopPropagation()}
         role="dialog"
       >
-        <h2 className="paper-position-config-modal-title">ตั้งค่าขอบกระดาษ</h2>
+        <h2 className="paper-position-config-modal-title">
+          ตั้งค่า Scale และ Type
+        </h2>
 
         <p className="paper-position-config-modal-description">
-          ปรับค่าขนาดภาพเพื่อลดขอบกระดาษ
+          ปรับค่า Scale สำหรับภาพแนวนอนและแนวตั้ง
         </p>
 
         {error && <p className="paper-position-config-error">{error}</p>}
@@ -209,42 +203,47 @@ export default function PaperPositionConfigModal({
         <div className="paper-position-config-inputs">
           <div className="paper-position-config-group">
             <h3 className="paper-position-config-group-title">
-              {type === 1 ? 'ปรับขนาดภาพแนวตั้ง' : 'ปรับขนาดภาพแนวนอน'}
+              Scale แนวนอน (Landscape)
             </h3>
             <div className="paper-position-config-input-group">
               <label
-                htmlFor="landscape-width"
+                htmlFor="landscape-scale"
                 className="paper-position-config-label"
               >
-                Width (%):
+                Scale (%):
               </label>
               <div className="paper-position-config-input-with-buttons">
                 <button
                   type="button"
                   className="paper-position-config-button-decrement"
-                  onClick={() =>
-                    setLandscapeWidth(roundToDecimal(landscapeWidth - 0.1))
-                  }
+                  onClick={() => {
+                    const newValue = Math.max(50, landscapeScale - 1);
+                    setLandscapeScale(newValue);
+                  }}
                   disabled={isLoading}
                   aria-label="ลดค่า"
                 >
                   −
                 </button>
                 <input
-                  id="landscape-width"
+                  id="landscape-scale"
                   type="number"
-                  step="0.1"
-                  value={landscapeWidth}
+                  step="1"
+                  min="50"
+                  max="150"
+                  value={landscapeScale}
                   onChange={(e) => {
-                    const value = parseFloat(e.target.value);
+                    const value = parseInt(e.target.value, 10);
                     if (!Number.isNaN(value)) {
-                      setLandscapeWidth(roundToDecimal(value));
+                      const clampedValue = Math.max(50, Math.min(150, value));
+                      setLandscapeScale(clampedValue);
                     }
                   }}
                   onBlur={(e) => {
-                    const value = parseFloat(e.target.value);
+                    const value = parseInt(e.target.value, 10);
                     if (!Number.isNaN(value)) {
-                      setLandscapeWidth(roundToDecimal(value));
+                      const clampedValue = Math.max(50, Math.min(150, value));
+                      setLandscapeScale(clampedValue);
                     }
                   }}
                   className="paper-position-config-input"
@@ -253,61 +252,10 @@ export default function PaperPositionConfigModal({
                 <button
                   type="button"
                   className="paper-position-config-button-increment"
-                  onClick={() =>
-                    setLandscapeWidth(roundToDecimal(landscapeWidth + 0.1))
-                  }
-                  disabled={isLoading}
-                  aria-label="เพิ่มค่า"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-            <div className="paper-position-config-input-group">
-              <label
-                htmlFor="landscape-height"
-                className="paper-position-config-label"
-              >
-                Height (%):
-              </label>
-              <div className="paper-position-config-input-with-buttons">
-                <button
-                  type="button"
-                  className="paper-position-config-button-decrement"
-                  onClick={() =>
-                    setLandscapeHeight(roundToDecimal(landscapeHeight - 0.1))
-                  }
-                  disabled={isLoading}
-                  aria-label="ลดค่า"
-                >
-                  −
-                </button>
-                <input
-                  id="landscape-height"
-                  type="number"
-                  step="0.1"
-                  value={landscapeHeight}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value);
-                    if (!Number.isNaN(value)) {
-                      setLandscapeHeight(roundToDecimal(value));
-                    }
+                  onClick={() => {
+                    const newValue = Math.min(150, landscapeScale + 1);
+                    setLandscapeScale(newValue);
                   }}
-                  onBlur={(e) => {
-                    const value = parseFloat(e.target.value);
-                    if (!Number.isNaN(value)) {
-                      setLandscapeHeight(roundToDecimal(value));
-                    }
-                  }}
-                  className="paper-position-config-input"
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  className="paper-position-config-button-increment"
-                  onClick={() =>
-                    setLandscapeHeight(roundToDecimal(landscapeHeight + 0.1))
-                  }
                   disabled={isLoading}
                   aria-label="เพิ่มค่า"
                 >
@@ -319,42 +267,47 @@ export default function PaperPositionConfigModal({
 
           <div className="paper-position-config-group">
             <h3 className="paper-position-config-group-title">
-              {type === 1 ? 'ปรับขนาดภาพแนวนอน' : 'ปรับขนาดภาพแนวตั้ง'}
+              Scale แนวตั้ง (Portrait)
             </h3>
             <div className="paper-position-config-input-group">
               <label
-                htmlFor="portrait-width"
+                htmlFor="portrait-scale"
                 className="paper-position-config-label"
               >
-                Width (%):
+                Scale (%):
               </label>
               <div className="paper-position-config-input-with-buttons">
                 <button
                   type="button"
                   className="paper-position-config-button-decrement"
-                  onClick={() =>
-                    setPortraitWidth(roundToDecimal(portraitWidth - 0.1))
-                  }
+                  onClick={() => {
+                    const newValue = Math.max(50, portraitScale - 1);
+                    setPortraitScale(newValue);
+                  }}
                   disabled={isLoading}
                   aria-label="ลดค่า"
                 >
                   −
                 </button>
                 <input
-                  id="portrait-width"
+                  id="portrait-scale"
                   type="number"
-                  step="0.1"
-                  value={portraitWidth}
+                  step="1"
+                  min="50"
+                  max="150"
+                  value={portraitScale}
                   onChange={(e) => {
-                    const value = parseFloat(e.target.value);
+                    const value = parseInt(e.target.value, 10);
                     if (!Number.isNaN(value)) {
-                      setPortraitWidth(roundToDecimal(value));
+                      const clampedValue = Math.max(50, Math.min(150, value));
+                      setPortraitScale(clampedValue);
                     }
                   }}
                   onBlur={(e) => {
-                    const value = parseFloat(e.target.value);
+                    const value = parseInt(e.target.value, 10);
                     if (!Number.isNaN(value)) {
-                      setPortraitWidth(roundToDecimal(value));
+                      const clampedValue = Math.max(50, Math.min(150, value));
+                      setPortraitScale(clampedValue);
                     }
                   }}
                   className="paper-position-config-input"
@@ -363,9 +316,10 @@ export default function PaperPositionConfigModal({
                 <button
                   type="button"
                   className="paper-position-config-button-increment"
-                  onClick={() =>
-                    setPortraitWidth(roundToDecimal(portraitWidth + 0.1))
-                  }
+                  onClick={() => {
+                    const newValue = Math.min(150, portraitScale + 1);
+                    setPortraitScale(newValue);
+                  }}
                   disabled={isLoading}
                   aria-label="เพิ่มค่า"
                 >
@@ -373,58 +327,12 @@ export default function PaperPositionConfigModal({
                 </button>
               </div>
             </div>
-            <div className="paper-position-config-input-group">
-              <label
-                htmlFor="portrait-height"
-                className="paper-position-config-label"
-              >
-                Height (%):
-              </label>
-              <div className="paper-position-config-input-with-buttons">
-                <button
-                  type="button"
-                  className="paper-position-config-button-decrement"
-                  onClick={() =>
-                    setPortraitHeight(roundToDecimal(portraitHeight - 0.1))
-                  }
-                  disabled={isLoading}
-                  aria-label="ลดค่า"
-                >
-                  −
-                </button>
-                <input
-                  id="portrait-height"
-                  type="number"
-                  step="0.1"
-                  value={portraitHeight}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value);
-                    if (!Number.isNaN(value)) {
-                      setPortraitHeight(roundToDecimal(value));
-                    }
-                  }}
-                  onBlur={(e) => {
-                    const value = parseFloat(e.target.value);
-                    if (!Number.isNaN(value)) {
-                      setPortraitHeight(roundToDecimal(value));
-                    }
-                  }}
-                  className="paper-position-config-input"
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  className="paper-position-config-button-increment"
-                  onClick={() =>
-                    setPortraitHeight(roundToDecimal(portraitHeight + 0.1))
-                  }
-                  disabled={isLoading}
-                  aria-label="เพิ่มค่า"
-                >
-                  +
-                </button>
-              </div>
-            </div>
+          </div>
+
+          <div className="paper-position-config-group">
+            <h3 className="paper-position-config-group-title">
+              Type Transform
+            </h3>
             <div className="paper-position-config-input-group">
               <span className="paper-position-config-label">
                 Type Transform:
