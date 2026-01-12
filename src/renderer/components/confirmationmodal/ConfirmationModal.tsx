@@ -23,7 +23,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   return (
     <div className="modal-overlay">
       <div className="modal-content">
-        <p className="modal-message">{message}</p>
+        <div className="modal-message">{message}</div>
         <div className="modal-actions">
           <button
             type="button"
