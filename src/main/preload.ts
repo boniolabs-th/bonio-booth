@@ -109,7 +109,7 @@ const electronHandler = {
     getPaperPositionConfig: () => {
       return ipcRenderer.invoke('get-paper-position-config');
     },
-    savePaperPositionConfig: (config: { landscapeWidth: number; landscapeHeight: number; portraitWidth: number; portraitHeight: number; type: number }) => {
+    savePaperPositionConfig: (config: { landscapeWidth: number; landscapeHeight: number; portraitWidth: number; portraitHeight: number; landscapeScale?: number; portraitScale?: number; type: number }) => {
       return ipcRenderer.invoke('save-paper-position-config', config);
     },
     resetPaperPositionConfig: () => {

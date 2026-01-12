@@ -22,7 +22,8 @@ export default function PrintTest(): React.JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   // Position Paper States
-  const [scale, setScale] = useState<number>(100);
+  const [landscapeScale, setLandscapeScale] = useState<number>(100);
+  const [portraitScale, setPortraitScale] = useState<number>(100);
   const [horizontal, setHorizontal] = useState<number>(0);
   const [vertical, setVertical] = useState<number>(0);
   const [isPaperPositionConfigModalOpen, setIsPaperPositionConfigModalOpen] =
@@ -67,7 +68,47 @@ export default function PrintTest(): React.JSX.Element {
           }
         }
 
-        // 2. โหลดค่าจาก API (สำหรับ scale และ fallback สำหรับ horizontal/vertical ถ้าไม่มีใน storage)
+        // 2. โหลดค่าจาก Paper Position Config (สำหรับ landscapeScale และ portraitScale)
+        // @ts-ignore
+        const paperPositionConfigResult =
+          await window.electron?.payment?.getPaperPositionConfig();
+
+        if (
+          paperPositionConfigResult?.success &&
+          paperPositionConfigResult.config
+        ) {
+          const {
+            landscapeScale: configLandscapeScale,
+            portraitScale: configPortraitScale,
+          } = paperPositionConfigResult.config;
+          console.log(
+            '🔍 [PrintTest] Paper position config from IPC:',
+            paperPositionConfigResult.config,
+          );
+
+          const finalLandscapeScale =
+            configLandscapeScale !== undefined && configLandscapeScale !== null
+              ? configLandscapeScale
+              : 100;
+          const finalPortraitScale =
+            configPortraitScale !== undefined && configPortraitScale !== null
+              ? configPortraitScale
+              : 100;
+
+          setLandscapeScale(finalLandscapeScale);
+          setPortraitScale(finalPortraitScale);
+
+          console.log('✅ [PrintTest] Paper position config loaded from API:', {
+            landscapeScale: finalLandscapeScale,
+            portraitScale: finalPortraitScale,
+          });
+        } else {
+          console.log(
+            '⚠️ [PrintTest] No paperPosition config from IPC, using defaults',
+          );
+        }
+
+        // 3. โหลดค่า horizontal และ vertical จาก API (fallback ถ้าไม่มีใน storage)
         // @ts-ignore
         const paperPositionResult =
           await window.electron?.payment?.getPaperPosition();
@@ -75,14 +116,6 @@ export default function PrintTest(): React.JSX.Element {
         if (paperPositionResult?.success && paperPositionResult.paperPosition) {
           const paperPos = paperPositionResult.paperPosition;
           console.log('🔍 [PrintTest] paperPos from IPC:', paperPos);
-
-          // ใช้ค่า default ถ้าเป็น undefined หรือ null เท่านั้น (ไม่ใช้ || เพราะ 0 และ -16 เป็น falsy)
-          const finalScale =
-            paperPos.scale !== undefined && paperPos.scale !== null
-              ? paperPos.scale
-              : 100;
-
-          setScale(finalScale);
 
           // ใช้ค่า horizontal และ vertical จาก API เฉพาะเมื่อยังไม่มีค่าจาก storage
           if (!hasStorageValue) {
@@ -101,16 +134,8 @@ export default function PrintTest(): React.JSX.Element {
             console.log(
               '✅ [PrintTest] Paper position loaded from API (fallback):',
               {
-                scale: finalScale,
                 horizontal: finalHorizontal,
                 vertical: finalVertical,
-              },
-            );
-          } else {
-            console.log(
-              '✅ [PrintTest] Paper position loaded from API (scale only):',
-              {
-                scale: finalScale,
               },
             );
           }
@@ -129,11 +154,12 @@ export default function PrintTest(): React.JSX.Element {
   // Debug: Log state changes
   useEffect(() => {
     console.log('🔄 [PrintTest] State updated:', {
-      scale,
+      landscapeScale,
+      portraitScale,
       horizontal,
       vertical,
     });
-  }, [scale, horizontal, vertical]);
+  }, [landscapeScale, portraitScale, horizontal, vertical]);
 
   const handleBack = () => {
     navigate('/');
@@ -185,12 +211,55 @@ export default function PrintTest(): React.JSX.Element {
 
       // แปลง image URL เป็น data URL
       console.log('📥 [PrintTest] Converting image URL to data URL...');
-      const imageDataUrl = await convertImageUrlToDataUrl(testImageUrl);
+      let imageDataUrl = await convertImageUrlToDataUrl(testImageUrl);
       console.log('✅ [PrintTest] Image converted successfully');
 
       // ตรวจสอบว่าเป็น portrait-cut (2x6) หรือไม่ เพื่อส่ง imageSize
       const isPortraitCut = orientation === 'portrait-cut';
       const imageSize = isPortraitCut ? '1200x3600' : undefined; // 2x6 frame = 1200x3600
+
+      // ถ้าเป็น portrait-cut ให้ duplicate ภาพ 2x6 ให้เป็น 4x6
+      if (isPortraitCut) {
+        console.log('=== DUPLICATING IMAGE FOR PRINT (2x6 -> 4x6) ===');
+        const doubleCanvas = document.createElement('canvas');
+        const img = new Image();
+
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => {
+            // 2x6 frame = 1200x3600, 4x6 = 2400x3600
+            const frameWidth = 1200;
+            const frameHeight = 3600;
+
+            doubleCanvas.width = frameWidth * 2; // 2400
+            doubleCanvas.height = frameHeight; // 3600
+            const dCtx = doubleCanvas.getContext('2d');
+
+            if (dCtx) {
+              // Fill with white background
+              dCtx.fillStyle = '#ffffff';
+              dCtx.fillRect(0, 0, doubleCanvas.width, doubleCanvas.height);
+
+              // Draw image twice: left and right
+              dCtx.drawImage(img, 0, 0, frameWidth, frameHeight);
+              dCtx.drawImage(img, frameWidth, 0, frameWidth, frameHeight);
+
+              imageDataUrl = doubleCanvas.toDataURL('image/png');
+              console.log(
+                '✅ [PrintTest] Image duplicated successfully (2x6 -> 4x6)',
+              );
+              resolve();
+            } else {
+              reject(new Error('Failed to get canvas context'));
+            }
+          };
+
+          img.onerror = () => {
+            reject(new Error('Failed to load image for duplication'));
+          };
+
+          img.src = imageDataUrl;
+        });
+      }
 
       // บันทึกค่า horizontal และ vertical ไว้ที่ storage
       try {
@@ -205,6 +274,51 @@ export default function PrintTest(): React.JSX.Element {
         });
       } catch (error) {
         console.error('❌ [PrintTest] Failed to save position:', error);
+      }
+
+      // บันทึกค่า landscapeScale และ portraitScale ไว้ที่ config
+      try {
+        // โหลด config เดิมก่อน
+        // @ts-ignore
+        const configResult =
+          await window.electron?.payment?.getPaperPositionConfig();
+
+        if (configResult?.success && configResult.config) {
+          const currentConfig = configResult.config;
+          // อัพเดทแค่ scale โดยคงค่า width, height, type ไว้
+          // @ts-ignore
+          await window.electron?.payment?.savePaperPositionConfig({
+            landscapeWidth: currentConfig.landscapeWidth || 0,
+            landscapeHeight: currentConfig.landscapeHeight || 0,
+            portraitWidth: currentConfig.portraitWidth || 0,
+            portraitHeight: currentConfig.portraitHeight || 0,
+            landscapeScale: Math.round(landscapeScale),
+            portraitScale: Math.round(portraitScale),
+            type: currentConfig.type || 2,
+          });
+          console.log('✅ [PrintTest] Scale saved to config:', {
+            landscapeScale,
+            portraitScale,
+          });
+        } else {
+          // ถ้าไม่มี config เดิม ให้สร้างใหม่
+          // @ts-ignore
+          await window.electron?.payment?.savePaperPositionConfig({
+            landscapeWidth: 0,
+            landscapeHeight: 0,
+            portraitWidth: 0,
+            portraitHeight: 0,
+            landscapeScale: Math.round(landscapeScale),
+            portraitScale: Math.round(portraitScale),
+            type: 2,
+          });
+          console.log('✅ [PrintTest] Scale saved to config (new):', {
+            landscapeScale,
+            portraitScale,
+          });
+        }
+      } catch (error) {
+        console.error('❌ [PrintTest] Failed to save scale:', error);
       }
 
       // เรียก print function
@@ -296,8 +410,6 @@ export default function PrintTest(): React.JSX.Element {
                   : orientation === 'portrait-cut'
                     ? TEST_IMAGE_PORTRAIT_URL_2X6
                     : TEST_IMAGE_LANDSCAPE_URL
-                      ? TEST_IMAGE_PORTRAIT_URL
-                      : TEST_IMAGE_LANDSCAPE_URL
               }
               alt="Test print"
               className="test-image"
@@ -388,33 +500,38 @@ export default function PrintTest(): React.JSX.Element {
             </h2>
 
             <div className="slider-group">
-              {/* <div className="slider-item">
+              <div className="slider-item">
                 <div className="slider-container-label">
-                  <label htmlFor="scale-slider" className="slider-label">
-                    Scale
+                  <label
+                    htmlFor="landscape-scale-slider"
+                    className="slider-label"
+                  >
+                    Scale แนวนอน (Landscape)
                   </label>
                   <input
                     type="number"
                     min="50"
                     max="150"
-                    value={scale}
+                    value={landscapeScale}
                     onChange={(e) => {
                       const value = Number(e.target.value);
                       if (!Number.isNaN(value) && value >= 50 && value <= 150) {
-                        setScale(value);
+                        setLandscapeScale(value);
                       }
                     }}
                     className="slider-value-input"
                     disabled={isPrinting}
-                    aria-label="Scale value"
-                    title="Scale value"
+                    aria-label="Landscape scale value"
+                    title="Landscape scale value"
                   />
                 </div>
                 <div className="slider-container-with-buttons">
                   <button
                     type="button"
                     className="slider-button-decrement"
-                    onClick={() => setScale(Math.max(50, scale - 1))}
+                    onClick={() =>
+                      setLandscapeScale(Math.max(50, landscapeScale - 1))
+                    }
                     disabled={isPrinting}
                     aria-label="ลดค่า"
                   >
@@ -422,25 +539,88 @@ export default function PrintTest(): React.JSX.Element {
                   </button>
 
                   <input
-                    id="scale-slider"
+                    id="landscape-scale-slider"
                     type="range"
                     min="50"
                     max="150"
-                    value={scale}
-                    onChange={(e) => setScale(Number(e.target.value))}
+                    value={landscapeScale}
+                    onChange={(e) => setLandscapeScale(Number(e.target.value))}
                     className="slider slider-horizontal"
                   />
                   <button
                     type="button"
                     className="slider-button-increment"
-                    onClick={() => setScale(Math.min(150, scale + 1))}
+                    onClick={() =>
+                      setLandscapeScale(Math.min(150, landscapeScale + 1))
+                    }
                     disabled={isPrinting}
                     aria-label="เพิ่มค่า"
                   >
                     +
                   </button>
                 </div>
-              </div> */}
+              </div>
+
+              <div className="slider-item">
+                <div className="slider-container-label">
+                  <label
+                    htmlFor="portrait-scale-slider"
+                    className="slider-label"
+                  >
+                    Scale แนวตั้ง (Portrait)
+                  </label>
+                  <input
+                    type="number"
+                    min="50"
+                    max="150"
+                    value={portraitScale}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      if (!Number.isNaN(value) && value >= 50 && value <= 150) {
+                        setPortraitScale(value);
+                      }
+                    }}
+                    className="slider-value-input"
+                    disabled={isPrinting}
+                    aria-label="Portrait scale value"
+                    title="Portrait scale value"
+                  />
+                </div>
+                <div className="slider-container-with-buttons">
+                  <button
+                    type="button"
+                    className="slider-button-decrement"
+                    onClick={() =>
+                      setPortraitScale(Math.max(50, portraitScale - 1))
+                    }
+                    disabled={isPrinting}
+                    aria-label="ลดค่า"
+                  >
+                    −
+                  </button>
+
+                  <input
+                    id="portrait-scale-slider"
+                    type="range"
+                    min="50"
+                    max="150"
+                    value={portraitScale}
+                    onChange={(e) => setPortraitScale(Number(e.target.value))}
+                    className="slider slider-horizontal"
+                  />
+                  <button
+                    type="button"
+                    className="slider-button-increment"
+                    onClick={() =>
+                      setPortraitScale(Math.min(150, portraitScale + 1))
+                    }
+                    disabled={isPrinting}
+                    aria-label="เพิ่มค่า"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
 
               <div className="slider-item">
                 <div className="slider-container-label">
