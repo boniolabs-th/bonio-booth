@@ -1772,7 +1772,77 @@ ipcMain.handle('save-print-test-position', async (event, position: PrintTestPosi
   }
 });
 
-// Handler สำหรับ upload files
+// Handler สำหรับสร้าง photo session
+ipcMain.handle(
+  'create-photo-session',
+  async (
+    event,
+    transactionId: string,
+    transactionCode?: string,
+  ) => {
+    try {
+      const result = await machineService.createPhotoSession(
+        transactionId,
+        transactionCode,
+      );
+      return result;
+    } catch (error) {
+      console.error('❌ [Main] Error in create-photo-session handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        message: errorMessage,
+        error: errorMessage,
+        photoSession: {
+          id: '',
+          transactionId,
+          numPhotosSelected: 0,
+          status: 'failed',
+        },
+        qrcodeStorageUrl: '',
+      };
+    }
+  },
+);
+
+// Handler สำหรับ upload files ไปยัง session
+ipcMain.handle(
+  'upload-files-to-session',
+  async (
+    event,
+    sessionId: string,
+    photos: string[],
+    videos: string[] = [],
+  ) => {
+    try {
+      const result = await machineService.uploadFilesToSession(
+        sessionId,
+        photos,
+        videos,
+      );
+      return result;
+    } catch (error) {
+      console.error('❌ [Main] Error in upload-files-to-session handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        message: errorMessage,
+        error: errorMessage,
+        photoSession: {
+          id: sessionId,
+          transactionId: '',
+          numPhotosSelected: photos.length,
+          status: 'failed',
+        },
+        files: [],
+      };
+    }
+  },
+);
+
+// Handler สำหรับ upload files (Legacy - สำหรับ backward compatibility)
 ipcMain.handle(
   'upload-machine-files',
   async (

@@ -189,7 +189,7 @@ export default function MainShooting() {
   // WEBCAM Functions
   // ===========================================================================
 
-  const startWebcam = async (): Promise<void> => {
+  const startWebcam = async (config?: CameraConfig | null): Promise<void> => {
     try {
       setIsCameraLoading(true);
       setCameraError('');
@@ -203,8 +203,16 @@ export default function MainShooting() {
 
       console.log('📹 [Webcam] Requesting camera access...');
 
-      // ใช้ deviceId จาก config ที่โหลดมาแล้ว
-      const targetDeviceId = cameraConfig?.type === 'webcam' ? cameraConfig.deviceId : null;
+      // ใช้ deviceId จาก config ที่ส่งมา หรือจาก state (fallback)
+      // ใช้ parameter config ก่อน เพราะมันเป็นค่าที่โหลดมาใหม่และแน่ใจว่า update แล้ว
+      const configToUse = config || cameraConfig;
+      const targetDeviceId = configToUse?.type === 'webcam' ? configToUse.deviceId : null;
+      
+      console.log('📹 [Webcam] Using camera config:', {
+        hasConfig: !!configToUse,
+        deviceId: targetDeviceId,
+        configSource: config ? 'parameter' : 'state',
+      });
 
       // List available devices ก่อน
       let finalDeviceId = targetDeviceId;
@@ -835,7 +843,8 @@ export default function MainShooting() {
         if (loadedCameraType === 'canon') {
           await startCanonCamera();
         } else {
-          await startWebcam();
+          // ส่ง loadedConfig ไปให้ startWebcam เพื่อให้แน่ใจว่าใช้ config ที่ถูกต้อง
+          await startWebcam(loadedConfig);
         }
 
         // Wait for cameraCountdown to be loaded from API

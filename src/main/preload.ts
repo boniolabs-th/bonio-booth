@@ -77,6 +77,28 @@ const electronHandler = {
     getResourcesPath: () => {
       return ipcRenderer.invoke('get-resources-path');
     },
+    createPhotoSession: (
+      transactionId: string,
+      transactionCode?: string,
+    ) => {
+      return ipcRenderer.invoke(
+        'create-photo-session',
+        transactionId,
+        transactionCode,
+      );
+    },
+    uploadFilesToSession: (
+      sessionId: string,
+      photos: string[],
+      videos?: string[],
+    ) => {
+      return ipcRenderer.invoke(
+        'upload-files-to-session',
+        sessionId,
+        photos,
+        videos || [],
+      );
+    },
     uploadMachineFiles: (
       transactionCode: string,
       photos: string[],

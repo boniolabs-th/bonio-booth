@@ -203,6 +203,20 @@ export interface PhotoSession {
   transactionId: string;
   formatId?: string;
   numPhotosSelected: number;
+  status?: 'pending' | 'uploading' | 'success' | 'failed'; // Status ของ session
+}
+
+export interface CreatePhotoSessionRequest {
+  transactionId: string; // Required
+  transactionCode?: string; // Optional
+}
+
+export interface CreatePhotoSessionResponse {
+  success: boolean;
+  message: string;
+  photoSession: PhotoSession;
+  qrcodeStorageUrl: string; // URL สำหรับ QR code (ได้ทันที)
+  error?: string;
 }
 
 export interface UploadFilesResponse {
@@ -210,7 +224,7 @@ export interface UploadFilesResponse {
   message: string;
   photoSession: PhotoSession;
   files: UploadFile[];
-  qrcodeStorageUrl?: string; // URL สำหรับ QR code ที่เก็บไว้ใน storage
+  qrcodeStorageUrl?: string; // URL สำหรับ QR code ที่เก็บไว้ใน storage (deprecated: ใช้จาก createPhotoSession แทน)
   error?: string;
 }
 
@@ -685,7 +699,239 @@ export class MachineService {
   }
 
   /**
-   * 10. POST /api/machines-public/upload-files
+   * 10. POST /api/machines-public/photo-session/create
+   * สร้าง photo session และรับ QR code URL ทันที (ไม่ต้องรอ upload)
+   */
+  async createPhotoSession(
+    transactionId: string,
+    transactionCode?: string,
+    machineId?: string,
+  ): Promise<CreatePhotoSessionResponse> {
+    try {
+      const requestBody: CreatePhotoSessionRequest = {
+        transactionId,
+        ...(transactionCode && { transactionCode }),
+      };
+
+      const response = await this.makeRequest<CreatePhotoSessionResponse>(
+        '/api/machines-public/photo-session/create',
+        'POST',
+        requestBody,
+        machineId ? { machineId } : undefined,
+      );
+      return response;
+    } catch (error) {
+      console.error('❌ [MachineService] Create photo session failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 11. POST /api/machines-public/photo-session/{sessionId}/upload
+   * Upload รูปภาพและวิดีโอไปยัง session ที่สร้างไว้แล้ว (ใช้ form-data)
+   */
+  async uploadFilesToSession(
+    sessionId: string,
+    photos: string[], // Array of base64 data URLs
+    videos: string[] = [], // Array of base64 data URLs
+    machineId?: string,
+  ): Promise<UploadFilesResponse> {
+    // ใช้ logic เดียวกับ uploadFiles แต่เปลี่ยน endpoint และไม่ต้องส่ง transactionCode/transactionId
+    // เพราะใช้ sessionId แทน
+    try {
+      // Create multipart form data
+      const boundary = `----WebKitFormBoundary${Date.now()}`;
+      const formData: Buffer[] = [];
+
+      // Helper function to convert base64 data URL to buffer
+      const dataUrlToBuffer = (
+        dataUrl: string,
+      ): { buffer: Buffer; filename: string; mimeType: string } => {
+        if (!dataUrl.startsWith('data:')) {
+          throw new Error(`Invalid data URL format: ${dataUrl.substring(0, 50)}...`);
+        }
+
+        const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!matches) {
+          throw new Error(`Invalid data URL format: ${dataUrl.substring(0, 50)}...`);
+        }
+
+        const mimeType = matches[1];
+        const base64Data = matches[2];
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        // Determine file extension from mime type
+        let extension = 'bin';
+        if (mimeType.includes('image/jpeg') || mimeType.includes('image/jpg')) {
+          extension = 'jpg';
+        } else if (mimeType.includes('image/png')) {
+          extension = 'png';
+        } else if (mimeType.includes('image/gif')) {
+          extension = 'gif';
+        } else if (mimeType.includes('video/mp4')) {
+          extension = 'mp4';
+        } else if (mimeType.includes('video/webm')) {
+          extension = 'webm';
+        }
+
+        const filename = `file.${extension}`;
+
+        return { buffer, filename, mimeType };
+      };
+
+      // Add photos
+      for (let i = 0; i < photos.length; i++) {
+        try {
+          const { buffer, filename, mimeType } = dataUrlToBuffer(photos[i]);
+          formData.push(
+            Buffer.from(
+              `--${boundary}\r\nContent-Disposition: form-data; name="photos"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
+            ),
+          );
+          formData.push(buffer);
+          formData.push(Buffer.from('\r\n'));
+        } catch (error) {
+          console.error(`❌ [MachineService] Failed to process photo ${i + 1}:`, error);
+        }
+      }
+
+      // Add videos
+      for (let i = 0; i < videos.length; i++) {
+        try {
+          const { buffer, filename, mimeType } = dataUrlToBuffer(videos[i]);
+          formData.push(
+            Buffer.from(
+              `--${boundary}\r\nContent-Disposition: form-data; name="videos"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
+            ),
+          );
+          formData.push(buffer);
+          formData.push(Buffer.from('\r\n'));
+        } catch (error) {
+          console.error(`❌ [MachineService] Failed to process video ${i + 1}:`, error);
+        }
+      }
+
+      // Close boundary
+      formData.push(Buffer.from(`--${boundary}--\r\n`));
+
+      const formBuffer = Buffer.concat(formData);
+
+      // Make request
+      return new Promise((resolve, reject) => {
+        try {
+          const url = new URL(
+            `/api/machines-public/photo-session/${sessionId}/upload`,
+            this.apiBaseUrl,
+          );
+
+          // Add query parameters
+          if (machineId) {
+            url.searchParams.append('machineId', machineId);
+          }
+          if (this.machinePort) {
+            url.searchParams.append('port', String(this.machinePort));
+          }
+
+          const options = {
+            hostname: url.hostname,
+            port: url.port || (url.protocol === 'https:' ? 443 : 80),
+            path: url.pathname + url.search,
+            method: 'POST',
+            headers: {
+              'Content-Type': `multipart/form-data; boundary=${boundary}`,
+              'Content-Length': formBuffer.length.toString(),
+              'X-Machine-Port': String(this.machinePort),
+              ...(this.machineId && { 'X-Machine-Id': this.machineId }),
+            },
+          };
+
+          const protocol = url.protocol === 'https:' ? https : http;
+
+          const req = protocol.request(options, (res) => {
+            let data = '';
+
+            res.on('data', (chunk) => {
+              data += chunk;
+            });
+
+            res.on('end', () => {
+              try {
+                if (
+                  res.statusCode &&
+                  res.statusCode >= 200 &&
+                  res.statusCode < 300
+                ) {
+                  const jsonData = data ? JSON.parse(data) : {};
+                  resolve(jsonData as UploadFilesResponse);
+                } else {
+                  let errorMessage = `HTTP ${res.statusCode}`;
+                  try {
+                    const errorData = JSON.parse(data);
+                    errorMessage =
+                      errorData.message || errorData.error || errorMessage;
+                  } catch {
+                    errorMessage = data || errorMessage;
+                  }
+                  console.error('❌ [MachineService] Upload to session failed:', errorMessage);
+                  reject(new Error(errorMessage));
+                }
+              } catch (parseError) {
+                console.error('❌ [MachineService] Parse error:', parseError, 'Data:', data);
+                reject(new Error(`Failed to parse response: ${data}`));
+              }
+            });
+          });
+
+          req.on('error', (error) => {
+            console.error('❌ [MachineService] Request error:', error);
+            reject(error);
+          });
+
+          // Timeout สำหรับ upload ไฟล์ใหญ่
+          const fileSizeMB = formBuffer.length / (1024 * 1024);
+          const calculatedTimeout = Math.max(60000, fileSizeMB * 10000);
+          const uploadTimeout = Math.min(calculatedTimeout, 300000); // สูงสุด 5 นาที
+
+          req.setTimeout(uploadTimeout, () => {
+            console.error(`❌ [MachineService] Upload timeout after ${uploadTimeout / 1000}s`);
+            req.destroy();
+            reject(new Error(`Upload timeout after ${uploadTimeout / 1000} seconds`));
+          });
+
+          // Write form buffer in chunks
+          const chunkSize = 1024 * 1024; // 1MB per chunk
+          let bytesWritten = 0;
+
+          const writeChunk = () => {
+            if (bytesWritten >= formBuffer.length) {
+              req.end();
+              return;
+            }
+
+            const chunk = formBuffer.slice(bytesWritten, bytesWritten + chunkSize);
+            const canContinue = req.write(chunk);
+            bytesWritten += chunk.length;
+
+            if (!canContinue) {
+              req.once('drain', writeChunk);
+            } else {
+              setImmediate(writeChunk);
+            }
+          };
+
+          writeChunk();
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
+    } catch (error) {
+      console.error('❌ [MachineService] Upload files to session failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 12. POST /api/machines-public/upload-files (Legacy - สำหรับ backward compatibility)
    * Upload รูปภาพและวิดีโอ (ใช้ form-data)
    */
   async uploadFiles(

@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { FrameConfig, FILTERS } from '../../utils/frameConfig';
 import { generateBoomerangAssets } from '../../utils/boomerang';
 import {
@@ -638,6 +638,76 @@ export default function PhotoResult() {
     'idle' | 'printing' | 'success' | 'error'
   >('idle');
   const [compiledVideoUrl, setCompiledVideoUrl] = useState<string | null>(null);
+  const [isCreatingVideo, setIsCreatingVideo] = useState(false);
+  const [isApplyingLUT, setIsApplyingLUT] = useState(false);
+  const hasGeneratedVideo = useRef(false);
+  const [previewBoomerangGif, setPreviewBoomerangGif] = useState<string | null>(
+    null,
+  );
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+  const [qrcodeStorageUrl, setQrcodeStorageUrl] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null); // เก็บ sessionId สำหรับ upload files
+  const [isUploading, setIsUploading] = useState(false);
+  const hasUploaded = useRef(false); // ป้องกันการ upload ซ้ำ
+  const hasCreatedSession = useRef(false); // ป้องกันการสร้าง session ซ้ำ
+
+  // สร้าง photo session ทันทีเมื่อมี transactionId (เพื่อรับ qrcodeStorageUrl ทันที)
+  useEffect(() => {
+    if (state?.transactionId && !hasCreatedSession.current) {
+      const createSession = async () => {
+        try {
+          hasCreatedSession.current = true;
+          console.log(
+            '📸 [PhotoResult] Creating photo session to get QR code URL immediately...',
+          );
+
+          // Format transaction code (optional)
+          const transactionCode = state.referenceId
+            ? state.referenceId.startsWith('TXN-')
+              ? state.referenceId
+              : `TXN-${state.referenceId}`
+            : undefined;
+
+          const sessionResult =
+            await window.electron.payment.createPhotoSession(
+              state.transactionId,
+              transactionCode,
+            );
+
+          if (sessionResult.success && sessionResult.qrcodeStorageUrl) {
+            console.log(
+              '✅ [PhotoResult] Photo session created! QR Code URL:',
+              sessionResult.qrcodeStorageUrl,
+            );
+            // Set state ทันทีเพื่อให้ QR code แสดงได้เลย
+            setQrcodeStorageUrl(sessionResult.qrcodeStorageUrl);
+            setSessionId(sessionResult.photoSession.id);
+            console.log(
+              '✅ [PhotoResult] Session ID:',
+              sessionResult.photoSession.id,
+            );
+            console.log(
+              '✅ [PhotoResult] QR code should be visible now!',
+            );
+          } else {
+            console.error(
+              '❌ [PhotoResult] Failed to create photo session:',
+              sessionResult.error || sessionResult.message,
+            );
+            hasCreatedSession.current = false; // Reset เพื่อให้ลองใหม่ได้
+          }
+        } catch (error) {
+          console.error(
+            '❌ [PhotoResult] Error creating photo session:',
+            error,
+          );
+          hasCreatedSession.current = false; // Reset เพื่อให้ลองใหม่ได้
+        }
+      };
+
+      createSession();
+    }
+  }, [state?.transactionId, state?.referenceId]);
 
   // Log เมื่อ compiledVideoUrl เปลี่ยน และ trigger upload ถ้าพร้อม
   useEffect(() => {
@@ -669,16 +739,6 @@ export default function PhotoResult() {
     state?.referenceId,
     state?.transactionId,
   ]);
-  const [isCreatingVideo, setIsCreatingVideo] = useState(false);
-  const [isApplyingLUT, setIsApplyingLUT] = useState(false);
-  const hasGeneratedVideo = useRef(false);
-  const [previewBoomerangGif, setPreviewBoomerangGif] = useState<string | null>(
-    null,
-  );
-  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
-  const [qrcodeStorageUrl, setQrcodeStorageUrl] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const hasUploaded = useRef(false); // ป้องกันการ upload ซ้ำ
   const [orientationLog, setOrientationLog] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const gifImageRef = useRef<HTMLImageElement | null>(null);
@@ -1449,13 +1509,26 @@ export default function PhotoResult() {
           );
         }
 
+        // ตรวจสอบว่ามี sessionId หรือไม่ (ควรมีจาก createPhotoSession แล้ว)
+        if (!sessionId) {
+          console.warn(
+            '⚠️ [PhotoResult] No sessionId found! Waiting for session to be created...',
+          );
+          // รอ sessionId สักครู่ (อาจจะยังสร้าง session ไม่เสร็จ)
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          if (!sessionId) {
+            throw new Error(
+              'Session ID is required. Please ensure photo session was created successfully.',
+            );
+          }
+        }
+
         console.log(
           '📤 [PhotoResult] ========== CALLING UPLOAD API ==========',
         );
-        console.log('📤 [PhotoResult] Calling uploadMachineFiles API...');
+        console.log('📤 [PhotoResult] Calling uploadFilesToSession API...');
         console.log('📤 [PhotoResult] Upload parameters:', {
-          transactionCode,
-          transactionId: state.transactionId,
+          sessionId,
           photosCount: photos.length,
           videosCount: videos.length,
         });
@@ -1472,24 +1545,20 @@ export default function PhotoResult() {
           '📤 [PhotoResult] =========================================',
         );
 
-        const uploadResult = await window.electron.payment.uploadMachineFiles(
-          transactionCode,
+        // ใช้ uploadFilesToSession แทน uploadMachineFiles (ใช้ sessionId)
+        const uploadResult = await window.electron.payment.uploadFilesToSession(
+          sessionId,
           photos,
           videos,
-          state.transactionId,
         );
 
         console.log('📤 [PhotoResult] Upload result:', uploadResult);
 
-        // เก็บ qrcodeStorageUrl จาก response (เช็คก่อน condition อื่นๆ)
-        if (uploadResult.qrcodeStorageUrl) {
-          console.log(
-            '✅ [PhotoResult] QR Code Storage URL:',
-            uploadResult.qrcodeStorageUrl,
+        // qrcodeStorageUrl ควรมีอยู่แล้วจาก createPhotoSession (ไม่ต้องรอจาก upload)
+        if (!qrcodeStorageUrl) {
+          console.warn(
+            '⚠️ [PhotoResult] No qrcodeStorageUrl found (should have been set from createPhotoSession)',
           );
-          setQrcodeStorageUrl(uploadResult.qrcodeStorageUrl);
-        } else {
-          console.warn('⚠️ [PhotoResult] No qrcodeStorageUrl in response');
         }
 
         if (uploadResult.success && uploadResult.files?.length > 0) {
@@ -1851,12 +1920,25 @@ export default function PhotoResult() {
                 videosCount: videos.length,
               });
 
+              // ตรวจสอบว่ามี sessionId หรือไม่
+              if (!sessionId) {
+                console.warn(
+                  '⚠️ [PhotoResult] No sessionId found! Waiting for session to be created...',
+                );
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+                if (!sessionId) {
+                  throw new Error(
+                    'Session ID is required. Please ensure photo session was created successfully.',
+                  );
+                }
+              }
+
+              // ใช้ uploadFilesToSession แทน uploadMachineFiles (ใช้ sessionId)
               const uploadResult =
-                await window.electron.payment.uploadMachineFiles(
-                  transactionCode,
+                await window.electron.payment.uploadFilesToSession(
+                  sessionId,
                   photos,
                   videos,
-                  state.transactionId,
                 );
 
               console.log('📤 [PhotoResult] Upload result (from useEffect):', {
@@ -1874,8 +1956,11 @@ export default function PhotoResult() {
 
               if (uploadResult.success) {
                 console.log('✅ [PhotoResult] Upload successful with video!');
-                if (uploadResult.qrcodeStorageUrl) {
-                  setQrcodeStorageUrl(uploadResult.qrcodeStorageUrl);
+                // qrcodeStorageUrl ควรมีอยู่แล้วจาก createPhotoSession (ไม่ต้องรอจาก upload)
+                if (!qrcodeStorageUrl) {
+                  console.warn(
+                    '⚠️ [PhotoResult] No qrcodeStorageUrl found (should have been set from createPhotoSession)',
+                  );
                 }
               }
 
@@ -1916,35 +2001,22 @@ export default function PhotoResult() {
     handleFinish();
   }, [handleFinish]);
 
-  const generateQRCode = () => {
-    // ใช้ qrcodeStorageUrl จาก API response เป็น data สำหรับสร้าง QR code
-    // qrcodeStorageUrl เป็น URL ของ photosession ที่ต้องใช้สร้าง QR code
+  // Generate QR code URL จาก qrcodeStorageUrl (ใช้ useMemo เพื่อไม่ให้ generate ซ้ำ)
+  // ควรได้ URL จาก createPhotoSession ที่เดียว ไม่ต้องมี fallback
+  const qrCodeUrl = useMemo(() => {
     if (qrcodeStorageUrl) {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrcodeStorageUrl)}`;
       console.log(
-        '📱 [PhotoResult] Generating QR code from qrcodeStorageUrl:',
-        qrcodeStorageUrl,
+        '📱 [PhotoResult] QR code URL generated immediately:',
+        qrUrl.substring(0, 100) + '...',
       );
       // สร้าง QR code จาก qrcodeStorageUrl โดยใช้ external QR code generator
-      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrcodeStorageUrl)}`;
-      return qrCodeUrl;
+      return qrUrl;
     }
-
-    // Fallback: Generate QR code from uploaded file URL (ถ้าไม่มี qrcodeStorageUrl)
-    if (uploadedFileUrl) {
-      console.log(
-        '📱 [PhotoResult] Generating QR code from uploadedFileUrl (fallback)',
-      );
-      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(uploadedFileUrl)}`;
-      return qrCodeUrl;
-    }
-
-    // Fallback: Generate QR code for the final image or download link
-    // For demo purposes, this would be a placeholder
-    console.warn(
-      '⚠️ [PhotoResult] No QR code URL available, using placeholder',
-    );
-    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMTAgMTBoODB2ODBIMTBWMTB6IiBmaWxsPSJibGFjayIvPgo8cGF0aCBkPSJNMjAgMjBoNjB2NjBIMjBWMjB6IiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMzAgMzBoNDB2NDBIMzBWMzB6IiBmaWxsPSJibGFjayIvPgo8L3N2Zz4K';
-  };
+    // ถ้ายังไม่มี qrcodeStorageUrl ให้ return null (จะแสดง loading แทน)
+    console.log('⚠️ [PhotoResult] No qrcodeStorageUrl yet, QR code URL is null');
+    return null;
+  }, [qrcodeStorageUrl]);
 
   const handleDownloadGif = () => {
     // Download compiled video
@@ -2112,7 +2184,61 @@ export default function PhotoResult() {
           <div className="download-content">
             <h2 className="download-title">Download GIF File</h2>
 
-            {isCreatingVideo ? (
+            {/* แสดง QR code ทันทีที่ qrCodeUrl มีค่า (ไม่ต้องรอ video หรือ upload) */}
+            {qrCodeUrl ? (
+              <div className="qr-display">
+                <img
+                  src={qrCodeUrl}
+                  alt="QR Code"
+                  className="qr-code"
+                  onLoad={() => {
+                    console.log(
+                      '✅ [PhotoResult] QR code image loaded successfully',
+                    );
+                  }}
+                  onError={(e) => {
+                    console.error(
+                      '❌ [PhotoResult] QR code image failed to load:',
+                      e,
+                    );
+                  }}
+                />
+                {/* แสดงสถานะการทำงานด้านล่าง QR code */}
+                {isCreatingVideo && (
+                  <p
+                    style={{
+                      fontSize: '12px',
+                      color: '#666',
+                      marginTop: '8px',
+                    }}
+                  >
+                    กำลังสร้างวิดีโอ...
+                  </p>
+                )}
+                {isApplyingLUT && (
+                  <p
+                    style={{
+                      fontSize: '12px',
+                      color: '#666',
+                      marginTop: '8px',
+                    }}
+                  >
+                    กำลังประมวลผล Filter...
+                  </p>
+                )}
+                {isUploading && (
+                  <p
+                    style={{
+                      fontSize: '12px',
+                      color: '#666',
+                      marginTop: '8px',
+                    }}
+                  >
+                    กำลังอัปโหลดไฟล์...
+                  </p>
+                )}
+              </div>
+            ) : isCreatingVideo ? (
               <div className="creating-video-message">
                 <div className="loading-spinner" />
                 <p>กำลังสร้างวิดีโอของคุณ...</p>
@@ -2122,14 +2248,10 @@ export default function PhotoResult() {
                 <div className="loading-spinner" />
                 <p>กำลังประมวลผล Filter...</p>
               </div>
-            ) : isUploading ? (
-              <div className="creating-video-message">
-                <div className="loading-spinner" />
-                <p>กำลังอัปโหลดไฟล์...</p>
-              </div>
             ) : (
-              <div className="qr-display">
-                <img src={generateQRCode()} alt="QR Code" className="qr-code" />
+              <div className="qr-loading">
+                <div className="loading-spinner" />
+                <p>กำลังสร้าง QR Code...</p>
               </div>
             )}
           </div>
