@@ -60,14 +60,25 @@ export default function OutOfPaper() {
     return undefined;
   }, [isMaintenanceMode, navigate]);
 
-  // Generate QR Code for LINE
-  const generateQRCode = () => {
+  // Generate QR Code for LINE using library
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
     if (lineUrl) {
-      return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(lineUrl)}`;
+      import('../../utils/qrCodeUtils').then(({ generateQRCodeDataUrl }) => {
+        generateQRCodeDataUrl(lineUrl, 200, 'M')
+          .then((dataUrl) => {
+            setQrCodeDataUrl(dataUrl);
+          })
+          .catch((error) => {
+            console.error('❌ [OutOfPaper] Failed to generate QR code:', error);
+            setQrCodeDataUrl(null);
+          });
+      });
+    } else {
+      setQrCodeDataUrl(null);
     }
-    // Fallback if no URL available (or use a placeholder)
-    return '';
-  };
+  }, [lineUrl]);
 
   return (
     <div className="get-outofpaper-container">
@@ -88,11 +99,15 @@ export default function OutOfPaper() {
 
         <div className="outofpaper-qr-section">
           <div className="qr-code-container">
-            <img
-              src={generateQRCode()}
-              alt="LINE QR Code"
-              className="qr-code-image"
-            />
+            {qrCodeDataUrl ? (
+              <img
+                src={qrCodeDataUrl}
+                alt="LINE QR Code"
+                className="qr-code-image"
+              />
+            ) : (
+              <div className="qr-code-loading">กำลังสร้าง QR Code...</div>
+            )}
           </div>
         </div>
       </div>

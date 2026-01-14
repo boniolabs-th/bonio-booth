@@ -2001,21 +2001,26 @@ export default function PhotoResult() {
     handleFinish();
   }, [handleFinish]);
 
-  // Generate QR code URL จาก qrcodeStorageUrl (ใช้ useMemo เพื่อไม่ให้ generate ซ้ำ)
-  // ควรได้ URL จาก createPhotoSession ที่เดียว ไม่ต้องมี fallback
-  const qrCodeUrl = useMemo(() => {
+  // Generate QR code data URL จาก qrcodeStorageUrl (ใช้ library แทน external service)
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
     if (qrcodeStorageUrl) {
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrcodeStorageUrl)}`;
-      console.log(
-        '📱 [PhotoResult] QR code URL generated immediately:',
-        qrUrl.substring(0, 100) + '...',
-      );
-      // สร้าง QR code จาก qrcodeStorageUrl โดยใช้ external QR code generator
-      return qrUrl;
+      // Import และ generate QR code โดยใช้ library
+      import('../../utils/qrCodeUtils').then(({ generateQRCodeDataUrl }) => {
+        generateQRCodeDataUrl(qrcodeStorageUrl, 200, 'M')
+          .then((dataUrl) => {
+            console.log('📱 [PhotoResult] QR code generated successfully');
+            setQrCodeDataUrl(dataUrl);
+          })
+          .catch((error) => {
+            console.error('❌ [PhotoResult] Failed to generate QR code:', error);
+            setQrCodeDataUrl(null);
+          });
+      });
+    } else {
+      setQrCodeDataUrl(null);
     }
-    // ถ้ายังไม่มี qrcodeStorageUrl ให้ return null (จะแสดง loading แทน)
-    console.log('⚠️ [PhotoResult] No qrcodeStorageUrl yet, QR code URL is null');
-    return null;
   }, [qrcodeStorageUrl]);
 
   const handleDownloadGif = () => {
@@ -2184,11 +2189,11 @@ export default function PhotoResult() {
           <div className="download-content">
             <h2 className="download-title">Download GIF File</h2>
 
-            {/* แสดง QR code ทันทีที่ qrCodeUrl มีค่า (ไม่ต้องรอ video หรือ upload) */}
-            {qrCodeUrl ? (
+            {/* แสดง QR code ทันทีที่ qrCodeDataUrl มีค่า (ไม่ต้องรอ video หรือ upload) */}
+            {qrCodeDataUrl ? (
               <div className="qr-display">
                 <img
-                  src={qrCodeUrl}
+                  src={qrCodeDataUrl}
                   alt="QR Code"
                   className="qr-code"
                   onLoad={() => {
