@@ -1,6 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { FrameConfig, FILTERS } from '../../utils/frameConfig';
 import { generateBoomerangAssets } from '../../utils/boomerang';
 import {
@@ -2001,22 +2002,6 @@ export default function PhotoResult() {
     handleFinish();
   }, [handleFinish]);
 
-  // Generate QR code URL จาก qrcodeStorageUrl (ใช้ useMemo เพื่อไม่ให้ generate ซ้ำ)
-  // ควรได้ URL จาก createPhotoSession ที่เดียว ไม่ต้องมี fallback
-  const qrCodeUrl = useMemo(() => {
-    if (qrcodeStorageUrl) {
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrcodeStorageUrl)}`;
-      console.log(
-        '📱 [PhotoResult] QR code URL generated immediately:',
-        qrUrl.substring(0, 100) + '...',
-      );
-      // สร้าง QR code จาก qrcodeStorageUrl โดยใช้ external QR code generator
-      return qrUrl;
-    }
-    // ถ้ายังไม่มี qrcodeStorageUrl ให้ return null (จะแสดง loading แทน)
-    console.log('⚠️ [PhotoResult] No qrcodeStorageUrl yet, QR code URL is null');
-    return null;
-  }, [qrcodeStorageUrl]);
 
   const handleDownloadGif = () => {
     // Download compiled video
@@ -2184,24 +2169,14 @@ export default function PhotoResult() {
           <div className="download-content">
             <h2 className="download-title">Download GIF File</h2>
 
-            {/* แสดง QR code ทันทีที่ qrCodeUrl มีค่า (ไม่ต้องรอ video หรือ upload) */}
-            {qrCodeUrl ? (
+            {/* แสดง QR code ทันทีที่ qrcodeStorageUrl มีค่า (ไม่ต้องรอ video หรือ upload) */}
+            {qrcodeStorageUrl ? (
               <div className="qr-display">
-                <img
-                  src={qrCodeUrl}
-                  alt="QR Code"
+                <QRCodeSVG
+                  value={qrcodeStorageUrl}
+                  size={200}
+                  level="M"
                   className="qr-code"
-                  onLoad={() => {
-                    console.log(
-                      '✅ [PhotoResult] QR code image loaded successfully',
-                    );
-                  }}
-                  onError={(e) => {
-                    console.error(
-                      '❌ [PhotoResult] QR code image failed to load:',
-                      e,
-                    );
-                  }}
                 />
                 {/* แสดงสถานะการทำงานด้านล่าง QR code */}
                 {isCreatingVideo && (
