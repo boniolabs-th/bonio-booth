@@ -173,6 +173,7 @@
     "productName": "Bonio Booth",
     "appId": "org.erb.BonioBooth",
     "asar": true,
+    "npmRebuild": false,
     "afterSign": ".erb/scripts/notarize.js",
     "asarUnpack": [
       "**/*.{node,dll}",
