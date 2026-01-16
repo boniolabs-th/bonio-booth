@@ -86,6 +86,7 @@ import {
   setMainWindow as setCanonMainWindow,
   isCameraConnected as isCanonCameraConnected,
 } from './services/canonCameraService';
+import { registerCanonCameraV2IpcHandlers } from './services/canonCameraServiceV2';
 import {
   getPrinterConfig,
   savePrinterConfig,
@@ -1035,6 +1036,10 @@ app
     // Register Canon Camera IPC handlers
     registerCanonCameraIpcHandlers();
     log.info('[Main] Canon Camera IPC handlers registered');
+
+    // Register Canon Camera V2 IPC handlers (using @brick-a-brack/napi-canon-cameras)
+    registerCanonCameraV2IpcHandlers();
+    log.info('[Main] Canon Camera V2 IPC handlers registered');
 
     createWindow();
 

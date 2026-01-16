@@ -462,7 +462,7 @@ export default function PhotoFilter() {
             }
           });
 
-          resolve(canvas.toDataURL('image/png'));
+          resolve(canvas.toDataURL('image/jpeg', 1.0));
         } catch (error) {
           reject(error);
         }
@@ -521,7 +521,7 @@ export default function PhotoFilter() {
               img.onload = () => {
                 dCtx.drawImage(img, 0, 0);
                 dCtx.drawImage(img, frameWidth, 0);
-                printImage = doubleCanvas.toDataURL('image/png');
+                printImage = doubleCanvas.toDataURL('image/jpeg', 1.0);
                 resolve();
               };
               img.src = filteredFinalImage;

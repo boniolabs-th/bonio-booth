@@ -1,10 +1,40 @@
 /**
  * Helper utilities for using LUT Worker
+ * Uses chunked processing to handle large images without timeout
+ * Uses WebGL for large images (Canon cameras) when GPU is available
  */
 
 import { LUT3D } from './lutProcessor';
+import { applyLUTWithWebGL, isWebGLAvailable, cleanupWebGL } from './lutWebGL';
 
 let worker: Worker | null = null;
+
+// Threshold for using WebGL (4 megapixels = ~2000x2000)
+// Canon images are typically 24MP+ so they will use WebGL
+const WEBGL_THRESHOLD_PIXELS = 4_000_000;
+
+// Cache WebGL availability check
+let webGLAvailable: boolean | null = null;
+
+/**
+ * Check if WebGL should be used for this image
+ */
+const shouldUseWebGL = (width: number, height: number): boolean => {
+  const pixelCount = width * height;
+
+  // Only use WebGL for large images (likely from Canon camera)
+  if (pixelCount < WEBGL_THRESHOLD_PIXELS) {
+    return false;
+  }
+
+  // Check WebGL availability (cache result)
+  if (webGLAvailable === null) {
+    webGLAvailable = isWebGLAvailable();
+    console.log(`[LUT] WebGL available: ${webGLAvailable}`);
+  }
+
+  return webGLAvailable;
+};
 
 /**
  * Initialize LUT Worker
@@ -20,11 +50,38 @@ export const initLUTWorker = (): Worker => {
 
 /**
  * Apply LUT using Web Worker (non-blocking)
+ * Supports progress callback for large images
+ * Automatically uses WebGL for large images (Canon) when GPU available
  */
 export const applyLUTWithWorker = (
   canvas: HTMLCanvasElement,
   lut: LUT3D,
+  onProgress?: (progress: number) => void,
 ): Promise<HTMLCanvasElement> => {
+  // Log image size for debugging
+  const pixelCount = canvas.width * canvas.height;
+  const megaPixels = (pixelCount / 1000000).toFixed(1);
+  console.log(`[LUT] Processing ${canvas.width}x${canvas.height} (${megaPixels}MP)`);
+
+  // Use WebGL for large images (Canon cameras typically 24MP+)
+  if (shouldUseWebGL(canvas.width, canvas.height)) {
+    console.log(`[LUT] Using WebGL acceleration for large image`);
+
+    try {
+      const result = applyLUTWithWebGL(canvas, lut);
+      if (result) {
+        // WebGL succeeded
+        if (onProgress) onProgress(100);
+        return Promise.resolve(result);
+      }
+      // WebGL returned null, fall through to CPU
+      console.warn(`[LUT] WebGL returned null, falling back to CPU`);
+    } catch (error) {
+      console.warn(`[LUT] WebGL failed, falling back to CPU:`, error);
+    }
+  }
+
+  // Use Web Worker (CPU) for smaller images or as fallback
   return new Promise((resolve, reject) => {
     const w = initLUTWorker();
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -37,17 +94,44 @@ export const applyLUTWithWorker = (
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const requestId = Math.random().toString(36).substring(7);
 
+    // Clone imageData for transfer (create a new ArrayBuffer)
+    const clonedData = new Uint8ClampedArray(imageData.data);
+    const clonedImageData = new ImageData(clonedData, imageData.width, imageData.height);
+
+    // Track last progress time for timeout detection
+    let lastProgressTime = Date.now();
+    const PROGRESS_TIMEOUT = 30000; // 30s without progress = timeout
+
     // Send to worker
     w.postMessage({
       type: 'APPLY_LUT',
-      imageData,
-      lut,
+      imageData: clonedImageData,
+      lut: {
+        size: lut.size,
+        data: Array.from(lut.data), // Convert Float32Array to regular array
+        domainMin: lut.domainMin,
+        domainMax: lut.domainMax,
+      },
       requestId,
     });
 
     // Listen for response
     const handleMessage = (e: MessageEvent) => {
-      if (e.data.type === 'LUT_APPLIED' && e.data.requestId === requestId) {
+      if (e.data.requestId !== requestId) return;
+
+      // Handle progress updates
+      if (e.data.type === 'LUT_PROGRESS') {
+        lastProgressTime = Date.now();
+        if (onProgress) {
+          onProgress(e.data.progress);
+        }
+        return;
+      }
+
+      // Handle completion
+      if (e.data.type === 'LUT_APPLIED') {
+        clearInterval(timeoutChecker);
+
         // Create result canvas
         const resultCanvas = document.createElement('canvas');
         resultCanvas.width = canvas.width;
@@ -55,32 +139,40 @@ export const applyLUTWithWorker = (
         const resultCtx = resultCanvas.getContext('2d');
 
         if (!resultCtx) {
+          w.removeEventListener('message', handleMessage);
           reject(new Error('Failed to create result canvas'));
           return;
         }
 
         resultCtx.putImageData(e.data.imageData, 0, 0);
         w.removeEventListener('message', handleMessage);
+
+        console.log(`[LUT] Processing complete`);
         resolve(resultCanvas);
       }
     };
 
     w.addEventListener('message', handleMessage);
 
-    // Timeout after 10 seconds
-    setTimeout(() => {
-      w.removeEventListener('message', handleMessage);
-      reject(new Error('LUT processing timeout'));
-    }, 10000);
+    // Check for progress timeout (no progress for 30s = stuck)
+    const timeoutChecker = setInterval(() => {
+      const elapsed = Date.now() - lastProgressTime;
+      if (elapsed > PROGRESS_TIMEOUT) {
+        clearInterval(timeoutChecker);
+        w.removeEventListener('message', handleMessage);
+        reject(new Error(`LUT processing timeout (no progress for ${PROGRESS_TIMEOUT / 1000}s)`));
+      }
+    }, 5000);
   });
 };
 
 /**
- * Terminate worker
+ * Terminate worker and cleanup WebGL
  */
 export const terminateLUTWorker = (): void => {
   if (worker) {
     worker.terminate();
     worker = null;
   }
+  cleanupWebGL();
 };

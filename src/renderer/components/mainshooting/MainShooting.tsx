@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BackButton } from '..';
 import { FrameConfig } from '../../utils/frameConfig';
-import useCanonCamera from '../../hooks/useCanonCamera';
+import useCanonCameraV2 from '../../hooks/useCanonCameraV2';
 import './MainShooting.css';
 
 type CameraType = 'webcam' | 'canon';
@@ -172,8 +172,8 @@ export default function MainShooting() {
   // Canon camera ref for live view image
   const canonLiveViewRef = useRef<HTMLImageElement>(null);
 
-  // Canon camera hook
-  const canonCamera = useCanonCamera();
+  // Canon camera hook (V2 - uses @brick-a-brack/napi-canon-cameras)
+  const canonCamera = useCanonCameraV2();
 
   const handleBack = () => {
     // Stop camera when going back
@@ -207,7 +207,7 @@ export default function MainShooting() {
       // ใช้ parameter config ก่อน เพราะมันเป็นค่าที่โหลดมาใหม่และแน่ใจว่า update แล้ว
       const configToUse = config || cameraConfig;
       const targetDeviceId = configToUse?.type === 'webcam' ? configToUse.deviceId : null;
-      
+
       console.log('📹 [Webcam] Using camera config:', {
         hasConfig: !!configToUse,
         deviceId: targetDeviceId,
@@ -455,7 +455,7 @@ export default function MainShooting() {
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0);
 
-      const photoData = canvas.toDataURL('image/png');
+      const photoData = canvas.toDataURL('image/jpeg', 1.0);
 
       // Flash effect
       setShowFlash(true);
@@ -622,45 +622,39 @@ export default function MainShooting() {
 
     console.log(`📷 [Canon] Captured ${recording.frames.length} frames`);
 
-    // Create video from recorded frames for boomerang
+    // Return frames data for background processing later
+    // Instead of blocking here, we'll process video in background
     if (recording.frames.length > 0) {
-      try {
-        const videoUrl = await createVideoFromFrames(recording.frames, 30);
-        return videoUrl;
-      } catch (error) {
-        console.error('❌ [Canon] Failed to create video from frames:', error);
-        return '';
-      }
+      // Store frames for background processing - return placeholder
+      // The actual video will be created in background after shutter
+      return JSON.stringify({ frames: recording.frames, pending: true });
     }
 
     return '';
-  }, [canonCamera, createVideoFromFrames]);
+  }, [canonCamera]);
 
   const takeCanonPhoto = useCallback(async (): Promise<string> => {
-    console.log('📷 [Canon] Taking photo from Live View...');
+    console.log('📷 [Canon] Taking photo with shutter...');
 
     // Flash effect
     setShowFlash(true);
     setTimeout(() => setShowFlash(false), 150);
 
-    // Use Live View frame directly - keeps Live View running smoothly
-    // Live View resolution (~1920x1280) is sufficient for 4x6" prints at 300 DPI
-    // and provides instant capture without camera shutter delay
-    const currentFrame = canonCamera.getCurrentFrame();
-    if (currentFrame) {
-      console.log('✅ [Canon] Photo captured from Live View');
-      return currentFrame;
-    }
+    try {
+      // Use shutter only - no fallback to Live View
+      const result = await canonCamera.takePicture();
 
-    // Fallback: try liveViewFrame state
-    const liveViewFrame = canonCamera.liveViewFrame;
-    if (liveViewFrame) {
-      console.log('✅ [Canon] Photo captured from liveViewFrame state');
-      return liveViewFrame;
-    }
+      if (result.success && result.imageData) {
+        console.log('✅ [Canon] Photo captured with shutter!');
+        return result.imageData;
+      }
 
-    console.error('❌ [Canon] No Live View frame available');
-    return '';
+      console.error('❌ [Canon] Shutter capture failed:', result.error);
+      return '';
+    } catch (error) {
+      console.error('❌ [Canon] Shutter capture error:', error);
+      return '';
+    }
   }, [canonCamera]);
 
   // ===========================================================================
@@ -890,9 +884,9 @@ export default function MainShooting() {
               console.log(`✅ Countdown finished for capture ${i + 1}`);
             });
 
-            // Stop recording and get video URL (or empty for Canon)
+            // Stop recording and get frames data (for Canon) or video URL (for webcam)
             // eslint-disable-next-line no-await-in-loop
-            const videoUrl = await stopRecording();
+            const recordingData = await stopRecording();
 
             // Take photo immediately after countdown
             // eslint-disable-next-line no-await-in-loop
@@ -900,11 +894,59 @@ export default function MainShooting() {
 
             console.log(`📷 [Capture ${i + 1}] photoData received:`, photoData ? `${photoData.substring(0, 50)}...` : 'EMPTY');
 
-            // Add capture to array (for Canon, videoUrl will be empty)
+            // Process video for Canon
+            let videoUrl = '';
+            // Store frames for boomerang if needed
+            let boomerangFrames: string[] | undefined;
+
+            if (cameraTypeRef.current === 'canon' && recordingData) {
+              try {
+                const data = JSON.parse(recordingData);
+                if (data.pending && data.frames?.length > 0) {
+                  boomerangFrames = data.frames;
+                  // Handle video creation in background (don't await)
+                  // This prevents blocking the UI and next capture countdown
+                  console.log(`📷 [Canon] Creating video in background from ${data.frames.length} frames...`);
+
+                  // Capture index for updating state later
+                  const currentCaptureIndex = i;
+
+                  createVideoFromFrames(data.frames, 30).then(url => {
+                    console.log(`✅ [Canon] Background video ready for capture ${currentCaptureIndex + 1}: ${url}`);
+                    // Update state with the generated video URL
+                    setCaptures(prevCaptures => {
+                      const updated = [...prevCaptures];
+                      if (updated[currentCaptureIndex]) {
+                        updated[currentCaptureIndex] = {
+                          ...updated[currentCaptureIndex],
+                          video: url
+                        };
+                      }
+                      return updated;
+                    });
+
+                    // Also update the local array reference if needed (though next iterations just append)
+                    if (newCaptures[currentCaptureIndex]) {
+                      newCaptures[currentCaptureIndex].video = url;
+                    }
+                  }).catch(err => {
+                    console.error('❌ [Canon] Background video processing failed:', err);
+                  });
+                }
+              } catch (err) {
+                console.error('❌ [Canon] Video data parse failed:', err);
+              }
+            } else {
+              // Webcam - recordingData is already a video URL
+              videoUrl = recordingData || '';
+            }
+
+            // Add capture to array
             if (photoData) {
               newCaptures.push({
-                video: videoUrl || '',
+                video: videoUrl, // Will be empty initially for Canon, updated later
                 photo: photoData,
+                boomerangFrames, // Store frames for potential use
               });
               // Update state to show progress
               setCaptures([...newCaptures]);
@@ -913,10 +955,10 @@ export default function MainShooting() {
               console.error(`❌ Capture ${i + 1} FAILED - no photoData`);
             }
 
-            // Wait 1 second before next capture (unless it's the last one)
+            // Wait 1.5 seconds before next capture to let camera stabilize
             if (i < requiredCaptures - 1) {
               // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
-              await new Promise((resolve) => setTimeout(resolve, 1000));
+              await new Promise((resolve) => setTimeout(resolve, 1500));
             }
           }
 

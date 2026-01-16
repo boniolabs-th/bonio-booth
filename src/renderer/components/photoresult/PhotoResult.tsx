@@ -112,22 +112,22 @@ const applyFilterToPhoto = async (
           const lut = await getCachedLUT(lutPath);
           const processedCanvas = await applyLUTWithWorker(canvas, lut);
 
-          resolve(processedCanvas.toDataURL('image/png'));
+          resolve(processedCanvas.toDataURL('image/jpeg', 1.0));
         } catch (error) {
           console.error('Failed to apply LUT:', error);
           // Fallback to original
           ctx.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL('image/png'));
+          resolve(canvas.toDataURL('image/jpeg', 1.0));
         }
       } else if (filter.type === 'css' && filter.filter) {
         // Apply CSS filter
         ctx.filter = filter.filter;
         ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
+        resolve(canvas.toDataURL('image/jpeg', 1.0));
       } else {
         // No filter to apply
         ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
+        resolve(canvas.toDataURL('image/jpeg', 1.0));
       }
     };
 

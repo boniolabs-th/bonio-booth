@@ -12,6 +12,8 @@ const configuration: webpack.Configuration = {
     ...Object.keys(externals || {}),
     // Native modules should not be bundled
     /\.node$/,
+    // node-gyp-build needs to resolve at runtime, not bundle time
+    'node-gyp-build',
   ],
 
   stats: 'errors-only',

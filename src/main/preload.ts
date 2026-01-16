@@ -270,6 +270,35 @@ const electronHandler = {
     /** Full disconnect flow: close session -> terminate */
     fullDisconnect: () => ipcRenderer.invoke('canon:fullDisconnect'),
   },
+  // Canon Camera V2 API using @brick-a-brack/napi-canon-cameras
+  canonCameraV2: {
+    /** Initialize Canon EDSDK V2 */
+    initialize: () => ipcRenderer.invoke('canon-v2:initialize'),
+    /** Check if SDK is initialized */
+    isInitialized: () => ipcRenderer.invoke('canon-v2:isInitialized'),
+    /** Get list of connected Canon cameras */
+    getCameraList: () => ipcRenderer.invoke('canon-v2:getCameraList'),
+    /** Connect to camera by index */
+    connect: (cameraIndex?: number) => ipcRenderer.invoke('canon-v2:connect', cameraIndex),
+    /** Disconnect from camera */
+    disconnect: () => ipcRenderer.invoke('canon-v2:disconnect'),
+    /** Check if camera is connected */
+    isConnected: () => ipcRenderer.invoke('canon-v2:isConnected'),
+    /** Take a picture and get base64 image */
+    takePicture: () => ipcRenderer.invoke('canon-v2:takePicture'),
+    /** Take a picture and save to path */
+    takePictureToFile: (savePath: string) => ipcRenderer.invoke('canon-v2:takePictureToFile', savePath),
+    /** Start live view */
+    startLiveView: () => ipcRenderer.invoke('canon-v2:startLiveView'),
+    /** Stop live view */
+    stopLiveView: () => ipcRenderer.invoke('canon-v2:stopLiveView'),
+    /** Get live view frame as base64 */
+    getLiveViewImage: () => ipcRenderer.invoke('canon-v2:getLiveViewImage'),
+    /** Get camera info */
+    getCameraInfo: () => ipcRenderer.invoke('canon-v2:getCameraInfo'),
+    /** Set save directory for captured images */
+    setSaveDirectory: (directory: string) => ipcRenderer.invoke('canon-v2:setSaveDirectory', directory),
+  },
 };
 
 contextBridge.exposeInMainWorld('electron', electronHandler);

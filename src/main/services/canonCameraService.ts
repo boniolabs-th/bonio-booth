@@ -126,17 +126,19 @@ const fs = require('fs');
  * Get native module path - tries multiple locations for dev/production
  */
 function getNativeModulePath(): string {
-  const nodeFileName = 'canon-edsdk.win32-x64-msvc.node';
+  const indexFileName = 'index.js';
 
   const possiblePaths = [
-    // Development: src/main/native/
-    path.join(__dirname, '..', 'native', nodeFileName),
+    // Development: src/main/native/ (using process.cwd() since __dirname points to .erb/dll in dev)
+    path.join(process.cwd(), 'src', 'main', 'native', indexFileName),
+    // Development fallback: relative to __dirname (works if running from src)
+    path.join(__dirname, '..', 'native', indexFileName),
     // Production (asar unpacked): resources/app.asar.unpacked/dist/main/native/
-    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'dist', 'main', 'native', nodeFileName),
+    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'dist', 'main', 'native', indexFileName),
     // Production alternative: next to exe
-    path.join(path.dirname(app.getPath('exe')), 'resources', 'app.asar.unpacked', 'dist', 'main', 'native', nodeFileName),
+    path.join(path.dirname(app.getPath('exe')), 'resources', 'app.asar.unpacked', 'dist', 'main', 'native', indexFileName),
     // Portable: same directory as exe
-    path.join(path.dirname(app.getPath('exe')), nodeFileName),
+    path.join(path.dirname(app.getPath('exe')), indexFileName),
   ];
 
   for (const nodePath of possiblePaths) {
@@ -743,31 +745,55 @@ export function registerCanonCameraIpcHandlers(): void {
   // Full connect flow: initialize -> get list -> connect -> open session
   ipcMain.handle('canon:fullConnect', async () => {
     try {
+      canonLog.info('fullConnect: Starting full connection flow');
+
       // Initialize SDK if not already
       if (!isSdkInitialized()) {
+        canonLog.info('fullConnect: Initializing SDK...');
         const initResult = await initializeCanonSdk();
         if (!initResult) {
+          canonLog.error('fullConnect: Failed to initialize SDK');
           return { success: false, error: 'Failed to initialize SDK' };
         }
+        canonLog.info('fullConnect: SDK initialized');
+        // Wait a bit for camera enumeration after SDK init
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
 
-      // Get camera list
-      const cameras = getCameraList();
+      // Get camera list with retry (camera enumeration can take time)
+      canonLog.info('fullConnect: Getting camera list...');
+      let cameras: CameraInfo[] = [];
+      const maxRetries = 5;
+      for (let i = 0; i < maxRetries; i++) {
+        cameras = getCameraList();
+        canonLog.info(`fullConnect: Attempt ${i + 1}/${maxRetries} - Found ${cameras.length} camera(s)`);
+        if (cameras.length > 0) break;
+        // Wait before retry
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
       if (cameras.length === 0) {
-        return { success: false, error: 'No Canon camera found' };
+        canonLog.error('fullConnect: No Canon camera found after retries');
+        return { success: false, error: 'No Canon camera found. Please check camera is connected and in PC Remote mode.' };
       }
 
       // Connect to first camera
+      canonLog.info('fullConnect: Connecting to camera...');
       const camera = connectCamera();
       if (!camera) {
+        canonLog.error('fullConnect: Failed to connect to camera');
         return { success: false, error: 'Failed to connect to camera' };
       }
+      canonLog.info(`fullConnect: Connected to ${camera.name}`);
 
       // Open session
+      canonLog.info('fullConnect: Opening session...');
       const sessionOpened = openSession();
       if (!sessionOpened) {
+        canonLog.error('fullConnect: Failed to open camera session');
         return { success: false, error: 'Failed to open camera session' };
       }
+      canonLog.info('fullConnect: Session opened successfully');
 
       return {
         success: true,

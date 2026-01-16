@@ -268,7 +268,7 @@ export default function PhotoDecorate() {
         // No photos assigned, draw frame only
         ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
 
-        const singleImageData = canvas.toDataURL('image/png');
+        const singleImageData = canvas.toDataURL('image/jpeg', 1.0);
 
         if (shouldDuplicate) {
           const doubleCanvas = document.createElement('canvas');
@@ -285,7 +285,7 @@ export default function PhotoDecorate() {
               proceedToResult(
                 singleImageData,
                 [],
-                doubleCanvas.toDataURL('image/png'),
+                doubleCanvas.toDataURL('image/jpeg', 1.0),
               );
             };
             img.src = singleImageData;
@@ -452,7 +452,7 @@ export default function PhotoDecorate() {
           [],
         );
 
-        const singleImageData = canvas.toDataURL('image/png');
+        const singleImageData = canvas.toDataURL('image/jpeg', 1.0);
 
         if (shouldDuplicate) {
           const doubleCanvas = document.createElement('canvas');
@@ -469,7 +469,7 @@ export default function PhotoDecorate() {
               proceedToResult(
                 singleImageData,
                 selectedCaptures,
-                doubleCanvas.toDataURL('image/png'),
+                doubleCanvas.toDataURL('image/jpeg', 1.0),
               );
             };
             img.src = singleImageData;
