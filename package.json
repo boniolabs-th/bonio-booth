@@ -178,7 +178,8 @@
     "asarUnpack": [
       "**/*.{node,dll}",
       "**/node_modules/@ffmpeg-installer/**/*",
-      "**/dist/main/native/**"
+      "**/dist/main/native/**/*",
+      "**/dist/main/native/*.js"
     ],
     "files": [
       "dist",
@@ -257,6 +258,11 @@
       {
         "from": "./assets/EDSDK",
         "to": "assets/EDSDK"
+      },
+      {
+        "from": "./src/main/native",
+        "to": "native",
+        "filter": ["**/*"]
       }
     ],
     "publish": {

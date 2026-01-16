@@ -15,12 +15,15 @@ const possibleSources = [
 const targetDir = path.join(__dirname, '../release/app/dist/main/native');
 
 // Files to copy
-const nodeFileName = 'canon-edsdk.win32-x64-msvc.node';
+const filesToCopy = [
+  'canon-edsdk.win32-x64-msvc.node',
+  'index.js',
+];
 
 // Find source directory
 let sourceDir = null;
 for (const src of possibleSources) {
-  const nodePath = path.join(src, nodeFileName);
+  const nodePath = path.join(src, filesToCopy[0]);
   if (fs.existsSync(nodePath)) {
     sourceDir = src;
     console.log(`📁 Found source at: ${src}`);
@@ -39,18 +42,19 @@ if (!sourceDir) {
 fs.mkdirSync(targetDir, { recursive: true });
 console.log(`📁 Target directory: ${targetDir}`);
 
-// Copy .node file
-const sourcePath = path.join(sourceDir, nodeFileName);
-const targetPath = path.join(targetDir, nodeFileName);
+// Copy all required files
+for (const fileName of filesToCopy) {
+  const sourcePath = path.join(sourceDir, fileName);
+  const targetPath = path.join(targetDir, fileName);
 
-if (fs.existsSync(sourcePath)) {
-  fs.copyFileSync(sourcePath, targetPath);
-  console.log(`✅ Copied: ${nodeFileName}`);
-  console.log(`   From: ${sourcePath}`);
-  console.log(`   To: ${targetPath}`);
-} else {
-  console.error(`❌ File not found: ${sourcePath}`);
-  process.exit(1);
+  if (fs.existsSync(sourcePath)) {
+    fs.copyFileSync(sourcePath, targetPath);
+    console.log(`✅ Copied: ${fileName}`);
+    console.log(`   From: ${sourcePath}`);
+    console.log(`   To: ${targetPath}`);
+  } else {
+    console.warn(`⚠️ File not found (skipping): ${sourcePath}`);
+  }
 }
 
 console.log('\n📷 Canon EDSDK native module copied successfully!');

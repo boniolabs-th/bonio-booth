@@ -8,6 +8,7 @@
  * When running `npm run build` or `npm run build:main`, this file is compiled to
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
+
 import path from 'path';
 import { app, BrowserWindow, shell, ipcMain, session, powerSaveBlocker } from 'electron';
 import { promises as fs } from 'fs';
@@ -15,6 +16,13 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
+
+// Fix GPU process crash on Electron 35+ in production builds
+// Use ANGLE with D3D11 backend for WebGL instead of native GPU
+// This keeps WebGL working while avoiding GPU process issues
+app.commandLine.appendSwitch('use-angle', 'd3d11');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('no-sandbox'); // Required for packaged apps with GPU
 
 // Load .env file manually if dotenv is not available
 const loadEnv = async () => {

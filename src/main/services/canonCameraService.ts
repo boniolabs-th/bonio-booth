@@ -133,6 +133,10 @@ function getNativeModulePath(): string {
     path.join(process.cwd(), 'src', 'main', 'native', indexFileName),
     // Development fallback: relative to __dirname (works if running from src)
     path.join(__dirname, '..', 'native', indexFileName),
+    // Production (extraResources): resources/native/
+    path.join(process.resourcesPath || '', 'native', indexFileName),
+    // Production alternative: next to exe in resources
+    path.join(path.dirname(app.getPath('exe')), 'resources', 'native', indexFileName),
     // Production (asar unpacked): resources/app.asar.unpacked/dist/main/native/
     path.join(process.resourcesPath || '', 'app.asar.unpacked', 'dist', 'main', 'native', indexFileName),
     // Production alternative: next to exe
