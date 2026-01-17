@@ -342,10 +342,11 @@ export function takePicture(): Promise<CaptureResult> {
 
     // Wait for Live View to fully stop, then proceed with capture
     stopLiveViewAndWait().then(async () => {
-      // Add a small stabilization delay after Live View stops
-      // This gives the camera time to fully transition before shutter command
-      await new Promise(r => setTimeout(r, 300));
-      canonLog.info('Stabilization delay complete, proceeding with shutter');
+      // CRITICAL FIX: Add longer stabilization delay after Live View stops
+      // This ensures camera is fully ready before shutter command
+      // Especially important when LiveViewStop event arrives quickly
+      await new Promise(r => setTimeout(r, 600));
+      canonLog.info('Stabilization delay complete (600ms), proceeding with shutter');
 
       try {
         const timeout = setTimeout(() => {

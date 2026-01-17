@@ -13,8 +13,57 @@ let worker: Worker | null = null;
 // Canon images are typically 24MP+ so they will use WebGL
 const WEBGL_THRESHOLD_PIXELS = 4_000_000;
 
+// Maximum dimensions for processing (to reduce file size from Canon's 24MP)
+const MAX_PROCESS_WIDTH = 3600;
+const MAX_PROCESS_HEIGHT = 2400;
+
 // Cache WebGL availability check
 let webGLAvailable: boolean | null = null;
+
+/**
+ * Resize canvas if it exceeds maximum dimensions
+ * Maintains aspect ratio
+ */
+const resizeCanvasIfNeeded = (canvas: HTMLCanvasElement): HTMLCanvasElement => {
+  const { width, height } = canvas;
+
+  // Check if resize is needed
+  if (width <= MAX_PROCESS_WIDTH && height <= MAX_PROCESS_HEIGHT) {
+    return canvas;
+  }
+
+  // Calculate new dimensions maintaining aspect ratio
+  const aspectRatio = width / height;
+  let newWidth = width;
+  let newHeight = height;
+
+  if (width > MAX_PROCESS_WIDTH) {
+    newWidth = MAX_PROCESS_WIDTH;
+    newHeight = Math.round(newWidth / aspectRatio);
+  }
+
+  if (newHeight > MAX_PROCESS_HEIGHT) {
+    newHeight = MAX_PROCESS_HEIGHT;
+    newWidth = Math.round(newHeight * aspectRatio);
+  }
+
+  console.log(`[LUT] Resizing from ${width}x${height} to ${newWidth}x${newHeight}`);
+
+  // Create resized canvas
+  const resizedCanvas = document.createElement('canvas');
+  resizedCanvas.width = newWidth;
+  resizedCanvas.height = newHeight;
+  const ctx = resizedCanvas.getContext('2d');
+
+  if (ctx) {
+    // Use high-quality image smoothing
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(canvas, 0, 0, newWidth, newHeight);
+  }
+
+  return resizedCanvas;
+};
 
 /**
  * Check if WebGL should be used for this image
@@ -58,17 +107,20 @@ export const applyLUTWithWorker = (
   lut: LUT3D,
   onProgress?: (progress: number) => void,
 ): Promise<HTMLCanvasElement> => {
+  // Resize canvas if needed (reduce Canon's 24MP to max 3600x2400)
+  const processCanvas = resizeCanvasIfNeeded(canvas);
+
   // Log image size for debugging
-  const pixelCount = canvas.width * canvas.height;
+  const pixelCount = processCanvas.width * processCanvas.height;
   const megaPixels = (pixelCount / 1000000).toFixed(1);
-  console.log(`[LUT] Processing ${canvas.width}x${canvas.height} (${megaPixels}MP)`);
+  console.log(`[LUT] Processing ${processCanvas.width}x${processCanvas.height} (${megaPixels}MP)`);
 
   // Use WebGL for large images (Canon cameras typically 24MP+)
-  if (shouldUseWebGL(canvas.width, canvas.height)) {
+  if (shouldUseWebGL(processCanvas.width, processCanvas.height)) {
     console.log(`[LUT] Using WebGL acceleration for large image`);
 
     try {
-      const result = applyLUTWithWebGL(canvas, lut);
+      const result = applyLUTWithWebGL(processCanvas, lut);
       if (result) {
         // WebGL succeeded
         if (onProgress) onProgress(100);
@@ -84,14 +136,14 @@ export const applyLUTWithWorker = (
   // Use Web Worker (CPU) for smaller images or as fallback
   return new Promise((resolve, reject) => {
     const w = initLUTWorker();
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const ctx = processCanvas.getContext('2d', { willReadFrequently: true });
 
     if (!ctx) {
       reject(new Error('Failed to get canvas context'));
       return;
     }
 
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, processCanvas.width, processCanvas.height);
     const requestId = Math.random().toString(36).substring(7);
 
     // Clone imageData for transfer (create a new ArrayBuffer)
@@ -132,10 +184,10 @@ export const applyLUTWithWorker = (
       if (e.data.type === 'LUT_APPLIED') {
         clearInterval(timeoutChecker);
 
-        // Create result canvas
+        // Create result canvas with processCanvas dimensions (resized)
         const resultCanvas = document.createElement('canvas');
-        resultCanvas.width = canvas.width;
-        resultCanvas.height = canvas.height;
+        resultCanvas.width = processCanvas.width;
+        resultCanvas.height = processCanvas.height;
         const resultCtx = resultCanvas.getContext('2d');
 
         if (!resultCtx) {

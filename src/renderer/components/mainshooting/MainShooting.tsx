@@ -131,6 +131,35 @@ function CropOverlay({
   );
 }
 
+/**
+ * Helper function to flip image horizontally (mirror effect)
+ * Used for both webcam and Canon photos to match the mirror-like preview
+ */
+const flipImageHorizontally = (imageDataUrl: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Cannot create canvas context'));
+        return;
+      }
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+
+      // Flip horizontally (mirror effect)
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0);
+
+      resolve(canvas.toDataURL('image/jpeg', 1.0));
+    };
+    img.onerror = () => reject(new Error('Failed to load image for flipping'));
+    img.src = imageDataUrl;
+  });
+};
+
 export default function MainShooting() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -453,7 +482,13 @@ export default function MainShooting() {
     if (context) {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
+
+      // Flip horizontally (mirror effect) to match the preview
+      context.translate(canvas.width, 0);
+      context.scale(-1, 1);
       context.drawImage(video, 0, 0);
+      // Reset transform for future use
+      context.setTransform(1, 0, 0, 1, 0, 0);
 
       const photoData = canvas.toDataURL('image/jpeg', 1.0);
 
@@ -646,7 +681,10 @@ export default function MainShooting() {
 
       if (result.success && result.imageData) {
         console.log('✅ [Canon] Photo captured with shutter!');
-        return result.imageData;
+        // Flip image horizontally (mirror effect) to match the preview
+        const flippedImage = await flipImageHorizontally(result.imageData);
+        console.log('✅ [Canon] Photo flipped horizontally');
+        return flippedImage;
       }
 
       console.error('❌ [Canon] Shutter capture failed:', result.error);

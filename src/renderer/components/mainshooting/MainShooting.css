@@ -92,15 +92,15 @@
   max-height: 65vh;
   object-fit: contain;
   border-radius: 20px;
-  /* Mirror the live preview horizontally */
+  /* Mirror the live preview horizontally (like a mirror) */
   transform: scaleX(-1);
   transform-origin: center;
 }
 
 /* Canon Live View specific styles */
 .camera-feed.canon-live-view {
-  /* Canon cameras don't need mirroring typically */
-  transform: none;
+  /* Canon cameras also need mirroring for mirror-like experience */
+  /* transform inherited from .camera-feed (scaleX(-1)) */
 }
 
 /* Canon waiting for live view */
