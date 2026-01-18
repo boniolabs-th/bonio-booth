@@ -24,10 +24,48 @@ export default function PrintTest(): React.JSX.Element {
   // Position Paper States
   const [landscapeScale, setLandscapeScale] = useState<number>(100);
   const [portraitScale, setPortraitScale] = useState<number>(100);
-  const [horizontal, setHorizontal] = useState<number>(0);
-  const [vertical, setVertical] = useState<number>(0);
+  const [landscapeHorizontal, setLandscapeHorizontal] = useState<number>(0);
+  const [landscapeVertical, setLandscapeVertical] = useState<number>(0);
+  const [portraitHorizontal, setPortraitHorizontal] = useState<number>(0);
+  const [portraitVertical, setPortraitVertical] = useState<number>(0);
   const [isPaperPositionConfigModalOpen, setIsPaperPositionConfigModalOpen] =
     useState(false);
+
+  // State สำหรับเก็บค่าเดิม (เพื่อใช้ในการยกเลิก)
+  const [savedLandscapeScale, setSavedLandscapeScale] = useState<number>(100);
+  const [savedPortraitScale, setSavedPortraitScale] = useState<number>(100);
+  const [savedLandscapeHorizontal, setSavedLandscapeHorizontal] =
+    useState<number>(0);
+  const [savedLandscapeVertical, setSavedLandscapeVertical] =
+    useState<number>(0);
+  const [savedPortraitHorizontal, setSavedPortraitHorizontal] =
+    useState<number>(0);
+  const [savedPortraitVertical, setSavedPortraitVertical] =
+    useState<number>(0);
+
+  // คำนวณค่า horizontal และ vertical ตาม orientation ปัจจุบัน
+  // portrait และ portrait-cut ใช้ค่าเดียวกัน
+  const currentHorizontal =
+    orientation === 'landscape' ? landscapeHorizontal : portraitHorizontal;
+  const currentVertical =
+    orientation === 'landscape' ? landscapeVertical : portraitVertical;
+
+  // Helper functions สำหรับอัพเดทค่าตาม orientation
+  const setCurrentHorizontal = (value: number) => {
+    if (orientation === 'landscape') {
+      setLandscapeHorizontal(value);
+    } else {
+      setPortraitHorizontal(value);
+    }
+  };
+
+  const setCurrentVertical = (value: number) => {
+    if (orientation === 'landscape') {
+      setLandscapeVertical(value);
+    } else {
+      setPortraitVertical(value);
+    }
+  };
 
   // Load print test position from storage and API
   useEffect(() => {
@@ -38,34 +76,44 @@ export default function PrintTest(): React.JSX.Element {
         const positionResult =
           await window.electron?.payment?.getPrintTestPosition();
 
-        let hasStorageValue = false;
         if (positionResult?.success && positionResult.position) {
-          const { horizontal: storageHorizontal, vertical: storageVertical } =
-            positionResult.position;
+          const pos = positionResult.position;
           console.log(
             '🔍 [PrintTest] Print test position from storage:',
             positionResult.position,
           );
 
-          // ใช้ค่าจาก storage ถ้ามี
-          if (storageHorizontal !== undefined && storageHorizontal !== null) {
-            setHorizontal(storageHorizontal);
-            hasStorageValue = true;
+          // โหลดค่าทั้งหมดจาก storage
+          if (
+            pos.landscapeHorizontal !== undefined &&
+            pos.landscapeHorizontal !== null
+          ) {
+            setLandscapeHorizontal(pos.landscapeHorizontal);
+            setSavedLandscapeHorizontal(pos.landscapeHorizontal);
           }
-          if (storageVertical !== undefined && storageVertical !== null) {
-            setVertical(storageVertical);
-            hasStorageValue = true;
+          if (
+            pos.landscapeVertical !== undefined &&
+            pos.landscapeVertical !== null
+          ) {
+            setLandscapeVertical(pos.landscapeVertical);
+            setSavedLandscapeVertical(pos.landscapeVertical);
+          }
+          if (
+            pos.portraitHorizontal !== undefined &&
+            pos.portraitHorizontal !== null
+          ) {
+            setPortraitHorizontal(pos.portraitHorizontal);
+            setSavedPortraitHorizontal(pos.portraitHorizontal);
+          }
+          if (
+            pos.portraitVertical !== undefined &&
+            pos.portraitVertical !== null
+          ) {
+            setPortraitVertical(pos.portraitVertical);
+            setSavedPortraitVertical(pos.portraitVertical);
           }
 
-          if (hasStorageValue) {
-            console.log(
-              '✅ [PrintTest] Print test position loaded from storage:',
-              {
-                horizontal: storageHorizontal,
-                vertical: storageVertical,
-              },
-            );
-          }
+          console.log('✅ [PrintTest] Print test position loaded from storage');
         }
 
         // 2. โหลดค่าจาก Paper Position Config (สำหรับ landscapeScale และ portraitScale)
@@ -97,6 +145,9 @@ export default function PrintTest(): React.JSX.Element {
 
           setLandscapeScale(finalLandscapeScale);
           setPortraitScale(finalPortraitScale);
+          // ตั้งค่า saved state ด้วย
+          setSavedLandscapeScale(finalLandscapeScale);
+          setSavedPortraitScale(finalPortraitScale);
 
           console.log('✅ [PrintTest] Paper position config loaded from API:', {
             landscapeScale: finalLandscapeScale,
@@ -118,6 +169,8 @@ export default function PrintTest(): React.JSX.Element {
           console.log('🔍 [PrintTest] paperPos from IPC:', paperPos);
 
           // ใช้ค่า horizontal และ vertical จาก API เฉพาะเมื่อยังไม่มีค่าจาก storage
+          const hasStorageValue =
+            positionResult?.success && positionResult.position;
           if (!hasStorageValue) {
             const finalHorizontal =
               paperPos.horizontal !== undefined && paperPos.horizontal !== null
@@ -128,8 +181,16 @@ export default function PrintTest(): React.JSX.Element {
                 ? paperPos.vertical
                 : 0;
 
-            setHorizontal(finalHorizontal);
-            setVertical(finalVertical);
+            // ตั้งค่าให้ทั้ง landscape และ portrait (fallback)
+            setLandscapeHorizontal(finalHorizontal);
+            setLandscapeVertical(finalVertical);
+            setPortraitHorizontal(finalHorizontal);
+            setPortraitVertical(finalVertical);
+            // ตั้งค่า saved state ด้วย
+            setSavedLandscapeHorizontal(finalHorizontal);
+            setSavedLandscapeVertical(finalVertical);
+            setSavedPortraitHorizontal(finalHorizontal);
+            setSavedPortraitVertical(finalVertical);
 
             console.log(
               '✅ [PrintTest] Paper position loaded from API (fallback):',
@@ -151,18 +212,133 @@ export default function PrintTest(): React.JSX.Element {
     loadPositions();
   }, []);
 
+  // เช็คว่ามีการเปลี่ยนแปลงค่าจากที่บันทึกไว้หรือไม่
+  const hasChanges =
+    landscapeScale !== savedLandscapeScale ||
+    portraitScale !== savedPortraitScale ||
+    landscapeHorizontal !== savedLandscapeHorizontal ||
+    landscapeVertical !== savedLandscapeVertical ||
+    portraitHorizontal !== savedPortraitHorizontal ||
+    portraitVertical !== savedPortraitVertical;
+
   // Debug: Log state changes
   useEffect(() => {
     console.log('🔄 [PrintTest] State updated:', {
       landscapeScale,
       portraitScale,
-      horizontal,
-      vertical,
+      landscapeHorizontal,
+      landscapeVertical,
+      portraitHorizontal,
+      portraitVertical,
+      currentOrientation: orientation,
+      currentHorizontal,
+      currentVertical,
+      hasChanges,
     });
-  }, [landscapeScale, portraitScale, horizontal, vertical]);
+  }, [
+    landscapeScale,
+    portraitScale,
+    landscapeHorizontal,
+    landscapeVertical,
+    portraitHorizontal,
+    portraitVertical,
+    orientation,
+    currentHorizontal,
+    currentVertical,
+    hasChanges,
+  ]);
 
   const handleBack = () => {
     navigate('/');
+  };
+
+  // ฟังก์ชันสำหรับบันทึกการตั้งค่า Position Paper
+  const handleSavePosition = async () => {
+    try {
+      // บันทึกค่า horizontal และ vertical ไว้ที่ storage
+      // @ts-ignore
+      await window.electron?.payment?.savePrintTestPosition({
+        landscapeHorizontal,
+        landscapeVertical,
+        portraitHorizontal,
+        portraitVertical,
+      });
+      console.log('✅ [PrintTest] Position saved to storage:', {
+        landscapeHorizontal,
+        landscapeVertical,
+        portraitHorizontal,
+        portraitVertical,
+      });
+
+      // บันทึกค่า scale ไว้ที่ config
+      // @ts-ignore
+      const configResult =
+        await window.electron?.payment?.getPaperPositionConfig();
+
+      if (configResult?.success && configResult.config) {
+        const currentConfig = configResult.config;
+        // @ts-ignore
+        await window.electron?.payment?.savePaperPositionConfig({
+          landscapeWidth: currentConfig.landscapeWidth || 0,
+          landscapeHeight: currentConfig.landscapeHeight || 0,
+          portraitWidth: currentConfig.portraitWidth || 0,
+          portraitHeight: currentConfig.portraitHeight || 0,
+          landscapeScale: Math.round(landscapeScale),
+          portraitScale: Math.round(portraitScale),
+          type: currentConfig.type || 2,
+        });
+        console.log('✅ [PrintTest] Scale saved to config:', {
+          landscapeScale,
+          portraitScale,
+        });
+      } else {
+        // @ts-ignore
+        await window.electron?.payment?.savePaperPositionConfig({
+          landscapeWidth: 0,
+          landscapeHeight: 0,
+          portraitWidth: 0,
+          portraitHeight: 0,
+          landscapeScale: Math.round(landscapeScale),
+          portraitScale: Math.round(portraitScale),
+          type: 2,
+        });
+        console.log('✅ [PrintTest] Scale saved to config (new):', {
+          landscapeScale,
+          portraitScale,
+        });
+      }
+
+      // อัพเดทค่า saved state
+      setSavedLandscapeScale(landscapeScale);
+      setSavedPortraitScale(portraitScale);
+      setSavedLandscapeHorizontal(landscapeHorizontal);
+      setSavedLandscapeVertical(landscapeVertical);
+      setSavedPortraitHorizontal(portraitHorizontal);
+      setSavedPortraitVertical(portraitVertical);
+
+      alert('บันทึกการตั้งค่าสำเร็จ');
+    } catch (error) {
+      console.error('❌ [PrintTest] Failed to save position:', error);
+      alert('บันทึกการตั้งค่าไม่สำเร็จ');
+    }
+  };
+
+  // ฟังก์ชันสำหรับรีเซ็ตค่าทั้งหมดกลับเป็นค่าที่บันทึกไว้
+  const resetToSavedValues = () => {
+    setLandscapeScale(savedLandscapeScale);
+    setPortraitScale(savedPortraitScale);
+    setLandscapeHorizontal(savedLandscapeHorizontal);
+    setLandscapeVertical(savedLandscapeVertical);
+    setPortraitHorizontal(savedPortraitHorizontal);
+    setPortraitVertical(savedPortraitVertical);
+  };
+
+  // ฟังก์ชันสำหรับยกเลิกการเปลี่ยนแปลง (คืนค่าเดิม)
+  const handleCancelPosition = () => {
+    resetToSavedValues();
+    console.log(
+      '🔄 [PrintTest] Position changes cancelled, restored to saved values',
+    );
   };
 
   const convertImageUrlToDataUrl = async (
@@ -261,16 +437,20 @@ export default function PrintTest(): React.JSX.Element {
         });
       }
 
-      // บันทึกค่า horizontal และ vertical ไว้ที่ storage
+      // บันทึกค่า horizontal และ vertical ไว้ที่ storage (บันทึกทั้งหมด)
       try {
         // @ts-ignore
         await window.electron?.payment?.savePrintTestPosition({
-          horizontal,
-          vertical,
+          landscapeHorizontal,
+          landscapeVertical,
+          portraitHorizontal,
+          portraitVertical,
         });
         console.log('✅ [PrintTest] Position saved to storage:', {
-          horizontal,
-          vertical,
+          landscapeHorizontal,
+          landscapeVertical,
+          portraitHorizontal,
+          portraitVertical,
         });
       } catch (error) {
         console.error('❌ [PrintTest] Failed to save position:', error);
@@ -351,8 +531,8 @@ export default function PrintTest(): React.JSX.Element {
             copies,
             orientation: isPortraitCut ? 'portrait' : orientation, // ส่ง portrait สำหรับ portrait-cut
             imageSize, // ส่ง imageSize เพื่อให้ระบบรู้ว่าเป็น 2x6 และจะตัดได้
-            horizontal, // ส่งค่า horizontal
-            vertical, // ส่งค่า vertical
+            horizontal: currentHorizontal, // ส่งค่า horizontal ตาม orientation
+            vertical: currentVertical, // ส่งค่า vertical ตาม orientation
           });
 
           // Timeout after 60 seconds
@@ -433,209 +613,247 @@ export default function PrintTest(): React.JSX.Element {
             </div>
           </div>
 
-          <div className="setting-group">
-            <label htmlFor="orientation" className="setting-label">
-              ขนาดกระดาษ:
-            </label>
-            <select
-              id="orientation"
-              value={orientation}
-              onChange={(e) =>
-                setOrientation(
-                  e.target.value as 'portrait' | 'landscape' | 'portrait-cut',
-                )
-              }
-              className="orientation-select"
-              disabled={isPrinting}
-            >
-              <option value="portrait">Portrait (ตั้ง) 4x6</option>
-              <option value="portrait-cut">Portrait Cut (ตั้ง-ตัด) 2x6</option>
-              <option value="landscape">Landscape (นอน) 6x4</option>
-            </select>
+          <div className="setting-group-row">
+            <div className="setting-group-item">
+              <label htmlFor="orientation" className="setting-label">
+                ขนาดกระดาษ:
+              </label>
+              <select
+                id="orientation"
+                value={orientation}
+                onChange={(e) => {
+                  const newOrientation = e.target.value as
+                    | 'portrait'
+                    | 'landscape'
+                    | 'portrait-cut';
+                  // Reset ค่าทั้งหมดกลับเป็นค่าที่บันทึกไว้เมื่อเปลี่ยน orientation
+                  resetToSavedValues();
+                  setOrientation(newOrientation);
+                }}
+                className="orientation-select"
+                disabled={isPrinting}
+              >
+                <option value="portrait">Portrait (ตั้ง) 4x6</option>
+                <option value="portrait-cut">Portrait Cut (ตั้ง-ตัด) 2x6</option>
+                <option value="landscape">Landscape (นอน) 6x4</option>
+              </select>
+            </div>
+
+            <div className="setting-group-item">
+              <label htmlFor="copies" className="setting-label">
+                จำนวนที่จะพิมพ์:
+              </label>
+              <div className="copies-input-group">
+                <button
+                  type="button"
+                  className="copies-button"
+                  onClick={() => setCopies(Math.max(1, copies - 1))}
+                  disabled={isPrinting || copies <= 1}
+                >
+                  −
+                </button>
+                <input
+                  id="copies"
+                  type="number"
+                  min="1"
+                  max="3"
+                  value={copies}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value, 3);
+                    if (!Number.isNaN(value) && value >= 1 && value <= 3) {
+                      setCopies(value);
+                    }
+                  }}
+                  className="copies-input"
+                  disabled={isPrinting}
+                />
+                <button
+                  type="button"
+                  className="copies-button"
+                  onClick={() => setCopies(Math.min(3, copies + 1))}
+                  disabled={isPrinting || copies >= 3}
+                >
+                  +
+                </button>
+              </div>
+              <p className="setting-hint">เลือกจำนวน 1-3 แผ่น</p>
+            </div>
           </div>
 
-          <div className="setting-group">
-            <label htmlFor="copies" className="setting-label">
-              จำนวนที่จะพิมพ์:
-            </label>
-            <div className="copies-input-group">
-              <button
-                type="button"
-                className="copies-button"
-                onClick={() => setCopies(Math.max(1, copies - 1))}
-                disabled={isPrinting || copies <= 1}
-              >
-                −
-              </button>
-              <input
-                id="copies"
-                type="number"
-                min="1"
-                max="3"
-                value={copies}
-                onChange={(e) => {
-                  const value = parseInt(e.target.value, 3);
-                  if (!Number.isNaN(value) && value >= 1 && value <= 3) {
-                    setCopies(value);
-                  }
-                }}
-                className="copies-input"
-                disabled={isPrinting}
-              />
-              <button
-                type="button"
-                className="copies-button"
-                onClick={() => setCopies(Math.min(3, copies + 1))}
-                disabled={isPrinting || copies >= 3}
-              >
-                +
-              </button>
-            </div>
-            <p className="setting-hint">เลือกจำนวน 1-3 แผ่น</p>
-          </div>
 
           <div className="position-paper-section">
-            <h2 id="position-paper-title" className="section-title">
-              Position Paper
-            </h2>
+            <div className="position-paper-header">
+              <h2 id="position-paper-title" className="section-title">
+                Position Paper {orientation === 'portrait' ? 'Portrait' : orientation === 'landscape' ? 'Landscape' : 'Portrait Cut'}
+              </h2>
+              {hasChanges && (
+                <div className="position-paper-actions">
+                  <button
+                    type="button"
+                    className="position-paper-save-button"
+                    onClick={handleSavePosition}
+                    disabled={isPrinting}
+                    aria-label="บันทึกการตั้งค่า"
+                  >
+                    บันทึก
+                  </button>
+                  <button
+                    type="button"
+                    className="position-paper-cancel-button"
+                    onClick={handleCancelPosition}
+                    disabled={isPrinting}
+                    aria-label="ยกเลิกการเปลี่ยนแปลง"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="slider-group">
-              <div className="slider-item">
-                <div className="slider-container-label">
-                  <label
-                    htmlFor="landscape-scale-slider"
-                    className="slider-label"
-                  >
-                    Scale แนวนอน (Landscape)
-                  </label>
-                  <input
-                    type="number"
-                    min="50"
-                    max="150"
-                    value={landscapeScale}
-                    onChange={(e) => {
-                      const value = Number(e.target.value);
-                      if (!Number.isNaN(value) && value >= 50 && value <= 150) {
-                        setLandscapeScale(value);
+              {/* Scale - แสดงตาม orientation ที่เลือก */}
+              {orientation === 'landscape' && (
+                <div className="slider-item">
+                  <div className="slider-container-label">
+                    <label
+                      htmlFor="landscape-scale-slider"
+                      className="slider-label"
+                    >
+                      Scale
+                    </label>
+                    <input
+                      type="number"
+                      min="50"
+                      max="150"
+                      value={landscapeScale}
+                      onChange={(e) => {
+                        const value = Number(e.target.value);
+                        if (!Number.isNaN(value) && value >= 50 && value <= 150) {
+                          setLandscapeScale(value);
+                        }
+                      }}
+                      className="slider-value-input"
+                      disabled={isPrinting}
+                      aria-label="Landscape scale value"
+                      title="Landscape scale value"
+                    />
+                  </div>
+                  <div className="slider-container-with-buttons">
+                    <button
+                      type="button"
+                      className="slider-button-decrement"
+                      onClick={() =>
+                        setLandscapeScale(Math.max(50, landscapeScale - 1))
                       }
-                    }}
-                    className="slider-value-input"
-                    disabled={isPrinting}
-                    aria-label="Landscape scale value"
-                    title="Landscape scale value"
-                  />
-                </div>
-                <div className="slider-container-with-buttons">
-                  <button
-                    type="button"
-                    className="slider-button-decrement"
-                    onClick={() =>
-                      setLandscapeScale(Math.max(50, landscapeScale - 1))
-                    }
-                    disabled={isPrinting}
-                    aria-label="ลดค่า"
-                  >
-                    −
-                  </button>
+                      disabled={isPrinting}
+                      aria-label="ลดค่า"
+                    >
+                      −
+                    </button>
 
-                  <input
-                    id="landscape-scale-slider"
-                    type="range"
-                    min="50"
-                    max="150"
-                    value={landscapeScale}
-                    onChange={(e) => setLandscapeScale(Number(e.target.value))}
-                    className="slider slider-horizontal"
-                  />
-                  <button
-                    type="button"
-                    className="slider-button-increment"
-                    onClick={() =>
-                      setLandscapeScale(Math.min(150, landscapeScale + 1))
-                    }
-                    disabled={isPrinting}
-                    aria-label="เพิ่มค่า"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              <div className="slider-item">
-                <div className="slider-container-label">
-                  <label
-                    htmlFor="portrait-scale-slider"
-                    className="slider-label"
-                  >
-                    Scale แนวตั้ง (Portrait)
-                  </label>
-                  <input
-                    type="number"
-                    min="50"
-                    max="150"
-                    value={portraitScale}
-                    onChange={(e) => {
-                      const value = Number(e.target.value);
-                      if (!Number.isNaN(value) && value >= 50 && value <= 150) {
-                        setPortraitScale(value);
+                    <input
+                      id="landscape-scale-slider"
+                      type="range"
+                      min="50"
+                      max="150"
+                      value={landscapeScale}
+                      onChange={(e) => setLandscapeScale(Number(e.target.value))}
+                      className="slider slider-horizontal"
+                    />
+                    <button
+                      type="button"
+                      className="slider-button-increment"
+                      onClick={() =>
+                        setLandscapeScale(Math.min(150, landscapeScale + 1))
                       }
-                    }}
-                    className="slider-value-input"
-                    disabled={isPrinting}
-                    aria-label="Portrait scale value"
-                    title="Portrait scale value"
-                  />
+                      disabled={isPrinting}
+                      aria-label="เพิ่มค่า"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-                <div className="slider-container-with-buttons">
-                  <button
-                    type="button"
-                    className="slider-button-decrement"
-                    onClick={() =>
-                      setPortraitScale(Math.max(50, portraitScale - 1))
-                    }
-                    disabled={isPrinting}
-                    aria-label="ลดค่า"
-                  >
-                    −
-                  </button>
+              )}
 
-                  <input
-                    id="portrait-scale-slider"
-                    type="range"
-                    min="50"
-                    max="150"
-                    value={portraitScale}
-                    onChange={(e) => setPortraitScale(Number(e.target.value))}
-                    className="slider slider-horizontal"
-                  />
-                  <button
-                    type="button"
-                    className="slider-button-increment"
-                    onClick={() =>
-                      setPortraitScale(Math.min(150, portraitScale + 1))
-                    }
-                    disabled={isPrinting}
-                    aria-label="เพิ่มค่า"
-                  >
-                    +
-                  </button>
+              {(orientation === 'portrait' || orientation === 'portrait-cut') && (
+                <div className="slider-item">
+                  <div className="slider-container-label">
+                    <label
+                      htmlFor="portrait-scale-slider"
+                      className="slider-label"
+                    >
+                      Scale 
+                    </label>
+                    <input
+                      type="number"
+                      min="50"
+                      max="150"
+                      value={portraitScale}
+                      onChange={(e) => {
+                        const value = Number(e.target.value);
+                        if (!Number.isNaN(value) && value >= 50 && value <= 150) {
+                          setPortraitScale(value);
+                        }
+                      }}
+                      className="slider-value-input"
+                      disabled={isPrinting}
+                      aria-label="Portrait scale value"
+                      title="Portrait scale value"
+                    />
+                  </div>
+                  <div className="slider-container-with-buttons">
+                    <button
+                      type="button"
+                      className="slider-button-decrement"
+                      onClick={() =>
+                        setPortraitScale(Math.max(50, portraitScale - 1))
+                      }
+                      disabled={isPrinting}
+                      aria-label="ลดค่า"
+                    >
+                      −
+                    </button>
+
+                    <input
+                      id="portrait-scale-slider"
+                      type="range"
+                      min="50"
+                      max="150"
+                      value={portraitScale}
+                      onChange={(e) => setPortraitScale(Number(e.target.value))}
+                      className="slider slider-horizontal"
+                    />
+                    <button
+                      type="button"
+                      className="slider-button-increment"
+                      onClick={() =>
+                        setPortraitScale(Math.min(150, portraitScale + 1))
+                      }
+                      disabled={isPrinting}
+                      aria-label="เพิ่มค่า"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
+              {/* Horizontal position - แสดงตาม orientation ที่เลือก */}
               <div className="slider-item">
                 <div className="slider-container-label">
                   <label htmlFor="horizontal-slider" className="slider-label">
                     Horizontal position
+                    {(orientation === 'portrait' || orientation === 'portrait-cut') && ' (Portrait)'}
                   </label>
                   <input
                     type="number"
                     min="-50"
                     max="50"
-                    value={horizontal}
+                    value={currentHorizontal}
                     onChange={(e) => {
                       const value = Number(e.target.value);
                       if (!Number.isNaN(value) && value >= -50 && value <= 50) {
-                        setHorizontal(value);
+                        setCurrentHorizontal(value);
                       }
                     }}
                     className="slider-value-input"
@@ -648,7 +866,7 @@ export default function PrintTest(): React.JSX.Element {
                   <button
                     type="button"
                     className="slider-button-decrement"
-                    onClick={() => setHorizontal(Math.max(-50, horizontal - 1))}
+                    onClick={() => setCurrentHorizontal(Math.max(-50, currentHorizontal - 1))}
                     disabled={isPrinting}
                     aria-label="ลดค่า"
                   >
@@ -660,14 +878,14 @@ export default function PrintTest(): React.JSX.Element {
                     type="range"
                     min="-50"
                     max="50"
-                    value={horizontal}
-                    onChange={(e) => setHorizontal(Number(e.target.value))}
+                    value={currentHorizontal}
+                    onChange={(e) => setCurrentHorizontal(Number(e.target.value))}
                     className="slider slider-horizontal"
                   />
                   <button
                     type="button"
                     className="slider-button-increment"
-                    onClick={() => setHorizontal(Math.min(50, horizontal + 1))}
+                    onClick={() => setCurrentHorizontal(Math.min(50, currentHorizontal + 1))}
                     disabled={isPrinting}
                     aria-label="เพิ่มค่า"
                   >
@@ -676,21 +894,23 @@ export default function PrintTest(): React.JSX.Element {
                 </div>
               </div>
 
+              {/* Vertical position - แสดงตาม orientation ที่เลือก */}
               <div className="slider-item">
                 <div className="slider-container-label">
                   <label htmlFor="vertical-slider" className="slider-label">
                     Vertical position
+                    {(orientation === 'portrait' || orientation === 'portrait-cut') && ' (Portrait)'}
                   </label>
 
                   <input
                     type="number"
                     min="-50"
                     max="50"
-                    value={vertical}
+                    value={currentVertical}
                     onChange={(e) => {
                       const value = Number(e.target.value);
                       if (!Number.isNaN(value) && value >= -50 && value <= 50) {
-                        setVertical(value);
+                        setCurrentVertical(value);
                       }
                     }}
                     className="slider-value-input-vertical"
@@ -703,7 +923,7 @@ export default function PrintTest(): React.JSX.Element {
                   <button
                     type="button"
                     className="slider-button-decrement-vertical"
-                    onClick={() => setVertical(Math.max(-50, vertical - 1))}
+                    onClick={() => setCurrentVertical(Math.max(-50, currentVertical - 1))}
                     disabled={isPrinting}
                     aria-label="ลดค่า"
                   >
@@ -716,15 +936,15 @@ export default function PrintTest(): React.JSX.Element {
                       type="range"
                       min="-50"
                       max="50"
-                      value={vertical}
-                      onChange={(e) => setVertical(Number(e.target.value))}
+                      value={currentVertical}
+                      onChange={(e) => setCurrentVertical(Number(e.target.value))}
                       className="slider slider-vertical"
                     />
                   </div>
                   <button
                     type="button"
                     className="slider-button-increment-vertical"
-                    onClick={() => setVertical(Math.min(50, vertical + 1))}
+                    onClick={() => setCurrentVertical(Math.min(50, currentVertical + 1))}
                     disabled={isPrinting}
                     aria-label="เพิ่มค่า"
                   >

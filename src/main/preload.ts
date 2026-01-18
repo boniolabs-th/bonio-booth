@@ -183,7 +183,12 @@ const electronHandler = {
     getPrintTestPosition: () => {
       return ipcRenderer.invoke('get-print-test-position');
     },
-    savePrintTestPosition: (position: { horizontal: number; vertical: number }) => {
+    savePrintTestPosition: (position: {
+      landscapeHorizontal: number;
+      landscapeVertical: number;
+      portraitHorizontal: number;
+      portraitVertical: number;
+    }) => {
       return ipcRenderer.invoke('save-print-test-position', position);
     },
   },

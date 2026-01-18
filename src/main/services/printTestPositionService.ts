@@ -9,14 +9,18 @@ import { promises as fs } from 'fs';
 import path from 'path';
 
 export interface PrintTestPosition {
-  horizontal: number;
-  vertical: number;
+  landscapeHorizontal: number;
+  landscapeVertical: number;
+  portraitHorizontal: number;
+  portraitVertical: number;
 }
 
 // Default values
 export const DEFAULT_PRINT_TEST_POSITION: PrintTestPosition = {
-  horizontal: 0,
-  vertical: 0,
+  landscapeHorizontal: 0,
+  landscapeVertical: 0,
+  portraitHorizontal: 0,
+  portraitVertical: 0,
 };
 
 const CONFIG_FILE_NAME = 'print-test-position.json';
@@ -40,8 +44,10 @@ export async function getPrintTestPosition(): Promise<PrintTestPosition> {
 
     // Validate config
     if (
-      typeof config.horizontal !== 'number' ||
-      typeof config.vertical !== 'number'
+      typeof config.landscapeHorizontal !== 'number' ||
+      typeof config.landscapeVertical !== 'number' ||
+      typeof config.portraitHorizontal !== 'number' ||
+      typeof config.portraitVertical !== 'number'
     ) {
       console.warn(
         '⚠️ [printTestPositionService] Invalid config format, using defaults',

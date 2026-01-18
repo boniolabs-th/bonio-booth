@@ -76,6 +76,18 @@
   margin-bottom: 25px;
 }
 
+.setting-group-row {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 25px;
+  flex-wrap: wrap;
+}
+
+.setting-group-item {
+  flex: 1;
+  min-width: 250px;
+}
+
 .setting-label {
   display: block;
   font-size: 18px;
@@ -276,6 +288,27 @@
   border: 2px solid #e0e0e0;
 }
 
+.position-paper-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #667eea;
+  padding-bottom: 10px;
+}
+
+.position-paper-header .section-title {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.position-paper-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .position-paper-button {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -297,6 +330,61 @@
 .position-paper-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.position-paper-save-button {
+  background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.position-paper-save-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.5);
+  background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+}
+
+.position-paper-save-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.position-paper-cancel-button {
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 15px;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 45px;
+  height: 45px;
+}
+
+.position-paper-cancel-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.5);
+  background: #d32f2f;
+}
+
+.position-paper-cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Modal Styles */
