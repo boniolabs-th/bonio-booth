@@ -15,7 +15,7 @@
     "link-modules": "node -r ts-node/register ../../.erb/scripts/link-modules.ts"
   },
   "dependencies": {
-    "@brick-a-brack/napi-canon-cameras": "file:../../../napi-canon-cameras/dist/napi-canon-cameras.tgz",
+    "canon-edsdk": "file:../../../EDSDK_Wrapper",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@kshersolution/ksher": "^1.0.9"
   }

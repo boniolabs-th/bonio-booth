@@ -91,7 +91,6 @@
     }
   },
   "dependencies": {
-    "@brick-a-brack/napi-canon-cameras": "file:../napi-canon-cameras/dist/napi-canon-cameras.tgz",
     "@electron/notarize": "^3.0.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@kshersolution/ksher": "^1.0.9",
