@@ -99,6 +99,27 @@ const electronHandler = {
         videos || [],
       );
     },
+    // Background upload - ส่ง job ไป queue และ return ทันที
+    queueBackgroundUpload: (
+      sessionId: string,
+      photos: string[],
+      videos?: string[],
+    ) => {
+      return ipcRenderer.invoke(
+        'queue-background-upload',
+        sessionId,
+        photos,
+        videos || [],
+      );
+    },
+    // ตรวจสอบสถานะ upload job
+    getUploadJobStatus: (jobId: string) => {
+      return ipcRenderer.invoke('get-upload-job-status', jobId);
+    },
+    // ตรวจสอบจำนวน pending uploads
+    getPendingUploadsCount: () => {
+      return ipcRenderer.invoke('get-pending-uploads-count');
+    },
     uploadMachineFiles: (
       transactionCode: string,
       photos: string[],

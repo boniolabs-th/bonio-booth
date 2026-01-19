@@ -119,13 +119,8 @@ const applyFilterToPhoto = async (
           ctx.drawImage(img, 0, 0);
           resolve(canvas.toDataURL('image/jpeg', 1.0));
         }
-      } else if (filter.type === 'css' && filter.filter) {
-        // Apply CSS filter
-        ctx.filter = filter.filter;
-        ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/jpeg', 1.0));
       } else {
-        // No filter to apply
+        // No filter to apply (LUT only supported now)
         ctx.drawImage(img, 0, 0);
         resolve(canvas.toDataURL('image/jpeg', 1.0));
       }
@@ -189,7 +184,8 @@ const generateFramedVideo = async (
     boomerangVideoDuration?: number, // Duration in seconds
   ): Promise<string> => {
     const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    // ใช้ srgb color space เพื่อให้สีถูกต้อง
+    const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
 
     if (!ctx) {
       throw new Error('ไม่สามารถสร้าง canvas context ได้');
@@ -242,9 +238,9 @@ const generateFramedVideo = async (
     );
 
     const fps = 12;
-    // ใช้ videoDuration ถ้ามี หรือ fallback เป็น 4 วินาที
-    // Loop วิดีโอ 3 รอบ (เช่น countdown 5 วิ x 3 = 15 วินาที)
-    const singleLoopDuration = boomerangVideoDuration || 4;
+    // ใช้ 3 วินาทีต่อ loop คงที่ (จับแค่ 3 วินาทีสุดท้ายของการถ่าย)
+    // Loop วิดีโอ 3 รอบ = 9 วินาทีรวม
+    const singleLoopDuration = 3; // คงที่ 3 วินาที
     const loopCount = 3;
     const totalDurationSeconds = singleLoopDuration * loopCount;
     const totalFrames = fps * totalDurationSeconds;
@@ -353,13 +349,8 @@ const generateFramedVideo = async (
             ctx.translate(-centerX, -centerY);
           }
 
-          if (!isLutFilterApplied && selectedFilterId) {
-            const filter = FILTERS.find((f) => f.id === selectedFilterId);
-            // Only apply CSS filters, LUT filters are already applied to source
-            if (filter?.type === 'css' && filter?.filter) {
-              ctx.filter = filter.filter;
-            }
-          }
+          // LUT filters are already applied to source, no additional CSS filter needed
+          // (CSS filters are no longer supported - LUT only)
 
           ctx.drawImage(
             image,
@@ -433,7 +424,8 @@ const generateFramedVideo = async (
   );
 
   const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+  // ใช้ srgb color space เพื่อให้สีถูกต้อง
+  const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
 
   if (!ctx) {
     throw new Error('ไม่สามารถสร้าง canvas context ได้');
@@ -452,20 +444,52 @@ const generateFramedVideo = async (
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, frameWidth, frameHeight);
 
+  // คำนวณจุดเริ่มต้น 3 วินาทีสุดท้ายของ video
+  // ถ้า countdown = 5 วิ → video duration ~5 วิ → เริ่มที่วินาทีที่ 2 (5-3=2)
+  // ถ้า countdown = 10 วิ → video duration ~10 วิ → เริ่มที่วินาทีที่ 7 (10-3=7)
+  const singleLoopDuration = 3; // คงที่ 3 วินาที
+  const loopCount = 3;
+  const maxDuration = singleLoopDuration * loopCount;
+
+  // หาจุดเริ่มต้น 3 วินาทีสุดท้าย
+  // ใช้ videoDuration จาก parameter หรือ fallback ใช้ video element duration
+  const firstVideo = videoElements[0];
+  const actualVideoDuration = videoDuration || firstVideo?.duration || 5;
+  const startOffset = Math.max(0, actualVideoDuration - singleLoopDuration);
+
+  console.log('🎬 [generateFramedVideo] Video timing:', {
+    actualVideoDuration,
+    singleLoopDuration,
+    startOffset,
+    loopCount,
+    maxDuration,
+  });
+
+  // ตั้งค่า video ให้ loop smooth โดยใช้ ended event
   videoElements.forEach((video) => {
     // eslint-disable-next-line no-param-reassign
-    video.currentTime = 0;
+    video.currentTime = startOffset; // เริ่มจาก 3 วินาทีสุดท้าย
+    // eslint-disable-next-line no-param-reassign
+    video.loop = false; // ปิด native loop เพราะเราจะจัดการเอง
+
+    // ใช้ ended event เพื่อ loop กลับไปที่จุดเริ่มต้นเมื่อ video จบ
+    const handleEnded = () => {
+      // eslint-disable-next-line no-param-reassign
+      video.currentTime = startOffset;
+      video.play().catch(() => undefined);
+    };
+    video.addEventListener('ended', handleEnded);
+
+    // เก็บ handler ไว้ cleanup ทีหลัง
+    // eslint-disable-next-line no-param-reassign
+    (video as any).__loopHandler = handleEnded;
+    // eslint-disable-next-line no-param-reassign
+    (video as any).__loopEventType = 'ended';
   });
 
   await Promise.all(
     videoElements.map((video) => video.play().catch(() => undefined)),
   );
-
-  // ใช้ videoDuration ที่ส่งมาจาก MainShooting (เพราะ WebM ไม่มี duration metadata)
-  // Loop วิดีโอ 3 รอบ (เช่น countdown 5 วิ x 3 = 15 วินาที)
-  const singleLoopDuration = videoDuration || 6; // fallback 6 seconds
-  const loopCount = 3;
-  const maxDuration = singleLoopDuration * loopCount;
 
   return new Promise<string>((resolve, reject) => {
     const stream = canvas.captureStream(30);
@@ -500,6 +524,12 @@ const generateFramedVideo = async (
       }
       stream.getTracks().forEach((track) => track.stop());
       videoElements.forEach((video) => {
+        // ลบ ended event listener
+        const handler = (video as any).__loopHandler;
+        const eventType = (video as any).__loopEventType || 'ended';
+        if (handler) {
+          video.removeEventListener(eventType, handler);
+        }
         video.pause();
         // eslint-disable-next-line no-param-reassign
         video.src = '';
@@ -537,6 +567,8 @@ const generateFramedVideo = async (
         mediaRecorder.stop();
         return;
       }
+
+      // Video loop ถูกจัดการโดย timeupdate event แล้ว ไม่ต้อง reset ที่นี่
 
       // Fill with white background first (paper color)
       ctx.fillStyle = '#ffffff';
@@ -583,13 +615,8 @@ const generateFramedVideo = async (
           ctx.translate(-centerX, -centerY);
         }
 
-        if (!isLutFilterApplied && selectedFilterId) {
-          const filter = FILTERS.find((f) => f.id === selectedFilterId);
-          // Only apply CSS filters, LUT filters are already applied to source
-          if (filter?.type === 'css' && filter?.filter) {
-            ctx.filter = filter.filter;
-          }
-        }
+        // LUT filters are already applied to source, no additional CSS filter needed
+        // (CSS filters are no longer supported - LUT only)
 
         ctx.drawImage(
           video,
@@ -645,6 +672,8 @@ export default function PhotoResult() {
   const [previewBoomerangGif, setPreviewBoomerangGif] = useState<string | null>(
     null,
   );
+  // Video ที่ผ่าน LUT filter แล้ว สำหรับใช้แสดง preview
+  const [processedPreviewVideoUrl, setProcessedPreviewVideoUrl] = useState<string | null>(null);
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [qrcodeStorageUrl, setQrcodeStorageUrl] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null); // เก็บ sessionId สำหรับ upload files
@@ -669,9 +698,10 @@ export default function PhotoResult() {
               : `TXN-${state.referenceId}`
             : undefined;
 
+          const transactionId = state.transactionId!; // Already checked above
           const sessionResult =
             await window.electron.payment.createPhotoSession(
-              state.transactionId,
+              transactionId,
               transactionCode,
             );
 
@@ -1072,6 +1102,12 @@ export default function PhotoResult() {
             console.log(
               '✅ [PhotoResult] All captures processed with LUT filter',
             );
+
+            // เก็บ processed video URL สำหรับ preview (ใช้ตัวแรก)
+            if (processedCaptures[0]?.video) {
+              setProcessedPreviewVideoUrl(processedCaptures[0].video);
+              console.log('📺 [PhotoResult] Set processed video for preview');
+            }
           } catch (lutError) {
             console.error(
               '❌ [PhotoResult] Failed to apply LUT filters:',
@@ -1084,9 +1120,8 @@ export default function PhotoResult() {
           }
         }
 
-        // Determine filter ID for CSS filters (LUT filters are already applied)
-        const initialFilterId =
-          filter?.type === 'css' ? state.selectedFilter : undefined;
+        // LUT filters are already applied, no CSS filter support
+        const initialFilterId = undefined; // CSS filters no longer supported
         const isLutFilterApplied = filter?.type === 'lut';
 
         console.log('🎬 [PhotoResult] Generating framed video...', {
@@ -1527,7 +1562,7 @@ export default function PhotoResult() {
         console.log(
           '📤 [PhotoResult] ========== CALLING UPLOAD API ==========',
         );
-        console.log('📤 [PhotoResult] Calling uploadFilesToSession API...');
+        console.log('📤 [PhotoResult] Calling queueBackgroundUpload API...');
         console.log('📤 [PhotoResult] Upload parameters:', {
           sessionId,
           photosCount: photos.length,
@@ -1546,14 +1581,15 @@ export default function PhotoResult() {
           '📤 [PhotoResult] =========================================',
         );
 
-        // ใช้ uploadFilesToSession แทน uploadMachineFiles (ใช้ sessionId)
-        const uploadResult = await window.electron.payment.uploadFilesToSession(
+        // ใช้ queueBackgroundUpload แทน uploadFilesToSession (ทำงานเบื้องหลัง)
+        // จะ return ทันทีโดยไม่ต้องรอ upload เสร็จ
+        const uploadResult = await window.electron.payment.queueBackgroundUpload(
           sessionId,
           photos,
           videos,
         );
 
-        console.log('📤 [PhotoResult] Upload result:', uploadResult);
+        console.log('📤 [PhotoResult] Background upload queued:', uploadResult);
 
         // qrcodeStorageUrl ควรมีอยู่แล้วจาก createPhotoSession (ไม่ต้องรอจาก upload)
         if (!qrcodeStorageUrl) {
@@ -1562,31 +1598,15 @@ export default function PhotoResult() {
           );
         }
 
-        if (uploadResult.success && uploadResult.files?.length > 0) {
+        if (uploadResult.success) {
           console.log(
-            '✅ [PhotoResult] Upload successful! Files:',
-            uploadResult.files,
+            '✅ [PhotoResult] Upload queued successfully! Job ID:',
+            uploadResult.jobId,
           );
-
-          // หา photo URL แรก
-          const photoFile = uploadResult.files.find(
-            (f: { type: string; url: string }) => f.type === 'photo',
-          );
-          if (photoFile?.url) {
-            console.log('✅ [PhotoResult] Photo URL:', photoFile.url);
-            setUploadedFileUrl(photoFile.url);
-          }
-
-          // แสดง URLs ทั้งหมด
-          uploadResult.files.forEach(
-            (file: { type: string; url: string; order: number }) => {
-              console.log(
-                `📁 [PhotoResult] ${file.type} (order: ${file.order}): ${file.url}`,
-              );
-            },
-          );
+          // Background upload จะทำงานเบื้องหลัง ไม่ต้องรอ
+          // User สามารถกด Done ได้เลย
         } else {
-          console.error('❌ [PhotoResult] Upload failed:', uploadResult);
+          console.error('❌ [PhotoResult] Failed to queue upload:', uploadResult);
         }
 
         setIsUploading(false);
@@ -1934,35 +1954,25 @@ export default function PhotoResult() {
                 }
               }
 
-              // ใช้ uploadFilesToSession แทน uploadMachineFiles (ใช้ sessionId)
+              // ใช้ queueBackgroundUpload แทน uploadFilesToSession (ทำงานเบื้องหลัง)
               const uploadResult =
-                await window.electron.payment.uploadFilesToSession(
+                await window.electron.payment.queueBackgroundUpload(
                   sessionId,
                   photos,
                   videos,
                 );
 
-              console.log('📤 [PhotoResult] Upload result (from useEffect):', {
+              console.log('📤 [PhotoResult] Background upload queued (from useEffect):', {
                 success: uploadResult.success,
-                filesCount: uploadResult.files?.length || 0,
-                videosInResponse:
-                  uploadResult.files?.filter(
-                    (f: { type: string }) => f.type === 'video',
-                  ).length || 0,
-                photosInResponse:
-                  uploadResult.files?.filter(
-                    (f: { type: string }) => f.type === 'photo',
-                  ).length || 0,
+                jobId: uploadResult.jobId,
               });
 
               if (uploadResult.success) {
-                console.log('✅ [PhotoResult] Upload successful with video!');
-                // qrcodeStorageUrl ควรมีอยู่แล้วจาก createPhotoSession (ไม่ต้องรอจาก upload)
-                if (!qrcodeStorageUrl) {
-                  console.warn(
-                    '⚠️ [PhotoResult] No qrcodeStorageUrl found (should have been set from createPhotoSession)',
-                  );
-                }
+                console.log('✅ [PhotoResult] Upload queued successfully with video!');
+                console.log('✅ [PhotoResult] Job ID:', uploadResult.jobId);
+                // Background upload จะทำงานเบื้องหลัง ไม่ต้องรอ
+              } else {
+                console.error('❌ [PhotoResult] Failed to queue upload (useEffect):', uploadResult);
               }
 
               setIsUploading(false);
@@ -2012,11 +2022,6 @@ export default function PhotoResult() {
       link.download = `bonio-booth-video-${Date.now()}.webm`;
       link.click();
     }
-  };
-
-  const getFilterStyle = () => {
-    const filter = FILTERS.find((f) => f.id === state.selectedFilter);
-    return filter?.filter || '';
   };
 
   return (
@@ -2074,9 +2079,6 @@ export default function PhotoResult() {
                     src={previewBoomerangGif}
                     alt="Boomerang preview"
                     className="video-preview"
-                    style={{
-                      filter: getFilterStyle(),
-                    }}
                     onLoad={(e) => {
                       // Force reload to loop GIF
                       const img = e.currentTarget;
@@ -2099,14 +2101,11 @@ export default function PhotoResult() {
                       setPreviewBoomerangGif(null);
                     }}
                   />
-                ) : state?.selectedCaptures?.[0]?.video ? (
+                ) : (processedPreviewVideoUrl || state?.selectedCaptures?.[0]?.video) ? (
                   <video
                     ref={videoRef}
-                    src={state.selectedCaptures[0].video}
+                    src={processedPreviewVideoUrl || state.selectedCaptures[0].video}
                     className="video-preview"
-                    style={{
-                      filter: getFilterStyle(),
-                    }}
                     loop
                     muted
                     playsInline
@@ -2239,9 +2238,9 @@ export default function PhotoResult() {
           type="button"
           className="finish-button"
           onClick={handleFinish}
-          disabled={printStatus !== 'success' || !qrcodeStorageUrl}
+          disabled={printStatus === 'printing'}
           style={{
-            opacity: printStatus !== 'success' || !qrcodeStorageUrl ? 0.5 : 1,
+            opacity: printStatus === 'printing' ? 0.5 : 1,
           }}
         >
           Done

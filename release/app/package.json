@@ -11,11 +11,9 @@
   "main": "./dist/main/main.js",
   "scripts": {
     "rebuild": "node -r ts-node/register ../../.erb/scripts/electron-rebuild.js",
-    "postinstall": "npm run rebuild && npm run link-modules",
-    "link-modules": "node -r ts-node/register ../../.erb/scripts/link-modules.ts"
+    "postinstall": "npm run rebuild"
   },
   "dependencies": {
-    "canon-edsdk": "file:../../../EDSDK_Wrapper",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@kshersolution/ksher": "^1.0.9"
   }

@@ -266,7 +266,7 @@ export const applyLUTToImage = async (
   ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
   const processedCanvas = applyLUTToCanvas(canvas, lut);
 
-  return processedCanvas.toDataURL('image/jpeg', 0.95);
+  return processedCanvas.toDataURL('image/jpeg', 1.0);
 };
 
 /**

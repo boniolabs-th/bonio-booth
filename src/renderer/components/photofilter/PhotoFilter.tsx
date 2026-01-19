@@ -46,6 +46,14 @@ export default function PhotoFilter() {
   const [canCut, setCanCut] = useState<boolean>(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Paper position config for print alignment
+  const [paperPositionConfig, setPaperPositionConfig] = useState<{
+    landscapeHorizontal: number;
+    landscapeVertical: number;
+    portraitHorizontal: number;
+    portraitVertical: number;
+  } | null>(null);
+
   // Horizontal scroll for filter thumbnails
   const filtersContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -179,6 +187,23 @@ export default function PhotoFilter() {
     fetchMachineData();
   }, []);
 
+  // Load paper position config for print alignment
+  useEffect(() => {
+    const loadPaperPositionConfig = async () => {
+      try {
+        // @ts-ignore
+        const positionResult = await window.electron?.payment?.getPrintTestPosition();
+        if (positionResult?.success && positionResult.position) {
+          setPaperPositionConfig(positionResult.position);
+          console.log('✅ [PhotoFilter] Paper position config loaded:', positionResult.position);
+        }
+      } catch (error) {
+        console.error('❌ [PhotoFilter] Failed to load paper position config:', error);
+      }
+    };
+    loadPaperPositionConfig();
+  }, []);
+
   const handleCountdownComplete = useCallback(() => {
     console.log(
       '⏰ [PhotoFilter] Countdown completed, auto-navigating to home',
@@ -294,7 +319,8 @@ export default function PhotoFilter() {
 
       img.onload = async () => {
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        // ใช้ srgb color space เพื่อให้สีถูกต้อง
+        const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
 
         if (!ctx) {
           reject(new Error('ไม่สามารถสร้าง canvas context ได้'));
@@ -350,7 +376,8 @@ export default function PhotoFilter() {
       }
 
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      // ใช้ srgb color space เพื่อให้สีถูกต้อง
+      const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
 
       if (!ctx) {
         reject(new Error('ไม่สามารถสร้าง canvas context ได้'));
@@ -511,7 +538,8 @@ export default function PhotoFilter() {
           const doubleCanvas = document.createElement('canvas');
           doubleCanvas.width = frameWidth * 2;
           doubleCanvas.height = frameHeight;
-          const dCtx = doubleCanvas.getContext('2d');
+          // ใช้ srgb color space เพื่อให้สีถูกต้อง
+          const dCtx = doubleCanvas.getContext('2d', { colorSpace: 'srgb' });
           if (dCtx) {
             dCtx.fillStyle = '#ffffff';
             dCtx.fillRect(0, 0, doubleCanvas.width, doubleCanvas.height);
@@ -613,6 +641,21 @@ export default function PhotoFilter() {
               const frameHeight = state.selectedFrame?.height || 1800;
               const imageSize = `${frameWidth}x${frameHeight}`;
 
+              // ดึงค่า horizontal และ vertical ตาม orientation จาก paper position config
+              const horizontal = printOrientation === 'landscape'
+                ? (paperPositionConfig?.landscapeHorizontal ?? 0)
+                : (paperPositionConfig?.portraitHorizontal ?? 0);
+              const vertical = printOrientation === 'landscape'
+                ? (paperPositionConfig?.landscapeVertical ?? 0)
+                : (paperPositionConfig?.portraitVertical ?? 0);
+
+              console.log('🖨️ [PhotoFilter] Paper position for print:', {
+                orientation: printOrientation,
+                horizontal,
+                vertical,
+                paperPositionConfig,
+              });
+
               window.electron.print.printPhoto({
                 imageDataUrl: printImage,
                 frameId: frameIdToSend,
@@ -620,6 +663,8 @@ export default function PhotoFilter() {
                 copies: state.quantity || 1,
                 orientation: printOrientation,
                 imageSize: imageSize, // เพิ่ม imageSize สำหรับตรวจสอบ frame type
+                horizontal, // ค่า horizontal จาก paper position config
+                vertical, // ค่า vertical จาก paper position config
               });
               console.log('Print request sent - waiting for response...');
             } catch (printError) {
@@ -678,24 +723,28 @@ export default function PhotoFilter() {
     }
   };
 
-  // สร้าง preview ของ finalImage ที่มี filter applied กับรูปภาพใน frame
+  // สร้าง preview ของภาพแรกขนาดใหญ่พร้อม filter (ไม่ใช่ภาพในกรอบ)
   const generatePreview = async () => {
-    if (
-      !state.finalImage ||
-      !state.selectedFrame ||
-      !state.selectedCaptures.length
-    ) {
-      setPreviewImage(state.finalImage || '');
+    if (!state.selectedCaptures.length) {
+      setPreviewImage('');
+      return;
+    }
+
+    // ถ้าไม่มี filter ให้แสดงภาพแรกเลย
+    if (selectedFilter === 'none') {
+      setPreviewImage(state.selectedCaptures[0].photo);
       return;
     }
 
     setIsGeneratingPreview(true);
     try {
-      const preview = await generateFinalImageWithFilteredPhotos();
-      setPreviewImage(preview);
+      // Apply filter กับภาพแรกแล้วแสดงขนาดใหญ่
+      const filteredCanvas = await applyFilterToPhoto(state.selectedCaptures[0].photo);
+      const filteredDataUrl = filteredCanvas.toDataURL('image/jpeg', 1.0);
+      setPreviewImage(filteredDataUrl);
     } catch (error) {
       console.error('Error generating preview:', error);
-      setPreviewImage(state.finalImage);
+      setPreviewImage(state.selectedCaptures[0].photo);
     } finally {
       setIsGeneratingPreview(false);
     }
@@ -707,10 +756,10 @@ export default function PhotoFilter() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFilter]);
 
-  // Initial preview on mount
+  // Initial preview on mount - แสดงภาพแรกทันที
   useEffect(() => {
-    if (state.finalImage && !previewImage) {
-      setPreviewImage(state.finalImage);
+    if (state.selectedCaptures?.length && !previewImage) {
+      setPreviewImage(state.selectedCaptures[0].photo);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -864,9 +913,6 @@ export default function PhotoFilter() {
                             alt={filter.name}
                             style={{ filter: getFilterStyle(filter.id) }}
                           />
-                        )}
-                        {filter.type === 'lut' && (
-                          <div className="lut-badge">LUT</div>
                         )}
                       </div>
                       <div className="filter-thumbnail-name">{filter.name}</div>

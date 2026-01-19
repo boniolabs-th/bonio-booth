@@ -483,12 +483,10 @@ export default function MainShooting() {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
-      // Flip horizontally (mirror effect) to match the preview
-      context.translate(canvas.width, 0);
-      context.scale(-1, 1);
+      // Draw image directly without flipping
+      // Live Preview is mirrored via CSS (scaleX(-1)) for selfie-like experience
+      // But captured photo should be the actual camera view (readable text/numbers)
       context.drawImage(video, 0, 0);
-      // Reset transform for future use
-      context.setTransform(1, 0, 0, 1, 0, 0);
 
       const photoData = canvas.toDataURL('image/jpeg', 1.0);
 
@@ -681,10 +679,11 @@ export default function MainShooting() {
 
       if (result.success && result.imageData) {
         console.log('✅ [Canon] Photo captured with shutter!');
-        // Flip image horizontally (mirror effect) to match the preview
-        const flippedImage = await flipImageHorizontally(result.imageData);
-        console.log('✅ [Canon] Photo flipped horizontally');
-        return flippedImage;
+        // Return image directly without flipping
+        // Live Preview is mirrored via CSS for selfie-like experience
+        // But captured photo should be the actual camera view (readable text/numbers)
+        console.log('✅ [Canon] Photo returned without flip (actual camera view)');
+        return result.imageData;
       }
 
       console.error('❌ [Canon] Shutter capture failed:', result.error);

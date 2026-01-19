@@ -408,7 +408,8 @@ export default function PrintTest(): React.JSX.Element {
 
             doubleCanvas.width = frameWidth * 2; // 2400
             doubleCanvas.height = frameHeight; // 3600
-            const dCtx = doubleCanvas.getContext('2d');
+            // ใช้ srgb color space เพื่อให้สีถูกต้อง
+            const dCtx = doubleCanvas.getContext('2d', { colorSpace: 'srgb' });
 
             if (dCtx) {
               // Fill with white background
@@ -419,7 +420,7 @@ export default function PrintTest(): React.JSX.Element {
               dCtx.drawImage(img, 0, 0, frameWidth, frameHeight);
               dCtx.drawImage(img, frameWidth, 0, frameWidth, frameHeight);
 
-              imageDataUrl = doubleCanvas.toDataURL('image/png');
+              imageDataUrl = doubleCanvas.toDataURL('image/jpeg', 1.0);
               console.log(
                 '✅ [PrintTest] Image duplicated successfully (2x6 -> 4x6)',
               );
@@ -784,7 +785,7 @@ export default function PrintTest(): React.JSX.Element {
                       htmlFor="portrait-scale-slider"
                       className="slider-label"
                     >
-                      Scale 
+                      Scale
                     </label>
                     <input
                       type="number"

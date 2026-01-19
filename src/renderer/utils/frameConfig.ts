@@ -191,17 +191,16 @@ export async function fetchFrameConfigs(): Promise<FrameConfig[]> {
 export interface FilterConfig {
   id: string;
   name: string;
-  filter?: string; // CSS filter (for preview)
-  lutFile?: string; // Filename of .cube LUT file (for FFmpeg)
-  type: 'css' | 'lut'; // Filter type
+  lutFile: string; // Filename of .cube LUT file (for FFmpeg)
+  type: 'lut'; // Filter type - LUT only
 }
 
 export const FILTERS: FilterConfig[] = [
-  // LUT-based filters (for high-quality color grading)
-  { id: 'matte-brown-mono', name: 'Matte Brown Mono', lutFile: 'Matte_Brown_Mono.cube', type: 'lut' },
-  { id: 'sepia-brown', name: 'Sepia Brown', lutFile: 'Sepia_Brown.cube', type: 'lut' },
-  { id: 'timelab-1', name: 'Timelab 1', lutFile: 'Timelab 1.cube', type: 'lut' },
-  { id: 'timelab-4', name: 'Timelab 4', lutFile: 'Timelab 4.cube', type: 'lut' },
-  { id: 'timelab-5', name: 'Timelab 5', lutFile: 'Timelab 5.cube', type: 'lut' },
-  { id: 'warm-vintage', name: 'Warm Vintage', lutFile: 'Warm_Vintage.cube', type: 'lut' },
+  // LUT-based filters (for high-quality color grading via FFmpeg)
+  { id: 'matte-brown-mono', name: 'Matte Brown', lutFile: 'Matte_Brown_Mono.cube', type: 'lut' },
+  { id: 'sepia-brown', name: 'Sepia', lutFile: 'Sepia_Brown.cube', type: 'lut' },
+  { id: 'timelab-1', name: 'Classic', lutFile: 'Timelab 1.cube', type: 'lut' },
+  { id: 'timelab-4', name: 'Soft', lutFile: 'Timelab 4.cube', type: 'lut' },
+  { id: 'timelab-5', name: 'Vivid', lutFile: 'Timelab 5.cube', type: 'lut' },
+  { id: 'warm-vintage', name: 'Vintage', lutFile: 'Warm_Vintage.cube', type: 'lut' },
 ];

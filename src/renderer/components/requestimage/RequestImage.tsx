@@ -266,7 +266,8 @@ export default function RequestImage(): React.JSX.Element {
 
             doubleCanvas.width = frameWidth * 2; // 2400
             doubleCanvas.height = frameHeight; // 3600
-            const dCtx = doubleCanvas.getContext('2d');
+            // ใช้ srgb color space เพื่อให้สีถูกต้อง
+            const dCtx = doubleCanvas.getContext('2d', { colorSpace: 'srgb' });
 
             if (dCtx) {
               // Fill with white background
@@ -277,7 +278,7 @@ export default function RequestImage(): React.JSX.Element {
               dCtx.drawImage(img, 0, 0, frameWidth, frameHeight);
               dCtx.drawImage(img, frameWidth, 0, frameWidth, frameHeight);
 
-              imageDataUrl = doubleCanvas.toDataURL('image/png');
+              imageDataUrl = doubleCanvas.toDataURL('image/jpeg', 1.0);
               console.log(
                 '✅ [RequestImage] Image duplicated successfully (2x6 -> 4x6)',
               );
@@ -325,6 +326,8 @@ export default function RequestImage(): React.JSX.Element {
             copies,
             orientation: isPortraitCut ? 'portrait' : orientation, // ส่ง portrait สำหรับ portrait-cut
             imageSize, // ส่ง imageSize เพื่อให้ระบบรู้ว่าเป็น 2x6 และจะตัดได้
+            horizontal, // ค่า horizontal จาก paper position
+            vertical, // ค่า vertical จาก paper position
           });
 
           // Timeout after 60 seconds

@@ -58,6 +58,7 @@ import {
   convertWebmToMp4Base64,
 } from './services/videoService';
 import machineService from './services/machineService';
+import { backgroundUploadService } from './services/backgroundUploadService';
 import sseClient from './services/sseClient';
 import shutdownManager, { ShutdownState } from './services/shutdownManager';
 import appCloseManager, { AppCloseState } from './services/appCloseManager';
@@ -561,6 +562,19 @@ async function generateImageWithPadding(
         note: 'Using original orientation for size adjustment, typeTransform only for rotation',
       });
 
+      // ถ้ามีการ rotate 90° ต้องสลับ horizontal กับ vertical
+      // เพราะหลัง rotate แกน X จะกลายเป็น Y และ Y กลายเป็น X
+      const effectiveHorizontal = willRotate ? vertical : horizontal;
+      const effectiveVertical = willRotate ? -horizontal : vertical;
+
+      console.log('🖼️ [generateImageWithPadding] Position adjustment:', {
+        willRotate,
+        originalHorizontal: horizontal,
+        originalVertical: vertical,
+        effectiveHorizontal,
+        effectiveVertical,
+      });
+
       // สร้างไฟล์ HTML ชั่วคราว
       const tempDir = app.getPath("temp");
       htmlPath = path.join(tempDir, `padded-image-${Date.now()}.html`);
@@ -601,16 +615,16 @@ async function generateImageWithPadding(
         height: auto;
         object-fit: contain;
         display: block;
-        margin-top: ${vertical < 0 ? vertical : 0}px;
-        margin-bottom: ${vertical > 0 ? -vertical : 0}px;
-        margin-left: ${horizontal < 0 ? horizontal : 0}px;
-        margin-right: ${horizontal > 0 ? -horizontal : 0}px;
+        margin-top: ${effectiveVertical < 0 ? effectiveVertical : 0}px;
+        margin-bottom: ${effectiveVertical > 0 ? -effectiveVertical : 0}px;
+        margin-left: ${effectiveHorizontal < 0 ? effectiveHorizontal : 0}px;
+        margin-right: ${effectiveHorizontal > 0 ? -effectiveHorizontal : 0}px;
         transform: ${(() => {
           const transforms = [];
           if (scaleValue !== 1) {
             transforms.push(`scale(${scaleValue})`);
           }
-          if (orientation !== typeTransform) {
+          if (willRotate) {
             transforms.push('rotate(90deg)');
           }
           return transforms.length > 0 ? transforms.join(' ') : 'none';
@@ -646,7 +660,8 @@ async function generateImageWithPadding(
             if (!resolved) {
               resolved = true;
               clearTimeout(timeout);
-              const buffer = image.toPNG();
+              // ใช้ JPEG แทน PNG เพื่อ color profile ที่ถูกต้องและขนาดไฟล์เล็กลง
+              const buffer = image.toJPEG(100);
               win.close();
               await cleanup();
               resolve(buffer);
@@ -1166,8 +1181,8 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     );
 
     const tempDir = app.getPath("temp");
-    const pngPath = path.join(tempDir, `photo-${Date.now()}.png`);
-    await fs.writeFile(pngPath, paddedImageBuffer);
+    const jpgPath = path.join(tempDir, `photo-${Date.now()}.jpg`);
+    await fs.writeFile(jpgPath, paddedImageBuffer);
 
     // ตรวจสอบว่าเป็น frame 2x6 หรือไม่ (ต้องตัดกระดาษ)
     // ใช้ imageSize เพื่อตรวจสอบ:
@@ -1223,7 +1238,7 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     const printNext = (copyNumber: number) => {
       if (copyNumber > copies) {
         // พิมพ์เสร็จทั้งหมดแล้ว
-        setTimeout(() => fs.unlink(pngPath).catch(() => {}), 2000);
+        setTimeout(() => fs.unlink(jpgPath).catch(() => {}), 2000);
 
         if (hasError) {
           event.reply("print-response", { success: false, error: errorMessage });
@@ -1244,13 +1259,13 @@ ipcMain.on("print-photo", async (event, printConfig) => {
 
       if (platform === 'win32') {
         // Windows
-        printCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${pngPath}" "${printerName}"`;
+        printCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${jpgPath}" "${printerName}"`;
       } else if (platform === 'darwin') {
         // macOS
-        printCmd = `lpr -P "${printerName}" "${pngPath}"`;
+        printCmd = `lpr -P "${printerName}" "${jpgPath}"`;
       } else {
         // Linux และ OS อื่นๆ
-        printCmd = `lp -d "${printerName}" "${pngPath}"`;
+        printCmd = `lp -d "${printerName}" "${jpgPath}"`;
       }
 
       exec(printCmd, (err) => {
@@ -1891,6 +1906,79 @@ ipcMain.handle(
     }
   },
 );
+
+// Handler สำหรับ background upload (ส่ง job ไป queue และ return ทันที)
+// ใช้เมื่อต้องการให้ upload ทำงานเบื้องหลังโดยไม่ต้องรอ
+ipcMain.handle(
+  'queue-background-upload',
+  async (
+    event,
+    sessionId: string,
+    photos: string[],
+    videos: string[] = [],
+  ) => {
+    try {
+      console.log('📤 [Main] Queueing background upload...');
+      console.log(`📤 [Main] Session: ${sessionId}, Photos: ${photos.length}, Videos: ${videos.length}`);
+
+      const result = await backgroundUploadService.queueUpload(
+        sessionId,
+        photos,
+        videos,
+      );
+
+      console.log(`✅ [Main] Upload queued with job ID: ${result.jobId}`);
+      return {
+        success: true,
+        jobId: result.jobId,
+        message: 'Upload queued successfully',
+      };
+    } catch (error) {
+      console.error('❌ [Main] Error in queue-background-upload handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        message: errorMessage,
+        error: errorMessage,
+      };
+    }
+  },
+);
+
+// Handler สำหรับตรวจสอบสถานะ background upload job
+ipcMain.handle('get-upload-job-status', async (event, jobId: string) => {
+  try {
+    const job = backgroundUploadService.getJobStatus(jobId);
+    return {
+      success: true,
+      job: job || null,
+    };
+  } catch (error) {
+    console.error('❌ [Main] Error in get-upload-job-status handler:', error);
+    return {
+      success: false,
+      job: null,
+    };
+  }
+});
+
+// Handler สำหรับตรวจสอบจำนวน pending uploads
+ipcMain.handle('get-pending-uploads-count', async () => {
+  try {
+    const count = backgroundUploadService.getPendingCount();
+    return {
+      success: true,
+      count,
+    };
+  } catch (error) {
+    console.error('❌ [Main] Error in get-pending-uploads-count handler:', error);
+    return {
+      success: false,
+      count: 0,
+    };
+  }
+});
 
 // ==================== SHUTDOWN MANAGEMENT ====================
 
