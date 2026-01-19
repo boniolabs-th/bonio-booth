@@ -227,8 +227,8 @@ export default function PhotoDecorate() {
     const frameImg = new Image();
     frameImg.crossOrigin = 'anonymous'; // Fix CORS issue
     frameImg.onload = () => {
-      const frameWidth = frameImg.naturalWidth || selectedFrame.width;
-      const frameHeight = frameImg.naturalHeight || selectedFrame.height;
+      const frameWidth = (frameImg.naturalWidth || selectedFrame.width) + 1;
+      const frameHeight = (frameImg.naturalHeight || selectedFrame.height) + 1;
 
       // Check if we need to duplicate for 4x6 (when machine cannot cut and frame is 2x6)
       // 2x6 frame usually has aspect ratio around 0.33 (2/6)
@@ -578,8 +578,8 @@ export default function PhotoDecorate() {
               // Add imageOffset to account for object-fit: contain positioning
               const slotX = slot.x * scaleFactor.x + imageOffset.x;
               const slotY = slot.y * scaleFactor.y + imageOffset.y;
-              const slotWidth = slot.width * scaleFactor.x;
-              const slotHeight = slot.height * scaleFactor.y;
+              const slotWidth = slot.width * scaleFactor.x + 1;
+              const slotHeight = slot.height * scaleFactor.y + 1;
               const slotAspectRatio = slot.width / slot.height;
               const scaledRadius = slot.radius * scaleFactor.x; // Scale radius
               const zIndex = slot.zIndex || 0;
