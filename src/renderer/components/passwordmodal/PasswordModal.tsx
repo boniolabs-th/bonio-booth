@@ -54,15 +54,14 @@ export default function PasswordModal({
     onCancel();
   }, [onCancel]);
 
-  // Focus input เมื่อ modal เปิด และจัดการ Escape key
   useEffect(() => {
     if (isOpen && inputRef.current) {
-      // รอสักครู่เพื่อให้ modal render เสร็จก่อน focus
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
+      inputRef.current?.focus();
     }
+  }, [isOpen]);
 
+  // Focus input เมื่อ modal เปิด และจัดการ Escape key
+  useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         handleCancel();
@@ -71,11 +70,11 @@ export default function PasswordModal({
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      return () => {
-        document.removeEventListener('keydown', handleEscape);
-      };
     }
-    return undefined;
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
   }, [isOpen, handleCancel]);
 
   const handleKeyDown = useCallback(
@@ -83,29 +82,21 @@ export default function PasswordModal({
       if (e.key === 'Enter') {
         e.preventDefault();
         handleSubmit();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        handleCancel();
       }
     },
-    [handleSubmit, handleCancel],
+    [handleSubmit],
   );
 
   if (!isOpen) return null;
 
   return (
     <div className="password-modal-overlay" role="presentation">
-      <button
-        type="button"
-        className="password-modal-backdrop"
-        onClick={handleCancel}
-        aria-label="ปิด modal"
-      />
       <div
         className="password-modal-content"
         role="dialog"
         aria-modal="true"
         aria-labelledby="password-modal-title"
+        tabIndex={-1}
       >
         <h2 id="password-modal-title" className="password-modal-title">
           {title}
