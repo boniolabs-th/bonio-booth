@@ -1,5 +1,7 @@
 *       text    eol=lf
 *.exe   binary
+*.dll   binary
+*.node  binary
 *.png   binary
 *.jpg   binary
 *.jpeg  binary

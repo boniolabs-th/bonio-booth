@@ -310,15 +310,13 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { getPropertyIds, getShutterButton, initializeSdk, terminateSdk, isSdkInitializedCheck, getSdkVersion, getEdsdkDllPath, getCameraList, connectCamera, connectCameraByIndex, openSession, closeSession, disconnectCamera, isCameraConnected, isSessionOpen, takePicture, captureToBuffer, pressShutterButton, startLiveView, stopLiveView, getLiveViewFrame, getProperty, setProperty, getIso, setIso, getAperture, setAperture, getShutterSpeed, setShutterSpeed, getBatteryLevel, getAvailableShots, processEvents } = nativeBinding
+const { CameraEventType, initializeSdk, terminateSdk, isSdkInitialized, isSdkInitializedCheck, getCameraList, connectCamera, connectCameraByIndex, openSession, closeSession, disconnectCamera, isCameraConnected, isSessionOpen, takePicture, captureToBuffer, pressShutterButton, startLiveView, stopLiveView, getLiveViewFrame, getProperty, setProperty, getIso, setIso, getAperture, setAperture, getShutterSpeed, setShutterSpeed, getBatteryLevel, getAvailableShots, processEvents, getSdkVersion, getEdsdkDllPath, getPropertyIds, getShutterButton, property_ids, shutter_button } = nativeBinding
 
-module.exports.getPropertyIds = getPropertyIds
-module.exports.getShutterButton = getShutterButton
+module.exports.CameraEventType = CameraEventType
 module.exports.initializeSdk = initializeSdk
 module.exports.terminateSdk = terminateSdk
+module.exports.isSdkInitialized = isSdkInitialized
 module.exports.isSdkInitializedCheck = isSdkInitializedCheck
-module.exports.getSdkVersion = getSdkVersion
-module.exports.getEdsdkDllPath = getEdsdkDllPath
 module.exports.getCameraList = getCameraList
 module.exports.connectCamera = connectCamera
 module.exports.connectCameraByIndex = connectCameraByIndex
@@ -344,8 +342,9 @@ module.exports.setShutterSpeed = setShutterSpeed
 module.exports.getBatteryLevel = getBatteryLevel
 module.exports.getAvailableShots = getAvailableShots
 module.exports.processEvents = processEvents
-
-// Compatibility aliases for bonio-booth
-module.exports.isSdkInitialized = isSdkInitializedCheck
-module.exports.propertyIds = getPropertyIds()
-module.exports.shutterButton = getShutterButton()
+module.exports.getSdkVersion = getSdkVersion
+module.exports.getEdsdkDllPath = getEdsdkDllPath
+module.exports.getPropertyIds = getPropertyIds
+module.exports.getShutterButton = getShutterButton
+module.exports.property_ids = property_ids
+module.exports.shutter_button = shutter_button
