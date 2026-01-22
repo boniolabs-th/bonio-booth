@@ -31,6 +31,7 @@ import {
   PrinterConfigModal,
 } from './components';
 import './App.css';
+import { useBlockTouchContextMenu } from './hooks/useBlockTouchContextMenu';
 
 function RouteListener() {
   const location = useLocation();
@@ -341,6 +342,8 @@ function ConfigChecker() {
 }
 
 export default function App() {
+  useBlockTouchContextMenu();
+
   return (
     <Router>
       <RouteListener />
