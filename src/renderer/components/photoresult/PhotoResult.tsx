@@ -1585,8 +1585,8 @@ export default function PhotoResult() {
           }
         }
 
-        // เพิ่มวิดีโอจาก compiledVideoUrl (วิดีโอที่ผ่าน LUT แล้ว)
-        // แปลง WebM เป็น MP4 ก่อน upload เพื่อให้ iPhone/Safari เปิดดูได้
+        // บันทึก WebM ไป temp file และส่ง path ไปให้ background service convert
+        // ไม่ต้องรอ convert ในตรงนี้ - จะทำในเบื้องหลังหลัง navigate ไปแล้ว
         console.log(
           '📤 [PhotoResult] ========== VIDEO UPLOAD CHECK ==========',
         );
@@ -1601,20 +1601,23 @@ export default function PhotoResult() {
           isApplyingLUT,
         });
 
+        let webmVideoPath: string | undefined;
         if (compiledVideoUrl) {
           try {
             console.log(
-              '📤 [PhotoResult] Converting WebM video to MP4 for iPhone/Safari compatibility...',
+              '📤 [PhotoResult] Saving WebM to temp file for background conversion...',
             );
 
             // Step 1: Fetch blob from blob URL
             const response = await fetch(compiledVideoUrl);
             const blob = await response.blob();
             const arrayBuffer = await blob.arrayBuffer();
+            const webmSizeMB = (blob.size / 1024 / 1024).toFixed(2);
 
             console.log('📤 [PhotoResult] Video blob fetched:', {
               blobSize: blob.size,
               blobType: blob.type,
+              sizeMB: webmSizeMB,
             });
 
             // Step 2: Save WebM to temp file
@@ -1623,64 +1626,20 @@ export default function PhotoResult() {
             if (!saveResult.success) {
               throw new Error(`Failed to save temp video: ${saveResult.error}`);
             }
+            webmVideoPath = saveResult.path;
             console.log(
               '📤 [PhotoResult] WebM saved to temp:',
-              saveResult.path,
+              webmVideoPath,
             );
-
-            // Step 3: Convert WebM to MP4 using FFmpeg (returns base64 data URL)
-            const convertResult = await window.electron.video.convertToMp4(
-              saveResult.path,
-              true,
+            console.log(
+              '✅ [PhotoResult] WebM saved! Will convert to MP4 in background after navigation.',
             );
-            if (!convertResult.success) {
-              throw new Error(
-                `Failed to convert to MP4: ${convertResult.error}`,
-              );
-            }
-
-            const mp4DataUrl = convertResult.dataUrl;
-            console.log('📤 [PhotoResult] MP4 conversion successful:', {
-              dataUrlLength: mp4DataUrl.length,
-              preview: mp4DataUrl.substring(0, 50),
-            });
-
-            // คำนวณขนาดไฟล์ MP4 (ประมาณ)
-            const base64Length = mp4DataUrl.includes('base64,')
-              ? mp4DataUrl.split('base64,')[1].length
-              : mp4DataUrl.length;
-            const estimatedSizeMB = (base64Length * 3) / 4 / (1024 * 1024);
-
-            console.log('📤 [PhotoResult] MP4 video size:', {
-              base64Length,
-              estimatedSizeMB: estimatedSizeMB.toFixed(2),
-            });
-
-            if (estimatedSizeMB > 10) {
-              console.warn(
-                `⚠️ [PhotoResult] MP4 video size (${estimatedSizeMB.toFixed(2)}MB) exceeds 10MB limit!`,
-              );
-              console.warn(
-                '⚠️ [PhotoResult] Video will be skipped to avoid upload failure',
-              );
-            } else {
-              videos.push(mp4DataUrl);
-              console.log(
-                '✅ [PhotoResult] Added MP4 video (converted from WebM) to videos',
-              );
-            }
-
-            // Note: Temp file cleanup is handled by OS temp folder cleanup
           } catch (error) {
             console.error(
-              '❌ [PhotoResult] Failed to convert video to MP4:',
+              '❌ [PhotoResult] Failed to save WebM to temp file:',
               error,
             );
-            // ไม่ fallback ไป WebM อีกต่อไป เพราะ iPhone/Safari ไม่รองรับ
-            // ถ้าแปลง MP4 ไม่สำเร็จ ให้ skip video upload
-            console.error(
-              '⚠️ [PhotoResult] Skipping video upload because MP4 conversion failed. iPhone/Safari will not be able to play WebM.',
-            );
+            // ไม่มี video path ส่งไป - upload จะมีแค่ photos
           }
         } else {
           console.warn(
@@ -1690,9 +1649,11 @@ export default function PhotoResult() {
             '⚠️ [PhotoResult] Video may still be processing. Consider waiting for video to be ready.',
           );
         }
+
         console.log('📤 [PhotoResult] Final upload arrays:', {
           photosCount: photos.length,
           videosCount: videos.length,
+          hasWebmVideoPath: !!webmVideoPath,
         });
         console.log(
           '📤 [PhotoResult] ===========================================',
@@ -1702,6 +1663,7 @@ export default function PhotoResult() {
         console.log('📤 [PhotoResult] Upload summary:', {
           photosCount: photos.length,
           videosCount: videos.length,
+          webmVideoPath,
           formatId: state.selectedFrame?.id,
         });
 
@@ -1771,6 +1733,7 @@ export default function PhotoResult() {
           sessionId,
           photosCount: photos.length,
           videosCount: videos.length,
+          webmVideoPath,
         });
         console.log('📤 [PhotoResult] Photos array:', {
           length: photos.length,
@@ -1780,20 +1743,26 @@ export default function PhotoResult() {
           length: videos.length,
           firstVideoPreview: videos[0]?.substring(0, 100) || 'none',
           hasCompiledVideoUrl: !!compiledVideoUrl,
+          webmVideoPath,
         });
         console.log(
           '📤 [PhotoResult] =========================================',
         );
 
-        // ใช้ queueBackgroundUpload แทน uploadFilesToSession (ทำงานเบื้องหลัง)
-        // จะ return ทันทีโดยไม่ต้องรอ upload เสร็จ
+        // ใช้ queueBackgroundUpload พร้อม webmVideoPath
+        // การแปลง WebM → MP4 จะทำในเบื้องหลังโดย backgroundUploadService
         const uploadResult = await window.electron.payment.queueBackgroundUpload(
           sessionId,
           photos,
           videos,
+          webmVideoPath, // ส่ง path ไปให้ convert ในเบื้องหลัง
         );
 
-        console.log('📤 [PhotoResult] Background upload queued:', uploadResult);
+        console.log('📤 [PhotoResult] Background upload queued:', {
+          success: uploadResult.success,
+          jobId: uploadResult.jobId,
+          willConvertInBackground: !!webmVideoPath,
+        });
 
         // qrcodeStorageUrl ควรมีอยู่แล้วจาก createPhotoSession (ไม่ต้องรอจาก upload)
         if (!qrcodeStorageUrl) {
@@ -2058,12 +2027,13 @@ export default function PhotoResult() {
                 );
               }
 
-              // เพิ่มวิดีโอ (แปลง WebM เป็น MP4 สำหรับ iPhone/Safari)
+              // บันทึก WebM ไป temp file และส่ง path ไปให้ background service convert
+              // ไม่ต้องรอ convert ในตรงนี้ - จะทำในเบื้องหลังหลัง navigate ไปแล้ว
+              let webmVideoPath: string | undefined;
               if (compiledVideoUrl) {
                 try {
-                  const convertStartTime = Date.now();
                   console.log(
-                    '📤 [PhotoResult] Converting WebM to MP4 (useEffect)...',
+                    '📤 [PhotoResult] Saving WebM to temp file for background conversion...',
                   );
 
                   // Fetch blob from blob URL
@@ -2084,53 +2054,19 @@ export default function PhotoResult() {
                       `Failed to save temp video: ${saveResult.error}`,
                     );
                   }
+                  webmVideoPath = saveResult.path;
                   console.log(
-                    `📁 [PhotoResult] Temp WebM saved: ${saveResult.path}`,
+                    `📁 [PhotoResult] Temp WebM saved: ${webmVideoPath}`,
                   );
-
-                  // Convert WebM to MP4
-                  const convertResult =
-                    await window.electron.video.convertToMp4(
-                      saveResult.path,
-                      true,
-                    );
-                  if (!convertResult.success) {
-                    throw new Error(
-                      `Failed to convert to MP4: ${convertResult.error}`,
-                    );
-                  }
-
-                  const convertEndTime = Date.now();
-                  const convertDuration = (
-                    (convertEndTime - convertStartTime) /
-                    1000
-                  ).toFixed(1);
-                  const mp4SizeMB = convertResult.dataUrl
-                    ? (
-                        (convertResult.dataUrl.length * 0.75) /
-                        1024 /
-                        1024
-                      ).toFixed(2)
-                    : 'N/A';
                   console.log(
-                    `✅ [PhotoResult] MP4 conversion done in ${convertDuration}s, size: ~${mp4SizeMB} MB`,
+                    '✅ [PhotoResult] WebM saved! Will convert to MP4 in background after navigation.',
                   );
-
-                  videos.push(convertResult.dataUrl);
-                  console.log(
-                    '✅ [PhotoResult] Added MP4 video to upload (useEffect)',
-                  );
-
-                  // Note: Temp file cleanup is handled by OS temp folder cleanup
                 } catch (error) {
                   console.error(
-                    '❌ [PhotoResult] MP4 conversion failed (useEffect):',
+                    '❌ [PhotoResult] Failed to save WebM to temp file:',
                     error,
                   );
-                  // ไม่ fallback ไป WebM เพราะ iPhone/Safari ไม่รองรับ
-                  console.error(
-                    '⚠️ [PhotoResult] Skipping video upload because MP4 conversion failed. iPhone/Safari will not be able to play WebM.',
-                  );
+                  // ไม่มี video path ส่งไป - upload จะมีแค่ photos
                 }
               }
 
@@ -2138,14 +2074,13 @@ export default function PhotoResult() {
                 photosCount: photos.length,
                 videosCount: videos.length,
                 hasCompiledVideoUrl: !!compiledVideoUrl,
-                compiledVideoUrlPreview: compiledVideoUrl?.substring(0, 50),
+                webmVideoPath,
               });
-
-              // Retry logic removed - MP4 conversion already handles fallback
 
               console.log('📤 [PhotoResult] Final arrays before upload:', {
                 photosCount: photos.length,
                 videosCount: videos.length,
+                hasWebmVideoPath: !!webmVideoPath,
               });
 
               // ตรวจสอบว่ามี sessionId หรือไม่
@@ -2161,17 +2096,20 @@ export default function PhotoResult() {
                 }
               }
 
-              // ใช้ queueBackgroundUpload แทน uploadFilesToSession (ทำงานเบื้องหลัง)
+              // ใช้ queueBackgroundUpload พร้อม webmVideoPath
+              // การแปลง WebM → MP4 จะทำในเบื้องหลังโดย backgroundUploadService
               const uploadResult =
                 await window.electron.payment.queueBackgroundUpload(
                   sessionId,
                   photos,
                   videos,
+                  webmVideoPath, // ส่ง path ไปให้ convert ในเบื้องหลัง
                 );
 
               console.log('📤 [PhotoResult] Background upload queued (from useEffect):', {
                 success: uploadResult.success,
                 jobId: uploadResult.jobId,
+                willConvertInBackground: !!webmVideoPath,
               });
 
               if (uploadResult.success) {

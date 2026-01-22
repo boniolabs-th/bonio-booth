@@ -1909,6 +1909,7 @@ ipcMain.handle(
 
 // Handler สำหรับ background upload (ส่ง job ไป queue และ return ทันที)
 // ใช้เมื่อต้องการให้ upload ทำงานเบื้องหลังโดยไม่ต้องรอ
+// ถ้าส่ง webmVideoPath มาด้วย จะแปลง WebM→MP4 ในเบื้องหลังก่อน upload
 ipcMain.handle(
   'queue-background-upload',
   async (
@@ -1916,15 +1917,20 @@ ipcMain.handle(
     sessionId: string,
     photos: string[],
     videos: string[] = [],
+    webmVideoPath?: string,
   ) => {
     try {
       console.log('📤 [Main] Queueing background upload...');
       console.log(`📤 [Main] Session: ${sessionId}, Photos: ${photos.length}, Videos: ${videos.length}`);
+      if (webmVideoPath) {
+        console.log(`📤 [Main] WebM video path: ${webmVideoPath} (will convert in background)`);
+      }
 
       const result = await backgroundUploadService.queueUpload(
         sessionId,
         photos,
         videos,
+        webmVideoPath,
       );
 
       console.log(`✅ [Main] Upload queued with job ID: ${result.jobId}`);

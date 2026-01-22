@@ -100,16 +100,19 @@ const electronHandler = {
       );
     },
     // Background upload - ส่ง job ไป queue และ return ทันที
+    // ถ้าส่ง webmVideoPath มาด้วย จะแปลง WebM→MP4 ในเบื้องหลังก่อน upload
     queueBackgroundUpload: (
       sessionId: string,
       photos: string[],
       videos?: string[],
+      webmVideoPath?: string,
     ) => {
       return ipcRenderer.invoke(
         'queue-background-upload',
         sessionId,
         photos,
         videos || [],
+        webmVideoPath,
       );
     },
     // ตรวจสอบสถานะ upload job

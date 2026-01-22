@@ -5,12 +5,14 @@
  */
 
 import machineService from './machineService';
+import { convertWebmToMp4Base64 } from './videoService';
 
-export interface UploadJob {
+interface UploadJob {
   id: string;
   sessionId: string;
   photos: string[];
   videos: string[];
+  webmVideoPath?: string; // Path to WebM file for background conversion
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
   createdAt: Date;
@@ -29,6 +31,7 @@ class BackgroundUploadService {
     sessionId: string,
     photos: string[],
     videos: string[],
+    webmVideoPath?: string,
   ): Promise<{ jobId: string; success: boolean }> {
     const jobId = `upload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -37,6 +40,7 @@ class BackgroundUploadService {
       sessionId,
       photos,
       videos,
+      webmVideoPath,
       status: 'pending',
       createdAt: new Date(),
     };
@@ -45,6 +49,9 @@ class BackgroundUploadService {
     console.log(`📤 [BackgroundUpload] Job ${jobId} queued for session ${sessionId}`);
     console.log(`📤 [BackgroundUpload] Queue size: ${this.uploadQueue.length}`);
     console.log(`📤 [BackgroundUpload] Photos: ${photos.length}, Videos: ${videos.length}`);
+    if (webmVideoPath) {
+      console.log(`📤 [BackgroundUpload] WebM video path: ${webmVideoPath} (will convert to MP4 in background)`);
+    }
 
     // เริ่ม process queue ทันที (ถ้ายังไม่ได้ process)
     this.processQueue();
@@ -122,10 +129,44 @@ class BackgroundUploadService {
         `📤 [BackgroundUpload] Uploading to session ${job.sessionId} (attempt ${retryCount + 1}/${this.maxRetries})`,
       );
 
+      // ถ้ามี webmVideoPath ให้แปลง WebM → MP4 ก่อน upload
+      let videosToUpload = [...job.videos];
+      if (job.webmVideoPath) {
+        console.log(`🎬 [BackgroundUpload] Converting WebM to MP4 in background...`);
+        console.log(`🎬 [BackgroundUpload] WebM path: ${job.webmVideoPath}`);
+        const convertStartTime = Date.now();
+
+        try {
+          // convertWebmToMp4Base64 returns dataUrl string directly (not an object)
+          console.log(`🎬 [BackgroundUpload] Calling convertWebmToMp4Base64...`);
+          const mp4DataUrl = await convertWebmToMp4Base64(job.webmVideoPath);
+          console.log(`🎬 [BackgroundUpload] convertWebmToMp4Base64 returned:`, {
+            type: typeof mp4DataUrl,
+            length: mp4DataUrl?.length || 0,
+            startsWithData: mp4DataUrl?.startsWith('data:') || false,
+            preview: mp4DataUrl?.substring(0, 50) || 'N/A',
+          });
+          if (mp4DataUrl && typeof mp4DataUrl === 'string' && mp4DataUrl.startsWith('data:video/mp4')) {
+            const convertDuration = ((Date.now() - convertStartTime) / 1000).toFixed(1);
+            const mp4SizeMB = ((mp4DataUrl.length * 0.75) / 1024 / 1024).toFixed(2);
+            console.log(`✅ [BackgroundUpload] MP4 conversion done in ${convertDuration}s, size: ~${mp4SizeMB} MB`);
+            videosToUpload.push(mp4DataUrl);
+          } else {
+            console.error(`❌ [BackgroundUpload] MP4 conversion failed: Invalid dataUrl returned`, {
+              mp4DataUrl: mp4DataUrl?.substring(0, 100) || 'undefined/null',
+            });
+            // ไม่ throw error - ยังคง upload photos ได้
+          }
+        } catch (convertError) {
+          console.error(`❌ [BackgroundUpload] MP4 conversion error:`, convertError);
+          // ไม่ throw error - ยังคง upload photos ได้
+        }
+      }
+
       const result = await machineService.uploadFilesToSession(
         job.sessionId,
         job.photos,
-        job.videos,
+        videosToUpload,
       );
 
       if (!result.success && retryCount < this.maxRetries - 1) {

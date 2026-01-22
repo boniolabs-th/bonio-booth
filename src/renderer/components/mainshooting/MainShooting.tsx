@@ -1050,9 +1050,26 @@ export default function MainShooting() {
     ? state.selectedFrame.slots.length + 2
     : 6; // fallback ถ้าไม่มี frame
 
-  // Navigate when we have all required captures
+  // Navigate when we have all required captures AND all videos are ready
   useEffect(() => {
     if (captures.length === requiredCaptures) {
+      // Check if all captures have valid video URLs (not empty)
+      // For Canon, videos are created asynchronously
+      const allVideosReady = captures.every(
+        (capture) => capture.video && capture.video.length > 0
+      );
+
+      if (!allVideosReady) {
+        console.log('⏳ [MainShooting] Waiting for Canon videos to be ready...');
+        console.log('📊 [MainShooting] Video status:', captures.map((c, i) => ({
+          index: i,
+          hasVideo: !!c.video,
+          videoLength: c.video?.length || 0,
+        })));
+        return; // Wait for videos to be ready
+      }
+
+      console.log('✅ [MainShooting] All captures and videos ready, navigating...');
       setTimeout(() => {
         navigate('/photo-decorate', {
           state: {
