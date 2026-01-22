@@ -194,6 +194,8 @@ let mainWindow: BrowserWindow | null = null;
 function getEdsdkDllPath(): string {
   // Check multiple possible locations
   const possiblePaths = [
+    // Production: resources/native folder (extraResources copies DLLs with native module)
+    path.join(process.resourcesPath || '', 'native', 'EDSDK.dll'),
     // Development: assets folder in project root
     path.join(process.cwd(), 'assets', 'EDSDK', 'Dll', 'EDSDK.dll'),
     // Production: resources/assets folder (extraResources)

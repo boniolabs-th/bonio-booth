@@ -278,7 +278,8 @@ export default function RequestImage(): React.JSX.Element {
               dCtx.drawImage(img, 0, 0, frameWidth, frameHeight);
               dCtx.drawImage(img, frameWidth, 0, frameWidth, frameHeight);
 
-              imageDataUrl = doubleCanvas.toDataURL('image/jpeg', 1.0);
+              // ใช้ quality 0.90 สำหรับ print output
+              imageDataUrl = doubleCanvas.toDataURL('image/jpeg', 0.90);
               console.log(
                 '✅ [RequestImage] Image duplicated successfully (2x6 -> 4x6)',
               );
@@ -436,7 +437,7 @@ export default function RequestImage(): React.JSX.Element {
                 onClick={() => setIsPaperPositionConfigModalOpen(true)}
                 disabled={isPrinting}
               >
-                Deverper Config
+                Developer Config
               </button>
             </div>
           </div> */}

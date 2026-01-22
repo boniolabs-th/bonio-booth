@@ -268,7 +268,8 @@ export default function PhotoDecorate() {
         // No photos assigned, draw frame only
         ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
 
-        const singleImageData = canvas.toDataURL('image/jpeg', 1.0);
+        // ใช้ quality 0.90 สำหรับ print output
+        const singleImageData = canvas.toDataURL('image/jpeg', 0.90);
 
         if (shouldDuplicate) {
           const doubleCanvas = document.createElement('canvas');
@@ -285,7 +286,8 @@ export default function PhotoDecorate() {
               proceedToResult(
                 singleImageData,
                 [],
-                doubleCanvas.toDataURL('image/jpeg', 1.0),
+                // ใช้ quality 0.90 สำหรับ duplicated print
+                doubleCanvas.toDataURL('image/jpeg', 0.90),
               );
             };
             img.src = singleImageData;
@@ -452,7 +454,8 @@ export default function PhotoDecorate() {
           [],
         );
 
-        const singleImageData = canvas.toDataURL('image/jpeg', 1.0);
+        // ใช้ quality 0.90 สำหรับ print output
+        const singleImageData = canvas.toDataURL('image/jpeg', 0.90);
 
         if (shouldDuplicate) {
           const doubleCanvas = document.createElement('canvas');
@@ -469,7 +472,8 @@ export default function PhotoDecorate() {
               proceedToResult(
                 singleImageData,
                 selectedCaptures,
-                doubleCanvas.toDataURL('image/jpeg', 1.0),
+                // ใช้ quality 0.90 สำหรับ duplicated print
+                doubleCanvas.toDataURL('image/jpeg', 0.90),
               );
             };
             img.src = singleImageData;

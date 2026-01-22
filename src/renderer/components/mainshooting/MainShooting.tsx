@@ -153,7 +153,8 @@ const flipImageHorizontally = (imageDataUrl: string): Promise<string> => {
       ctx.scale(-1, 1);
       ctx.drawImage(img, 0, 0);
 
-      resolve(canvas.toDataURL('image/jpeg', 1.0));
+      // ใช้ quality 0.92 สำหรับ original capture (คุณภาพสูง)
+      resolve(canvas.toDataURL('image/jpeg', 0.92));
     };
     img.onerror = () => reject(new Error('Failed to load image for flipping'));
     img.src = imageDataUrl;
@@ -488,7 +489,8 @@ export default function MainShooting() {
       // But captured photo should be the actual camera view (readable text/numbers)
       context.drawImage(video, 0, 0);
 
-      const photoData = canvas.toDataURL('image/jpeg', 1.0);
+      // ใช้ quality 0.92 สำหรับ original webcam capture
+      const photoData = canvas.toDataURL('image/jpeg', 0.92);
 
       // Flash effect
       setShowFlash(true);

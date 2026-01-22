@@ -114,13 +114,17 @@ export function initializeCanonCameraV2(): boolean {
   try {
     // Dynamic import of canon-edsdk from local native folder
     // In development: webpack bundles to .erb/dll/, so we need to use app.getAppPath()
-    // In production: __dirname points to app.asar/dist/main
+    // In production: extraResources copies native folder to resources/native
     const isPackaged = app.isPackaged;
     let nativePath: string;
 
+    canonLog.info(`app.isPackaged: ${isPackaged}`);
+    canonLog.info(`process.resourcesPath: ${process.resourcesPath}`);
+    canonLog.info(`app.getAppPath(): ${app.getAppPath()}`);
+
     if (isPackaged) {
-      // Production: native module is in app.asar.unpacked/dist/main/native
-      nativePath = path.join(process.resourcesPath, 'app.asar.unpacked', 'dist', 'main', 'native', 'index.js');
+      // Production: native module is in resources/native (via extraResources)
+      nativePath = path.join(process.resourcesPath, 'native', 'index.js');
     } else {
       // Development: native module is in src/main/native
       nativePath = path.join(app.getAppPath(), 'src', 'main', 'native', 'index.js');
@@ -139,8 +143,8 @@ export function initializeCanonCameraV2(): boolean {
     let edsdkDllPath: string;
 
     if (isPackaged) {
-      // In production, DLLs are in resources/assets/EDSDK/Dll
-      edsdkDllPath = path.join(process.resourcesPath, 'assets', 'EDSDK', 'Dll', 'EDSDK.dll');
+      // In production, EDSDK.dll is in resources/native (copied with native module)
+      edsdkDllPath = path.join(process.resourcesPath, 'native', 'EDSDK.dll');
     } else {
       // In development, use assets folder
       edsdkDllPath = path.join(app.getAppPath(), 'assets', 'EDSDK', 'Dll', 'EDSDK.dll');

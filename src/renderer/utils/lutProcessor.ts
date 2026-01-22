@@ -266,7 +266,8 @@ export const applyLUTToImage = async (
   ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
   const processedCanvas = applyLUTToCanvas(canvas, lut);
 
-  return processedCanvas.toDataURL('image/jpeg', 1.0);
+  // ใช้ quality 0.88 เพื่อ balance ระหว่างขนาดไฟล์และคุณภาพ
+  return processedCanvas.toDataURL('image/jpeg', 0.88);
 };
 
 /**

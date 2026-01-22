@@ -326,11 +326,103 @@ export function getOptimalWebcamConstraints(
   };
 }
 
+/**
+ * ประมวลผลภาพจากกล้อง Canon ให้คมชัดขึ้น
+ * ใช้ Unsharp Mask algorithm สำหรับ edge enhancement
+ *
+ * @param dataUrl - Image data URL จาก Canon capture
+ * @param options - Processing options
+ * @returns Promise<string> - Processed image data URL
+ */
+export async function processCanonPhoto(
+  dataUrl: string,
+  options: {
+    sharpen?: boolean;
+    sharpenAmount?: number;
+    quality?: number;
+  } = {},
+): Promise<string> {
+  const {
+    sharpen = true,
+    sharpenAmount = 0.4, // ค่า default สำหรับ Canon (สูงกว่า webcam เล็กน้อย)
+    quality = JPEG_QUALITY.PRINT,
+  } = options;
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+
+    img.onload = () => {
+      // Create canvas at native resolution
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+
+      const ctx = canvas.getContext('2d', {
+        willReadFrequently: true,
+        colorSpace: 'srgb',
+      });
+
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+
+      // Draw image at native resolution
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Apply sharpening if enabled
+      let outputCanvas = canvas;
+      if (sharpen) {
+        console.log(`🔍 [ImageProcessing] Applying Canon sharpen (amount: ${sharpenAmount})`);
+        // ใช้ applyUnsharpMask สำหรับคุณภาพสูงกว่า
+        outputCanvas = applyUnsharpMask(canvas, sharpenAmount, 1);
+      }
+
+      // Export with optimized quality
+      const processedDataUrl = outputCanvas.toDataURL('image/jpeg', quality);
+
+      console.log(`✅ [ImageProcessing] Canon photo processed:`, {
+        originalSize: `${(dataUrl.length / 1024 / 1024).toFixed(2)} MB`,
+        processedSize: `${(processedDataUrl.length / 1024 / 1024).toFixed(2)} MB`,
+        reduction: `${(100 - (processedDataUrl.length / dataUrl.length) * 100).toFixed(1)}%`,
+        quality,
+        sharpen,
+        sharpenAmount,
+      });
+
+      resolve(processedDataUrl);
+    };
+
+    img.onerror = () => {
+      reject(new Error('Failed to load Canon image for processing'));
+    };
+
+    img.src = dataUrl;
+  });
+}
+
+/**
+ * Apply sharpening to a canvas and return new canvas
+ * Convenience function for use in filter pipelines
+ *
+ * @param canvas - Source canvas
+ * @param amount - Sharpening strength (0.1 - 1.0)
+ * @returns Sharpened canvas
+ */
+export function sharpenCanvas(
+  canvas: HTMLCanvasElement,
+  amount: number = 0.35,
+): HTMLCanvasElement {
+  return applyUnsharpMask(canvas, amount, 1);
+}
+
 export default {
   JPEG_QUALITY,
   applySharpen,
   applyUnsharpMask,
   processWebcamPhoto,
+  processCanonPhoto,
+  sharpenCanvas,
   getNativeWebcamResolution,
   getOptimalWebcamConstraints,
 };

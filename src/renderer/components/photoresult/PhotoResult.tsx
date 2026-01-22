@@ -10,6 +10,7 @@ import {
   getLUTFilePath,
 } from '../../utils/lutProcessor';
 import { applyLUTWithWorker } from '../../utils/lutWorkerHelper';
+import { sharpenCanvas } from '../../utils/imageProcessing';
 import { COUNTDOWN } from '../../utils/appConfig';
 
 import './PhotoResult.css';
@@ -112,17 +113,24 @@ const applyFilterToPhoto = async (
           const lut = await getCachedLUT(lutPath);
           const processedCanvas = await applyLUTWithWorker(canvas, lut);
 
-          resolve(processedCanvas.toDataURL('image/jpeg', 1.0));
+          // Apply sharpening เพื่อให้ภาพคมชัดขึ้น
+          const sharpenedCanvas = sharpenCanvas(processedCanvas, 0.35);
+
+          // ใช้ quality 0.88 เพื่อลดขนาดไฟล์โดยคงคุณภาพ
+          resolve(sharpenedCanvas.toDataURL('image/jpeg', 0.88));
         } catch (error) {
           console.error('Failed to apply LUT:', error);
-          // Fallback to original
+          // Fallback to original with sharpening
           ctx.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL('image/jpeg', 1.0));
+          const sharpenedCanvas = sharpenCanvas(canvas, 0.35);
+          resolve(sharpenedCanvas.toDataURL('image/jpeg', 0.88));
         }
       } else {
         // No filter to apply (LUT only supported now)
         ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/jpeg', 1.0));
+        // Apply sharpening เพื่อให้ภาพคมชัดขึ้น
+        const sharpenedCanvas = sharpenCanvas(canvas, 0.35);
+        resolve(sharpenedCanvas.toDataURL('image/jpeg', 0.88));
       }
     };
 

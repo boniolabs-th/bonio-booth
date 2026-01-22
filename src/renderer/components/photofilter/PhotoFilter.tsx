@@ -5,6 +5,7 @@ import { FrameConfig, FILTERS } from '../../utils/frameConfig';
 import { getCachedLUT, getLUTFilePath } from '../../utils/lutProcessor';
 import { applyLUTWithWorker } from '../../utils/lutWorkerHelper';
 import { drawPhotoInSlot } from '../../utils/canvasUtils';
+import { sharpenCanvas } from '../../utils/imageProcessing';
 import './PhotoFilter.css';
 import Countdown from '../countdown';
 import { COUNTDOWN } from '../../utils/appConfig';
@@ -342,12 +343,15 @@ export default function PhotoFilter() {
             const lut = await getCachedLUT(lutPath);
             const processedCanvas = await applyLUTWithWorker(canvas, lut);
 
-            resolve(processedCanvas);
+            // Apply sharpening เพื่อให้ภาพคมชัดขึ้น (amount 0.35 = subtle but noticeable)
+            const sharpenedCanvas = sharpenCanvas(processedCanvas, 0.35);
+            resolve(sharpenedCanvas);
           } catch (error) {
             console.error('Failed to apply LUT:', error);
-            // Fallback to original
+            // Fallback to original with sharpening
             ctx.drawImage(img, 0, 0);
-            resolve(canvas);
+            const sharpenedCanvas = sharpenCanvas(canvas, 0.35);
+            resolve(sharpenedCanvas);
           }
         } else {
           // Apply CSS filter (traditional)
@@ -355,7 +359,9 @@ export default function PhotoFilter() {
             ctx.filter = filter.filter;
           }
           ctx.drawImage(img, 0, 0);
-          resolve(canvas);
+          // Apply sharpening เพื่อให้ภาพคมชัดขึ้น
+          const sharpenedCanvas = sharpenCanvas(canvas, 0.35);
+          resolve(sharpenedCanvas);
         }
       };
 
@@ -489,7 +495,8 @@ export default function PhotoFilter() {
             }
           });
 
-          resolve(canvas.toDataURL('image/jpeg', 1.0));
+          // ใช้ quality 0.90 สำหรับ print output - balance ระหว่าง quality และ file size
+          resolve(canvas.toDataURL('image/jpeg', 0.90));
         } catch (error) {
           reject(error);
         }
@@ -549,7 +556,8 @@ export default function PhotoFilter() {
               img.onload = () => {
                 dCtx.drawImage(img, 0, 0);
                 dCtx.drawImage(img, frameWidth, 0);
-                printImage = doubleCanvas.toDataURL('image/jpeg', 1.0);
+                // ใช้ quality 0.90 สำหรับ duplicated print image
+                printImage = doubleCanvas.toDataURL('image/jpeg', 0.90);
                 resolve();
               };
               img.src = filteredFinalImage;
@@ -740,7 +748,8 @@ export default function PhotoFilter() {
     try {
       // Apply filter กับภาพแรกแล้วแสดงขนาดใหญ่
       const filteredCanvas = await applyFilterToPhoto(state.selectedCaptures[0].photo);
-      const filteredDataUrl = filteredCanvas.toDataURL('image/jpeg', 1.0);
+      // ใช้ quality 0.85 สำหรับ preview (ไม่ต้องสูงมาก)
+      const filteredDataUrl = filteredCanvas.toDataURL('image/jpeg', 0.85);
       setPreviewImage(filteredDataUrl);
     } catch (error) {
       console.error('Error generating preview:', error);
