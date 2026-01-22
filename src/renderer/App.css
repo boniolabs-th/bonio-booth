@@ -2,7 +2,12 @@
  * @NOTE: Prepend a `~` to css file paths that are in your node_modules
  *        See https://github.com/webpack-contrib/sass-loader#imports
  */
+html{
+ touch-action: manipulation;
+}
+
 body {
+  touch-action: manipulation;
   position: relative;
   color: white;
   height: min(100vh, calc(100vw * 16 / 9));

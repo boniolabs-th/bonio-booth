@@ -582,8 +582,8 @@ export default function PhotoDecorate() {
               // Add imageOffset to account for object-fit: contain positioning
               const slotX = slot.x * scaleFactor.x + imageOffset.x;
               const slotY = slot.y * scaleFactor.y + imageOffset.y;
-              const slotWidth = slot.width * scaleFactor.x + 1;
-              const slotHeight = slot.height * scaleFactor.y + 1;
+              const slotWidth = slot.width * scaleFactor.x + 2;
+              const slotHeight = slot.height * scaleFactor.y + 2;
               const slotAspectRatio = slot.width / slot.height;
               const scaledRadius = slot.radius * scaleFactor.x; // Scale radius
               const zIndex = slot.zIndex || 0;
@@ -595,8 +595,8 @@ export default function PhotoDecorate() {
                   className="frame-slot-preview"
                   style={{
                     position: 'absolute',
-                    left: `${slotX}px`,
-                    top: `${slotY}px`,
+                    left: `${slotX - 1}px`,
+                    top: `${slotY - 1}px`,
                     width: `${slotWidth}px`,
                     height: `${slotHeight}px`,
                     aspectRatio: slotAspectRatio,

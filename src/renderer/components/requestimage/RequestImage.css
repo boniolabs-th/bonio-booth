@@ -1,10 +1,20 @@
+.request-image-back-btn-container {
+  position: relative;
+  transform: translateY(-40px);
+  z-index: 1;
+}
+
 .request-image-container {
-  width: 100%;
-  height: 80vh;
+  border-radius: 1rem;
+  width: 95%;
+  height: 100%;
+  max-height: 80dvh;
+  margin: 2rem;
   display: flex;
   flex-direction: column;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   overflow-y: auto;
+  position: relative;
 }
 
 .request-image-header {
@@ -32,9 +42,8 @@
   display: flex;
   flex-direction: column;
   gap: 30px;
-  max-width: 900px;
   margin: 0 auto;
-  width: 100%;
+  width: 90%;
 }
 
 .request-image-url-section,
@@ -62,7 +71,7 @@
 }
 
 .url-input {
-  width: 100%;
+  width: calc(100% - 32px);
   padding: 15px;
   font-size: 16px;
   border: 2px solid #ddd;
@@ -83,6 +92,7 @@
 }
 
 .image-preview-container {
+  text-align: center;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -226,6 +236,7 @@
   border-radius: 8px;
   margin-bottom: 20px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 15px;
   font-size: 18px;
@@ -252,6 +263,9 @@
   font-weight: normal;
   margin-top: 5px;
   color: #d32f2f;
+  background: #d32f2f2b;
+  width: calc(100% - 40px);
+  word-break: break-all;
 }
 
 .loading-spinner {
@@ -511,6 +525,18 @@
 }
 
 @media (max-width: 768px) {
+  .request-image-back-btn-container {
+    transform: translateY(24px);
+  }
+
+  .request-image-container {
+    border-radius: 0;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+  }
+
   .request-image-content {
     padding: 20px;
   }

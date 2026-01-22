@@ -367,8 +367,11 @@ export default function RequestImage(): React.JSX.Element {
 
   return (
     <div className="request-image-container">
+      <div className="request-image-back-btn-container">
+        <BackButton onBackClick={handleBack} disabled={isPrinting} />
+      </div>
+
       {/* Header */}
-      <BackButton onBackClick={handleBack} disabled={isPrinting} />
       <div className="request-image-header">
         <h1 className="request-image-title">ปริ้นย้อนหลัง</h1>
       </div>
