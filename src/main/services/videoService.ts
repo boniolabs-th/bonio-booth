@@ -295,6 +295,9 @@ export const applyLutToVideo = async (
 
     console.log('🎨 [VideoService] Applying LUT from temp:', tempLutPath);
 
+    // Get input video duration first using ffprobe-like approach
+    // Since WebM from MediaRecorder often has incorrect duration,
+    // we'll process the entire input without duration limit
     const args = [
       '-i',
       inputVideoPath,
@@ -303,19 +306,21 @@ export const applyLutToVideo = async (
       '-c:v',
       'libx264',
       '-preset',
-      'medium', // Better compression (same as convertWebmToMp4)
+      'slow', // Better quality encoding (slower but sharper)
       '-crf',
-      '20', // Good quality (same as convertWebmToMp4)
+      '16', // Higher quality (lower = better, 16 is very good)
       '-maxrate',
-      '6M', // Limit bitrate to ~6Mbps for ~15MB target
+      '12M', // Higher bitrate for better quality
       '-bufsize',
-      '12M', // Buffer size for rate control
+      '24M', // Buffer size for rate control
       '-r',
       '30', // Force 30fps output
       '-pix_fmt',
       'yuv420p',
       '-movflags',
       '+faststart',
+      '-vsync',
+      'cfr', // Constant frame rate to ensure consistent duration
       '-y',
       output,
     ];
@@ -463,10 +468,14 @@ export const cleanupTempFiles = async (filePaths: string[]): Promise<void> => {
 /**
  * Convert WebM video to MP4 (H.264) for iPhone/Safari compatibility
  * iPhone/Safari does not support WebM format, so we need to convert to MP4
+ * @param inputVideoPath - Path to input WebM file
+ * @param outputPath - Optional output path
+ * @param targetDuration - Optional target duration in seconds (default: 9)
  */
 export const convertWebmToMp4 = async (
   inputVideoPath: string,
   outputPath?: string,
+  targetDuration: number = 9,
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     const output =
@@ -480,21 +489,26 @@ export const convertWebmToMp4 = async (
     // - libx264: Most compatible codec for all devices including iPhone
     // - an: No audio (WebM from canvas recording usually has no audio)
     // - movflags +faststart: Optimize for web streaming
+    // - t: Force exact output duration
     const args = [
       '-i',
       inputVideoPath,
+      '-t',
+      String(targetDuration), // Force exact output duration (9 seconds)
       '-c:v',
       'libx264',
       '-preset',
-      'medium', // Better compression than ultrafast
+      'slow', // Better quality encoding (slower but sharper)
       '-crf',
-      '20', // Good quality (lower = better)
+      '16', // Higher quality (lower = better, 16 is very good)
       '-maxrate',
-      '6M', // Limit bitrate to ~6Mbps for ~15MB target (18s video)
+      '12M', // Higher bitrate for better quality
       '-bufsize',
-      '12M', // Buffer size for rate control
+      '24M', // Buffer size for rate control
       '-r',
       '30', // Force 30fps output (WebM from canvas has variable fps)
+      '-vsync',
+      'cfr', // Constant frame rate - preserve original duration
       '-pix_fmt',
       'yuv420p', // Required for iPhone compatibility
       '-an', // No audio (WebM from canvas usually has no audio track)
@@ -543,11 +557,14 @@ export const convertWebmToMp4 = async (
 /**
  * Convert WebM to MP4 and return as Base64 data URL
  * Useful for direct embedding or download
+ * @param inputVideoPath - Path to input WebM file
+ * @param targetDuration - Optional target duration in seconds (default: 9)
  */
 export const convertWebmToMp4Base64 = async (
   inputVideoPath: string,
+  targetDuration: number = 9,
 ): Promise<string> => {
-  const mp4Path = await convertWebmToMp4(inputVideoPath);
+  const mp4Path = await convertWebmToMp4(inputVideoPath, undefined, targetDuration);
   const buffer = await fs.promises.readFile(mp4Path);
   const base64 = buffer.toString('base64');
 

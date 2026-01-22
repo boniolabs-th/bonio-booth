@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { BackButton } from '..';
 import { FrameConfig } from '../../utils/frameConfig';
 import useCanonCameraV2 from '../../hooks/useCanonCameraV2';
+import { resizeCanonPhoto } from '../../utils/imageProcessing';
 import './MainShooting.css';
 
 type CameraType = 'webcam' | 'canon';
@@ -685,7 +686,17 @@ export default function MainShooting() {
         // Live Preview is mirrored via CSS for selfie-like experience
         // But captured photo should be the actual camera view (readable text/numbers)
         console.log('✅ [Canon] Photo returned without flip (actual camera view)');
-        return result.imageData;
+
+        // Resize photo from 6000x4000 to 3600x2400 to reduce file size
+        try {
+          console.log('📷 [Canon] Resizing photo to 3600x2400...');
+          const resizedPhoto = await resizeCanonPhoto(result.imageData);
+          console.log('✅ [Canon] Photo resized successfully!');
+          return resizedPhoto;
+        } catch (resizeError) {
+          console.error('⚠️ [Canon] Resize failed, returning original:', resizeError);
+          return result.imageData;
+        }
       }
 
       console.error('❌ [Canon] Shutter capture failed:', result.error);

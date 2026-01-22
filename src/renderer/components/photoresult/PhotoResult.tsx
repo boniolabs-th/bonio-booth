@@ -2,6 +2,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import fixWebmDuration from 'fix-webm-duration';
 import { FrameConfig, FILTERS } from '../../utils/frameConfig';
 import { generateBoomerangAssets } from '../../utils/boomerang';
 import {
@@ -169,18 +170,48 @@ const generateFramedVideo = async (
       videoElement.loop = true;
       videoElement.playsInline = true;
 
-      const timeout = setTimeout(() => {
-        reject(new Error(`วิดีโอที่ ${index + 1} ใช้เวลานานเกินไปในการโหลด`));
-      }, 10000);
+      let resolved = false;
 
-      videoElement.onloadedmetadata = () => {
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          reject(new Error(`วิดีโอที่ ${index + 1} ใช้เวลานานเกินไปในการโหลด`));
+        }
+      }, 15000);
+
+      const handleReady = (source: string) => {
+        if (resolved) return;
+        resolved = true;
         clearTimeout(timeout);
+        console.log(`🎬 [loadVideoElement] Video ${index + 1} ready (${source}):`, {
+          duration: videoElement.duration,
+          videoWidth: videoElement.videoWidth,
+          videoHeight: videoElement.videoHeight,
+          readyState: videoElement.readyState,
+          src: capture.video.substring(0, 50),
+        });
         resolve(videoElement);
       };
 
+      // Use canplaythrough for better readiness (video is fully buffered)
+      videoElement.oncanplaythrough = () => handleReady('canplaythrough');
+
+      // Fallback to loadedmetadata if canplaythrough doesn't fire
+      videoElement.onloadedmetadata = () => {
+        // Give canplaythrough a chance to fire first
+        setTimeout(() => {
+          if (!resolved && videoElement.readyState >= 2) {
+            handleReady('loadedmetadata-fallback');
+          }
+        }, 500);
+      };
+
       videoElement.onerror = () => {
-        clearTimeout(timeout);
-        reject(new Error(`ไม่สามารถโหลดวิดีโอที่ ${index + 1}`));
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          reject(new Error(`ไม่สามารถโหลดวิดีโอที่ ${index + 1}`));
+        }
       };
     });
 
@@ -290,10 +321,22 @@ const generateFramedVideo = async (
         }
       };
 
-      mediaRecorder.onstop = () => {
+      mediaRecorder.onstop = async () => {
         cleanup();
-        const blob = new Blob(chunks, { type: selectedMimeType });
-        resolve(URL.createObjectURL(blob));
+        const rawBlob = new Blob(chunks, { type: selectedMimeType });
+
+        // Fix WebM duration metadata สำหรับ boomerang video
+        const durationMs = totalDurationSeconds * 1000;
+        console.log('🎬 [composeBoomerangVideo] Fixing WebM duration:', durationMs, 'ms');
+
+        try {
+          const fixedBlob = await fixWebmDuration(rawBlob, durationMs, { logger: false });
+          console.log('✅ [composeBoomerangVideo] WebM duration fixed successfully');
+          resolve(URL.createObjectURL(fixedBlob));
+        } catch (err) {
+          console.warn('⚠️ [composeBoomerangVideo] Failed to fix WebM duration, using original:', err);
+          resolve(URL.createObjectURL(rawBlob));
+        }
       };
 
       mediaRecorder.onerror = (event) => {
@@ -304,10 +347,43 @@ const generateFramedVideo = async (
         );
       };
 
+      const recordingStartTime = Date.now();
+      const targetDuration = totalDurationSeconds * 1000;
+
       const drawFrame = () => {
         if (!recording) {
           return;
         }
+
+        const now = Date.now();
+        const elapsed = now - recordingStartTime;
+
+        // Force stop if we exceed duration (with small safety buffer)
+        if (elapsed >= targetDuration) {
+          recording = false;
+          mediaRecorder.stop();
+          return;
+        }
+
+        // Calculate frame cursor based on time for smoother playback match
+        // But for recording, we can just increment to ensure we draw all needed frames?
+        // Actually, for captureStream, we just need to keep the canvas updated.
+        // Let's use time-based frame selection to ensure 9s loop logic works correctly
+        // independently of draw speed.
+
+        // elapsed ms
+        // 1 loop = 3000ms
+        // current loop time = elapsed % 3000
+        // frame index in loop = floor((elapsed % 3000) / (1000/fps))
+        // This ensures the animation plays at correct speed relative to real time.
+
+        // However, we want to maintain the "frameCursor" logic to be simple.
+        // Let's stick to frameCursor logic but constrained by TIME stop condition?
+        // No, if we use time stop, we should use time drawing to match.
+
+        const loopDurationMs = singleLoopDuration * 1000;
+        const timeInLoop = elapsed % loopDurationMs;
+        const currentFrameIndex = Math.floor(timeInLoop / (1000 / fps));
 
         // Fill with white background first (paper color)
         ctx.fillStyle = '#ffffff';
@@ -319,7 +395,9 @@ const generateFramedVideo = async (
             return;
           }
 
-          const image = slotFrames[frameCursor % slotFrames.length];
+          // Use currentFrameIndex instead of frameCursor
+          // This ensures we pick the right frame for the current timestamp
+          const image = slotFrames[currentFrameIndex % slotFrames.length];
           const imageWidth = image.naturalWidth || image.width;
           const imageHeight = image.naturalHeight || image.height;
           const slotAspect = slot.width / slot.height;
@@ -392,19 +470,21 @@ const generateFramedVideo = async (
           }
         });
 
-        frameCursor += 1;
-        if (frameCursor >= totalFrames) {
-          recording = false;
-          mediaRecorder.stop();
-          return;
-        }
+        // frameCursor += 1; // Removed in favor of time-based calculation
+        // if (frameCursor >= totalFrames) ... // Removed
+
+        // Schedule next check/draw
+        // We use requestAnimationFrame-like timing via setTimeout
+        // to keep loop running until duration expires
 
         timeoutId = window.setTimeout(() => {
           drawFrame();
         }, 1000 / fps);
       };
 
-      mediaRecorder.start();
+      // Start recording
+      // Use 1000ms timeslice to ensure we get data regularly
+      mediaRecorder.start(1000);
       drawFrame();
     });
   };
@@ -452,47 +532,79 @@ const generateFramedVideo = async (
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, frameWidth, frameHeight);
 
-  // คำนวณจุดเริ่มต้น 3 วินาทีสุดท้ายของ video
-  // ถ้า countdown = 5 วิ → video duration ~5 วิ → เริ่มที่วินาทีที่ 2 (5-3=2)
-  // ถ้า countdown = 10 วิ → video duration ~10 วิ → เริ่มที่วินาทีที่ 7 (10-3=7)
-  const singleLoopDuration = 3; // คงที่ 3 วินาที
+  // Video output: 3 วินาที x 3 รอบ = 9 วินาที
+  // MediaRecorder จะ record canvas ไปเรื่อยๆ จนครบ maxDuration (9 วินาที)
+  const singleLoopDuration = 3; // ความยาว video source ประมาณ 3 วินาที (ตาม countdown)
   const loopCount = 3;
-  const maxDuration = singleLoopDuration * loopCount;
+  const maxDuration = singleLoopDuration * loopCount; // = 9 วินาที
 
-  // หาจุดเริ่มต้น 3 วินาทีสุดท้าย
-  // ใช้ videoDuration จาก parameter หรือ fallback ใช้ video element duration
+  // คำนวณ duration จริงของ video source
+  // WebM จาก MediaRecorder มักมี duration = Infinity หรือ NaN
   const firstVideo = videoElements[0];
-  const actualVideoDuration = videoDuration || firstVideo?.duration || 5;
-  const startOffset = Math.max(0, actualVideoDuration - singleLoopDuration);
+  let actualVideoDuration = videoDuration || 3;
+  // ต้องเช็คว่า duration เป็นค่าที่ใช้ได้จริง (finite, > 0, < 60)
+  if (
+    firstVideo?.duration &&
+    Number.isFinite(firstVideo.duration) &&
+    firstVideo.duration > 0 &&
+    firstVideo.duration < 60
+  ) {
+    actualVideoDuration = firstVideo.duration;
+  }
 
   console.log('🎬 [generateFramedVideo] Video timing:', {
-    actualVideoDuration,
     singleLoopDuration,
-    startOffset,
     loopCount,
     maxDuration,
+    actualVideoDuration,
+    videoDurationFromParam: videoDuration,
+    firstVideoDuration: firstVideo?.duration,
+    isFirstVideoDurationValid:
+      firstVideo?.duration &&
+      Number.isFinite(firstVideo.duration) &&
+      firstVideo.duration > 0 &&
+      firstVideo.duration < 60,
   });
 
-  // ตั้งค่า video ให้ loop smooth โดยใช้ ended event
+  // IMPORTANT: Always use fixed 9-second output duration
+  // regardless of source video duration
+  const FIXED_OUTPUT_DURATION = 9; // seconds
+  console.log('🎬 [generateFramedVideo] Using FIXED output duration:', FIXED_OUTPUT_DURATION, 'seconds');
+
+  // ใช้ native loop เป็นหลัก + manual sync เพื่อ smooth loop
+  // สำหรับ MP4 ที่ผ่าน LUT filter, native loop อาจมี stutter
   videoElements.forEach((video) => {
     // eslint-disable-next-line no-param-reassign
-    video.currentTime = startOffset; // เริ่มจาก 3 วินาทีสุดท้าย
+    video.currentTime = 0; // เริ่มจากต้น video
     // eslint-disable-next-line no-param-reassign
-    video.loop = false; // ปิด native loop เพราะเราจะจัดการเอง
+    video.loop = true; // ใช้ native loop เป็นหลัก
+    // eslint-disable-next-line no-param-reassign
+    video.muted = true; // Ensure muted for autoplay
+    // eslint-disable-next-line no-param-reassign
+    video.playsInline = true; // Ensure inline playback
+    // eslint-disable-next-line no-param-reassign
+    video.playbackRate = 1.0; // Ensure normal speed
 
-    // ใช้ ended event เพื่อ loop กลับไปที่จุดเริ่มต้นเมื่อ video จบ
+    // Fallback: ถ้า video จบจริงๆ (ended event) ให้ loop กลับทันที
+    // กรณี WebM/MP4 ที่ native loop ไม่ทำงาน
     const handleEnded = () => {
       // eslint-disable-next-line no-param-reassign
-      video.currentTime = startOffset;
+      video.currentTime = 0;
       video.play().catch(() => undefined);
     };
     video.addEventListener('ended', handleEnded);
 
-    // เก็บ handler ไว้ cleanup ทีหลัง
+    // Handle stall/waiting - restart playback
+    const handleWaiting = () => {
+      console.log('⚠️ Video waiting/stalled, attempting to continue...');
+    };
+    video.addEventListener('waiting', handleWaiting);
+
+    // เก็บ handlers ไว้ cleanup ทีหลัง
     // eslint-disable-next-line no-param-reassign
-    (video as any).__loopHandler = handleEnded;
+    (video as any).__endedHandler = handleEnded;
     // eslint-disable-next-line no-param-reassign
-    (video as any).__loopEventType = 'ended';
+    (video as any).__waitingHandler = handleWaiting;
   });
 
   await Promise.all(
@@ -514,16 +626,23 @@ const generateFramedVideo = async (
 
     console.log('🎬 [generateFramedVideo] Using codec:', selectedMimeType);
 
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType: selectedMimeType,
-      videoBitsPerSecond: 8000000, // 10 Mbps for high quality
+// ใช้ timeslice 1000ms เพื่อให้ generated blobs มี timestamp ที่ถูกต้องมากขึ้น
+      // ช่วยแก้ปัญหา WebM duration ผิดพลาด
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: selectedMimeType,
+        videoBitsPerSecond: 8000000, // 8 Mbps
     });
 
     const chunks: Blob[] = [];
     let animationFrameId: number | null = null;
-    // maxDuration คำนวณจากความยาววิดีโอต้นฉบับแล้ว (ด้านบน)
+    // ใช้ FIXED_OUTPUT_DURATION (9 วินาที) แทน maxDuration เพื่อให้แน่ใจว่า output ยาว 9 วินาทีเสมอ
+    const recordingDuration = FIXED_OUTPUT_DURATION; // 9 seconds fixed
     const startTime = performance.now();
     let recording = true;
+    let frameCount = 0;
+    let actualElapsedMs = 0; // เก็บ elapsed time จริงสำหรับ fix-webm-duration
+
+    console.log('🎬 [generateFramedVideo] Starting recording with duration:', recordingDuration, 'seconds');
 
     const cleanup = () => {
       recording = false;
@@ -533,10 +652,14 @@ const generateFramedVideo = async (
       stream.getTracks().forEach((track) => track.stop());
       videoElements.forEach((video) => {
         // ลบ ended event listener
-        const handler = (video as any).__loopHandler;
-        const eventType = (video as any).__loopEventType || 'ended';
-        if (handler) {
-          video.removeEventListener(eventType, handler);
+        const endedHandler = (video as any).__endedHandler;
+        if (endedHandler) {
+          video.removeEventListener('ended', endedHandler);
+        }
+        // ลบ waiting event listener
+        const waitingHandler = (video as any).__waitingHandler;
+        if (waitingHandler) {
+          video.removeEventListener('waiting', waitingHandler);
         }
         video.pause();
         // eslint-disable-next-line no-param-reassign
@@ -550,11 +673,38 @@ const generateFramedVideo = async (
       }
     };
 
-    mediaRecorder.onstop = () => {
+    mediaRecorder.onstop = async () => {
       cleanup();
-      const blob = new Blob(chunks, { type: selectedMimeType });
-      const url = URL.createObjectURL(blob);
-      resolve(url);
+      const rawBlob = new Blob(chunks, { type: selectedMimeType });
+
+      // Fix WebM duration metadata (MediaRecorder สร้าง WebM ที่มี duration: Infinity)
+      // ใช้ actualElapsedMs ที่เก็บไว้ตอน recording เสร็จ
+      const durationMs = actualElapsedMs || recordingDuration * 1000;
+      console.log('🎬 [generateFramedVideo] Fixing WebM duration:', {
+        durationMs,
+        actualElapsedMs,
+        recordingDuration,
+        rawBlobSize: rawBlob.size,
+        chunksCount: chunks.length,
+      });
+
+      try {
+        // Enable logger to see what fix-webm-duration is doing
+        const fixedBlob = await fixWebmDuration(rawBlob, durationMs, {
+          logger: (msg: string) => console.log('🔧 [fix-webm-duration]', msg)
+        });
+        console.log('✅ [generateFramedVideo] WebM duration fixed:', {
+          originalSize: rawBlob.size,
+          fixedSize: fixedBlob.size,
+          durationMs,
+        });
+        const url = URL.createObjectURL(fixedBlob);
+        resolve(url);
+      } catch (err) {
+        console.error('❌ [generateFramedVideo] Failed to fix WebM duration:', err);
+        const url = URL.createObjectURL(rawBlob);
+        resolve(url);
+      }
     };
 
     mediaRecorder.onerror = (event) => {
@@ -570,13 +720,56 @@ const generateFramedVideo = async (
       }
 
       const elapsed = (performance.now() - startTime) / 1000;
-      if (elapsed >= maxDuration) {
+      frameCount++;
+
+      // ตรวจสอบว่า video ยังเล่นอยู่หรือไม่ - ถ้าหยุดให้ restart
+      // ไม่ใช้ sync time เพราะอาจทำให้ stutter
+      videoElements.forEach((video) => {
+        if (video.paused || video.ended) {
+          // eslint-disable-next-line no-param-reassign
+          video.currentTime = 0;
+          video.play().catch(() => undefined);
+        }
+      });
+
+      // Log progress every 30 frames (~1 second at 30fps)
+      if (frameCount % 30 === 0) {
+        console.log('🎬 [generateFramedVideo] Recording progress:', {
+          elapsed: elapsed.toFixed(2),
+          targetDuration: recordingDuration,
+          frameCount,
+          videoCurrentTimes: videoElements.map((v) => v.currentTime.toFixed(2)),
+        });
+      }
+
+      // Stop recording when we reach target duration + buffer
+      // บันทึกเกิน 1 วินาที เพื่อให้มี frames เพียงพอ
+      // FFmpeg จะตัดให้เหลือ 9 วินาทีพอดีด้วย -t 9
+      const recordBuffer = 1; // 1 second extra to ensure enough frames
+      if (elapsed >= recordingDuration + recordBuffer) {
+        // เก็บ elapsed time จริงสำหรับ fix-webm-duration
+        actualElapsedMs = Math.round(performance.now() - startTime); // elapsed จริงใน ms
+        console.log('🎬 [generateFramedVideo] Recording completed:', {
+          elapsed: elapsed.toFixed(2),
+          targetDuration: recordingDuration,
+          recordBuffer,
+          actualElapsedMs,
+          totalFrames: frameCount,
+          videoCurrentTimes: videoElements.map((v) => v.currentTime.toFixed(2)),
+        });
         recording = false;
-        mediaRecorder.stop();
+        // Request final data before stopping
+        if (mediaRecorder.state === 'recording') {
+          mediaRecorder.requestData();
+        }
+        // Small delay to ensure data is flushed
+        setTimeout(() => {
+          mediaRecorder.stop();
+        }, 100);
         return;
       }
 
-      // Video loop ถูกจัดการโดย timeupdate event แล้ว ไม่ต้อง reset ที่นี่
+      // Video loop ถูกจัดการโดย native loop (video.loop = true)
 
       // Fill with white background first (paper color)
       ctx.fillStyle = '#ffffff';
@@ -661,6 +854,8 @@ const generateFramedVideo = async (
       animationFrameId = requestAnimationFrame(drawFrame);
     };
 
+    // Start recording without timeslice for more accurate duration
+    // timeslice can cause last chunk to be cut off
     mediaRecorder.start();
     drawFrame();
   });
@@ -686,6 +881,7 @@ export default function PhotoResult() {
   const [qrcodeStorageUrl, setQrcodeStorageUrl] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null); // เก็บ sessionId สำหรับ upload files
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadQueued, setIsUploadQueued] = useState(false); // track ว่า queue upload สำเร็จหรือยัง
   const hasUploaded = useRef(false); // ป้องกันการ upload ซ้ำ
   const hasCreatedSession = useRef(false); // ป้องกันการสร้าง session ซ้ำ
 
@@ -1613,8 +1809,11 @@ export default function PhotoResult() {
           );
           // Background upload จะทำงานเบื้องหลัง ไม่ต้องรอ
           // User สามารถกด Done ได้เลย
+          setIsUploadQueued(true); // Mark upload as queued - enable Done button
         } else {
           console.error('❌ [PhotoResult] Failed to queue upload:', uploadResult);
+          // Still allow Done button even if queue failed (user shouldn't be stuck)
+          setIsUploadQueued(true);
         }
 
         setIsUploading(false);
@@ -1979,8 +2178,11 @@ export default function PhotoResult() {
                 console.log('✅ [PhotoResult] Upload queued successfully with video!');
                 console.log('✅ [PhotoResult] Job ID:', uploadResult.jobId);
                 // Background upload จะทำงานเบื้องหลัง ไม่ต้องรอ
+                setIsUploadQueued(true); // Mark upload as queued - enable Done button
               } else {
                 console.error('❌ [PhotoResult] Failed to queue upload (useEffect):', uploadResult);
+                // Still allow Done button even if queue failed (user shouldn't be stuck)
+                setIsUploadQueued(true);
               }
 
               setIsUploading(false);
@@ -2074,102 +2276,8 @@ export default function PhotoResult() {
 
       {/* Bottom Section - Video Preview & QR Code */}
       <div className="result-bottom">
-        {/* Left - Video Preview */}
-        <div className="video-preview-section">
-          {state?.selectedCaptures?.[0] && (
-            <>
-              <div className="video-preview-container">
-                {previewBoomerangGif &&
-                previewBoomerangGif !== 'http://localhost:1212/index.html' &&
-                previewBoomerangGif.startsWith('data:') ? (
-                  <img
-                    ref={gifImageRef}
-                    src={previewBoomerangGif}
-                    alt="Boomerang preview"
-                    className="video-preview"
-                    onLoad={(e) => {
-                      // Force reload to loop GIF
-                      const img = e.currentTarget;
-                      if (img.complete) {
-                        // Reset image to force replay
-                        const currentSrc = img.src;
-                        img.src = '';
-                        setTimeout(() => {
-                          img.src = currentSrc;
-                        }, 10);
-                      }
-                    }}
-                    onError={() => {
-                      // eslint-disable-next-line no-console
-                      console.error(
-                        '❌ [PhotoResult] Failed to load GIF:',
-                        previewBoomerangGif?.substring(0, 50),
-                      );
-                      // Fallback to video if GIF fails to load
-                      setPreviewBoomerangGif(null);
-                    }}
-                  />
-                ) : (processedPreviewVideoUrl || state?.selectedCaptures?.[0]?.video) ? (
-                  <video
-                    ref={videoRef}
-                    src={processedPreviewVideoUrl || state.selectedCaptures[0].video}
-                    className="video-preview"
-                    loop
-                    muted
-                    playsInline
-                    autoPlay
-                    onEnded={(e) => {
-                      const video = e.currentTarget;
-                      video.currentTime = 0;
-                      video.play().catch(() => {
-                        // Ignore play errors
-                      });
-                    }}
-                  />
-                ) : (
-                  <div className="video-preview-loading">
-                    <div className="loading-spinner" />
-                    <p>กำลังโหลดวิดีโอ...</p>
-                  </div>
-                )}
-              </div>
-              {/* <button
-                type="button"
-                className="download-video-button"
-                onClick={handleDownloadGif}
-                disabled={!compiledVideoUrl}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <polyline
-                    points="7 10 12 15 17 10"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <line
-                    x1="12"
-                    y1="15"
-                    x2="12"
-                    y2="3"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                ดาวน์โหลดวิดีโอ
-              </button> */}
-            </>
-          )}
-        </div>
+        {/* Left - Video Preview (Removed as requested) */}
+        {/* <div className="video-preview-section"> ... </div> */}
 
         {/* Right - QR Code & Download */}
         <div className="download-section">
@@ -2246,12 +2354,13 @@ export default function PhotoResult() {
           type="button"
           className="finish-button"
           onClick={handleFinish}
-          disabled={printStatus === 'printing'}
+          disabled={printStatus === 'printing' || !isUploadQueued}
           style={{
-            opacity: printStatus === 'printing' ? 0.5 : 1,
+            opacity: (printStatus === 'printing' || !isUploadQueued) ? 0.5 : 1,
+            cursor: (printStatus === 'printing' || !isUploadQueued) ? 'not-allowed' : 'pointer',
           }}
         >
-          Done
+          {!isUploadQueued ? 'กำลังเตรียมข้อมูล...' : 'Done'}
         </button>
       </div>
 

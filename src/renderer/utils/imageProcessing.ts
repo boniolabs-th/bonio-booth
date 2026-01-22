@@ -3,7 +3,18 @@
  * - Sharpening filter
  * - Quality optimization
  * - Native resolution handling
+ * - Canon photo resizing
  */
+
+/**
+ * Canon photo target resolution
+ * Original: 6000x4000 (~6-7MB)
+ * Target: 3600x2400 (~2-3MB)
+ */
+export const CANON_TARGET_RESOLUTION = {
+  width: 3600,
+  height: 2400,
+};
 
 /**
  * JPEG quality สำหรับการ save รูปภาพ
@@ -12,12 +23,97 @@
  */
 export const JPEG_QUALITY = {
   /** คุณภาพสูงสุด - ใช้สำหรับ print output */
-  PRINT: 0.92,
+  PRINT: 1.0,
   /** คุณภาพมาตรฐาน - ใช้สำหรับ upload/share */
-  STANDARD: 0.85,
+  STANDARD: 1.0,
   /** คุณภาพต่ำ - ใช้สำหรับ thumbnail/preview */
-  PREVIEW: 0.7,
+  PREVIEW: 1.0,
 };
+
+/**
+ * Resize Canon photo from original resolution (6000x4000) to target resolution (3600x2400)
+ * This reduces file size from ~6-7MB to ~2-3MB while maintaining good quality
+ *
+ * @param imageDataUrl - Base64 data URL of the original image
+ * @param targetWidth - Target width (default: 3600)
+ * @param targetHeight - Target height (default: 2400)
+ * @param quality - JPEG quality (default: 0.92 for print quality)
+ * @returns Promise<string> - Base64 data URL of the resized image
+ */
+export async function resizeCanonPhoto(
+  imageDataUrl: string,
+  targetWidth: number = CANON_TARGET_RESOLUTION.width,
+  targetHeight: number = CANON_TARGET_RESOLUTION.height,
+  quality: number = JPEG_QUALITY.PRINT,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+
+    img.onload = () => {
+      const originalWidth = img.naturalWidth;
+      const originalHeight = img.naturalHeight;
+
+      console.log(`📷 [resizeCanonPhoto] Original: ${originalWidth}x${originalHeight}`);
+      console.log(`📷 [resizeCanonPhoto] Target: ${targetWidth}x${targetHeight}`);
+
+      // If already smaller than target, return original
+      if (originalWidth <= targetWidth && originalHeight <= targetHeight) {
+        console.log('📷 [resizeCanonPhoto] Image already at or below target size, returning original');
+        resolve(imageDataUrl);
+        return;
+      }
+
+      // Calculate scale to fit target while maintaining aspect ratio
+      const scaleX = targetWidth / originalWidth;
+      const scaleY = targetHeight / originalHeight;
+      const scale = Math.min(scaleX, scaleY);
+
+      const newWidth = Math.round(originalWidth * scale);
+      const newHeight = Math.round(originalHeight * scale);
+
+      console.log(`📷 [resizeCanonPhoto] Resizing to: ${newWidth}x${newHeight} (scale: ${scale.toFixed(3)})`);
+
+      // Create canvas for resizing
+      const canvas = document.createElement('canvas');
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+
+      const ctx = canvas.getContext('2d', {
+        alpha: false,
+        desynchronized: true,
+      });
+
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+
+      // Use high quality image smoothing for best resize quality
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // Draw resized image
+      ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+      // Convert to data URL with specified quality
+      const resizedDataUrl = canvas.toDataURL('image/jpeg', quality);
+
+      // Log size comparison
+      const originalSize = imageDataUrl.length;
+      const resizedSize = resizedDataUrl.length;
+      const reduction = ((1 - resizedSize / originalSize) * 100).toFixed(1);
+      console.log(`📷 [resizeCanonPhoto] Size reduced by ${reduction}% (${(originalSize / 1024 / 1024).toFixed(2)}MB -> ${(resizedSize / 1024 / 1024).toFixed(2)}MB)`);
+
+      resolve(resizedDataUrl);
+    };
+
+    img.onerror = () => {
+      reject(new Error('Failed to load image for resizing'));
+    };
+
+    img.src = imageDataUrl;
+  });
+}
 
 /**
  * Apply unsharp mask (sharpening) to canvas image
