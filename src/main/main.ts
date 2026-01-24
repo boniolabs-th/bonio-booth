@@ -57,9 +57,9 @@ import {
   convertWebmToMp4,
   convertWebmToMp4Base64,
 } from './services/videoService';
-import machineService from './services/machineService';
+import machineService, { StatusResponse } from './services/machineService';
 import { backgroundUploadService } from './services/backgroundUploadService';
-import sseClient from './services/sseClient';
+import sseClient, { MachineEventType } from './services/sseClient';
 import shutdownManager, { ShutdownState } from './services/shutdownManager';
 import appCloseManager, { AppCloseState } from './services/appCloseManager';
 import { getEnvConfig, clearEnvConfigCache, DEFAULT_PORT } from './config/env.config';
@@ -112,77 +112,100 @@ class AppUpdater {
   }
 }
 
+let machineId: string = '';
+let machineStatus: StatusResponse | null = null;
+let isHandlingShutdownReady = false;
+let deviceCheckTimeout: NodeJS.Timeout | null = null;
 
 /**
  * Helper function สำหรับเช็คและจัดการ isShutdownReady หลังจากเรียก init()
  */
 function handleShutdownReady(initResponse: any): void {
-  // ส่ง log ไปที่ renderer
-  const sendLog = (level: 'log' | 'warn' | 'error', message: string, data?: any) => {
-    if (mainWindow) {
-      mainWindow.webContents.send('shutdown-log', { level, message, data, timestamp: new Date().toISOString() });
-    }
-  };
+  console.log('initResponse:', initResponse);
 
-  // ดึง isShutdownReady โดยเช็คทั้ง undefined, null, false
-  const isShutdownReady = (initResponse as any)?.isShutdownReady ?? initResponse?.isShutdownReady;
-  const isShutdownReadyBool = isShutdownReady === true || isShutdownReady === 'true';
-
-  // ดึง isClosedAppReady
-  const isClosedAppReady = (initResponse as any)?.isClosedAppReady ?? initResponse?.isClosedAppReady;
-  const isClosedAppReadyBool = isClosedAppReady === true || isClosedAppReady === 'true';
-
-  // Log ทุกครั้งที่ function ถูกเรียก (สำคัญมาก!)
-  console.log('🔍 [Main] ========== HANDLING SHUTDOWN READY ==========');
-  console.log('🔍 [Main] isShutdownReady from init (raw):', isShutdownReady);
-  console.log('🔍 [Main] isShutdownReady (boolean):', isShutdownReadyBool);
-  console.log('🔍 [Main] isClosedAppReady from init (raw):', isClosedAppReady);
-  console.log('🔍 [Main] isClosedAppReady (boolean):', isClosedAppReadyBool);
-  console.log('🔍 [Main] Current shutdown state BEFORE:', shutdownManager.getState());
-
-  sendLog('warn', '🔍 ========== HANDLING SHUTDOWN READY ==========');
-  sendLog('log', '🔍 isShutdownReady & isClosedAppReady', {
-    isShutdownReady: { raw: isShutdownReady, boolean: isShutdownReadyBool },
-    isClosedAppReady: { raw: isClosedAppReady, boolean: isClosedAppReadyBool },
-    stateBefore: shutdownManager.getState(),
-  });
-
-  // จัดการ isShutdownReady (shutdown เครื่อง)
-  if (isShutdownReadyBool) {
-    // ถ้า isShutdownReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
-    console.log('🛑 [Main] isShutdownReady is TRUE, ensuring countdown is running');
-    sendLog('error', '🛑 isShutdownReady = TRUE, starting countdown');
-    shutdownManager.ensureCountdown(2, 'manual'); // ใช้ 2 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
-    const stateAfter = shutdownManager.getState();
-    console.log('🛑 [Main] Current shutdown state AFTER:', stateAfter);
-    sendLog('log', '🛑 Countdown started', { stateAfter });
-  } else {
-    // ถ้า isShutdownReady เป็น false, undefined, หรือ null ให้เคลียร์ shutdown ทันที
-    console.log('🔄 [Main] isShutdownReady is FALSE/undefined/null, cancelling shutdown immediately');
-    sendLog('error', '🔄 isShutdownReady = FALSE, cancelling shutdown NOW!');
-    shutdownManager.cancelShutdown();
-    const stateAfter = shutdownManager.getState();
-    console.log('🔄 [Main] Current shutdown state AFTER cancel:', stateAfter);
-    sendLog('log', '🔄 Shutdown cancelled', { stateAfter });
+  if (isHandlingShutdownReady) {
+    console.log('⚠️ [Main] Already handling shutdown ready, skipping');
+    return;
   }
 
-  // จัดการ isClosedAppReady (ปิดโปรแกรม)
-  if (isClosedAppReadyBool) {
-    // ถ้า isClosedAppReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
-    console.log('🚪 [Main] isClosedAppReady is TRUE, ensuring app close countdown is running');
-    sendLog('error', '🚪 isClosedAppReady = TRUE, starting app close countdown');
-    appCloseManager.ensureCountdown(2); // ใช้ 2 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
-    const stateAfter = appCloseManager.getState();
-    console.log('🚪 [Main] Current app close state AFTER:', stateAfter);
-    sendLog('log', '🚪 App close countdown started', { stateAfter });
-  } else {
-    // ถ้า isClosedAppReady เป็น false, undefined, หรือ null ให้เคลียร์ app close ทันที
-    console.log('🔄 [Main] isClosedAppReady is FALSE/undefined/null, cancelling app close immediately');
-    sendLog('error', '🔄 isClosedAppReady = FALSE, cancelling app close NOW!');
-    appCloseManager.cancelAppClose();
-    const stateAfter = appCloseManager.getState();
-    console.log('🔄 [Main] Current app close state AFTER cancel:', stateAfter);
-    sendLog('log', '🔄 App close cancelled', { stateAfter });
+  isHandlingShutdownReady = true;
+
+  try {
+    // ส่ง log ไปที่ renderer
+    const sendLog = (level: 'log' | 'warn' | 'error', message: string, data?: any) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('shutdown-log', { level, message, data, timestamp: new Date().toISOString() });
+      }
+    };
+
+    console.log('isShutdownReady', initResponse?.isShutdownReady);
+    console.log('isClosedAppReady', initResponse?.isClosedAppReady);
+
+    // ดึง isShutdownReady โดยเช็คทั้ง undefined, null, false
+    const isShutdownReady = (initResponse as any)?.isShutdownReady ?? initResponse?.isShutdownReady;
+    const isShutdownReadyBool = isShutdownReady === true || isShutdownReady === 'true';
+
+    // ดึง isClosedAppReady
+    const isClosedAppReady = (initResponse as any)?.isClosedAppReady ?? initResponse?.isClosedAppReady;
+    const isClosedAppReadyBool = isClosedAppReady === true || isClosedAppReady === 'true';
+
+    // Log ทุกครั้งที่ function ถูกเรียก (สำคัญมาก!)
+    console.log('🔍 [Main] ========== HANDLING SHUTDOWN READY ==========');
+    console.log('🔍 [Main] isShutdownReady from init (raw):', isShutdownReady);
+    console.log('🔍 [Main] isShutdownReady (boolean):', isShutdownReadyBool);
+    console.log('🔍 [Main] isClosedAppReady from init (raw):', isClosedAppReady);
+    console.log('🔍 [Main] isClosedAppReady (boolean):', isClosedAppReadyBool);
+    console.log('🔍 [Main] Current shutdown state BEFORE:', shutdownManager.getState());
+
+    sendLog('warn', '🔍 ========== HANDLING SHUTDOWN READY ==========');
+    sendLog('log', '🔍 isShutdownReady & isClosedAppReady', {
+      isShutdownReady: { raw: isShutdownReady, boolean: isShutdownReadyBool },
+      isClosedAppReady: { raw: isClosedAppReady, boolean: isClosedAppReadyBool },
+      stateBefore: shutdownManager.getState(),
+    });
+
+    // จัดการ isShutdownReady (shutdown เครื่อง)
+    if (isShutdownReadyBool) {
+      // ถ้า isShutdownReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
+      console.log('🛑 [Main] isShutdownReady is TRUE, ensuring countdown is running');
+      sendLog('error', '🛑 isShutdownReady = TRUE, starting countdown');
+      shutdownManager.ensureCountdown(2, 'manual'); // ใช้ 2 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
+      const stateAfter = shutdownManager.getState();
+      console.log('🛑 [Main] Current shutdown state AFTER:', stateAfter);
+      sendLog('log', '🛑 Countdown started', { stateAfter });
+    } else {
+      // ถ้า isShutdownReady เป็น false, undefined, หรือ null ให้เคลียร์ shutdown ทันที
+      console.log('🔄 [Main] isShutdownReady is FALSE/undefined/null, cancelling shutdown immediately');
+      sendLog('error', '🔄 isShutdownReady = FALSE, cancelling shutdown NOW!');
+      shutdownManager.cancelShutdown();
+      const stateAfter = shutdownManager.getState();
+      console.log('🔄 [Main] Current shutdown state AFTER cancel:', stateAfter);
+      sendLog('log', '🔄 Shutdown cancelled', { stateAfter });
+    }
+
+    // จัดการ isClosedAppReady (ปิดโปรแกรม)
+    if (isClosedAppReadyBool) {
+      // ถ้า isClosedAppReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
+      console.log('🚪 [Main] isClosedAppReady is TRUE, ensuring app close countdown is running');
+      sendLog('error', '🚪 isClosedAppReady = TRUE, starting app close countdown');
+      appCloseManager.ensureCountdown(2); // ใช้ 2 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
+      const stateAfter = appCloseManager.getState();
+      console.log('🚪 [Main] Current app close state AFTER:', stateAfter);
+      sendLog('log', '🚪 App close countdown started', { stateAfter });
+    } else {
+      // ถ้า isClosedAppReady เป็น false, undefined, หรือ null ให้เคลียร์ app close ทันที
+      console.log('🔄 [Main] isClosedAppReady is FALSE/undefined/null, cancelling app close immediately');
+      sendLog('error', '🔄 isClosedAppReady = FALSE, cancelling app close NOW!');
+      appCloseManager.cancelAppClose();
+      const stateAfter = appCloseManager.getState();
+      console.log('🔄 [Main] Current app close state AFTER cancel:', stateAfter);
+      sendLog('log', '🔄 App close cancelled', { stateAfter });
+    }
+  } finally {
+    // Release lock หลัง 1 วินาที
+    setTimeout(() => {
+      isHandlingShutdownReady = false;
+    }, 1000);
   }
 }
 
@@ -192,6 +215,8 @@ async function initializeApp() {
 
     // ดึง config จาก persistent storage
     const envConfig = await getEnvConfig();
+
+    machineId = envConfig.MACHINE_ID;
     const machineIdFromConfig = envConfig.MACHINE_ID;
     const machinePortFromConfig = envConfig.PORT ? Number(envConfig.PORT) : Number(DEFAULT_PORT);
 
@@ -255,11 +280,11 @@ async function initializeApp() {
 
     // ตรวจสอบ devices ที่ตั้งค่าไว้ (camera/printer) หลังจาก init สำเร็จ
     // ทำแบบ async เพื่อไม่ให้บล็อกการโหลด app
-    setTimeout(() => {
+    deviceCheckTimeout = setTimeout(() => {
       checkConfiguredDevices().catch(err => {
         console.error('❌ [Main] Error in checkConfiguredDevices:', err);
       });
-    }, 3000); // รอ 3 วินาทีหลัง init เสร็จ
+    }, 3000);
 
     // Helper function สำหรับส่ง log ไปที่ renderer (DevTools)
     const sendLogToRenderer = (level: 'log' | 'warn' | 'error', message: string, data?: any) => {
@@ -808,6 +833,8 @@ const createWindow = async () => {
     if (!shouldQuit) {
       event.preventDefault();
       // ไม่ทำอะไร - ให้ปิดได้เฉพาะผ่าน context menu เท่านั้น
+    } else {
+      sseClient.destroy();
     }
     // ถ้า shouldQuit เป็น true จะปล่อยให้ปิดได้ตามปกติ
   });
@@ -967,6 +994,7 @@ const createWindow = async () => {
   });
 
   mainWindow.on('closed', () => {
+    sseClient.destroy();
     mainWindow = null;
     shouldQuit = false; // Reset flag เมื่อ window ถูกปิดแล้ว
   });
@@ -1003,6 +1031,27 @@ const createWindow = async () => {
 /**
  * Add event listeners...
  */
+sseClient.on(MachineEventType.SSE_CONNECTED, () => {
+  log.info('[Main] SSE Connected successfully');
+
+  // machineStatus = await machineService.getStatus(machineId)
+  // console.log('machineStatus:',machineStatus.machine.status);
+
+  if (mainWindow) {
+    mainWindow.webContents.send('sse-status-changed', { connected: true });
+  }
+});
+
+sseClient.on(MachineEventType.SSE_DISCONNECTED, (_, data) => {
+  log.warn('[Main] SSE Disconnected:', data);
+
+  // machineStatus = await machineService.getStatus(machineId)
+  // console.log('machineStatus:',machineStatus.machine.status);
+
+  if (mainWindow) {
+    mainWindow.webContents.send('sse-status-changed', { connected: false });
+  }
+});
 
 app.on('window-all-closed', () => {
   // หยุด power save blocker เมื่อปิด app
@@ -1010,6 +1059,14 @@ app.on('window-all-closed', () => {
     powerSaveBlocker.stop(powerSaveBlockerId);
     log.info('[Main] Power save blocker stopped');
     powerSaveBlockerId = null;
+  }
+
+   // ⭐ Disconnect SSE Client
+   try {
+    sseClient.destroy();
+    log.info('[Main] SSE Client disconnected');
+  } catch (error) {
+    log.error('[Main] Failed to disconnect SSE Client:', error);
   }
 
   // Terminate Canon SDK
@@ -1032,13 +1089,32 @@ app
   .then(() => {
     log.info('[Main] App ready - starting initialization');
 
+    sseClient.on('connected', (_, data) => {
+      console.log('✅ SSE Connected:', data);
+      if (mainWindow) {
+        mainWindow.webContents.send('sse-connected', data);
+      }
+    });
+
     // ========== POWER SAVE BLOCKER ==========
     // ป้องกันไม่ให้หน้าจอปิดหรือเครื่องเข้าสู่ sleep mode
     // 'prevent-display-sleep' จะป้องกันหน้าจอปิด (display turn off)
     // 'prevent-app-suspension' จะป้องกัน app ถูก suspend
-    powerSaveBlockerId = powerSaveBlocker.start('prevent-display-sleep');
-    log.info('[Main] Power save blocker started with ID:', powerSaveBlockerId);
-    log.info('[Main] Power save blocker is active:', powerSaveBlocker.isStarted(powerSaveBlockerId));
+    try {
+      powerSaveBlockerId = powerSaveBlocker.start('prevent-display-sleep');
+
+      if (powerSaveBlocker.isStarted(powerSaveBlockerId)) {
+        log.info('[Main] Power save blocker started with ID:', powerSaveBlockerId);
+        log.info('[Main] Power save blocker is active:', powerSaveBlocker.isStarted(powerSaveBlockerId));
+      } else {
+        log.error('[Main] Power save blocker failed to start');
+        powerSaveBlockerId = null;
+      }
+    } catch (error) {
+      log.error('[Main] Error starting power save blocker:', error);
+      powerSaveBlockerId = null;
+    }
+
 
     // ตั้งค่า permissions ก่อนสร้าง window
     // ตั้งค่า permissions สำหรับกล้องและไมโครโฟนใน default session
@@ -1080,6 +1156,36 @@ app
     });
   })
   .catch(console.log);
+
+  app.on('before-quit', async (event) => {
+    if (deviceCheckTimeout) {
+      clearTimeout(deviceCheckTimeout);
+      deviceCheckTimeout = null;
+    }
+
+    const pendingCount = await backgroundUploadService.getPendingCount();
+
+    if (pendingCount > 0) {
+      console.log(`⏳ [Main] Waiting for ${pendingCount} pending uploads...`);
+      event.preventDefault(); // ยกเลิกการปิดชั่วคราว
+
+      // รอ uploads เสร็จ (max 30 วินาที)
+      const maxWaitTime = 30000;
+      const startTime = Date.now();
+
+      const checkInterval = setInterval(async () => {
+        const remaining = await backgroundUploadService.getPendingCount();
+        const elapsed = Date.now() - startTime;
+
+        if (remaining === 0 || elapsed > maxWaitTime) {
+          clearInterval(checkInterval);
+          console.log('✅ [Main] All uploads completed or timeout, quitting');
+          app.quit();
+        }
+      }, 1000);
+    }
+  });
+
 
 interface PrintConfig {
   imageDataUrl: string;
@@ -2064,6 +2170,8 @@ ipcMain.on('quit-app', () => {
   // ตั้ง flag เพื่อบอกว่าเราต้องการปิดแอปจริงๆ
   shouldQuit = true;
   // ปิด window (จะไม่ถูก preventDefault เพราะ shouldQuit = true)
+  sseClient.destroy();
+
   if (mainWindow) {
     mainWindow.close();
   }

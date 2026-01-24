@@ -32,6 +32,11 @@ import {
 } from './components';
 import './App.css';
 import { useBlockTouchContextMenu } from './hooks/useBlockTouchContextMenu';
+// import machineService from '../main/services/machineService';
+// import { getEnvConfig } from '../main/config/env.config';
+// import sseClient from '../main/services/sseClient';
+// import { useMachineStatus } from './hooks/useMachineStatus';
+// import { useSseStatus } from './hooks/useSseStatus';
 
 function RouteListener() {
   const location = useLocation();
@@ -51,7 +56,8 @@ function MaintenanceListener() {
   const navigate = useNavigate();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showQuitPasswordModal, setShowQuitPasswordModal] = useState(false);
-  const [showClearConfigPasswordModal, setShowClearConfigPasswordModal] = useState(false);
+  const [showClearConfigPasswordModal, setShowClearConfigPasswordModal] =
+    useState(false);
   const [showCameraConfigModal, setShowCameraConfigModal] = useState(false);
   const [showPrinterConfigModal, setShowPrinterConfigModal] = useState(false);
 
@@ -104,36 +110,32 @@ function MaintenanceListener() {
     );
 
     // Listen for quit app password modal request
-    const unsubscribeQuitPasswordModal = (window as any).electron.ipcRenderer.on(
-      'show-quit-app-password-modal',
-      () => {
-        setShowQuitPasswordModal(true);
-      },
-    );
+    const unsubscribeQuitPasswordModal = (
+      window as any
+    ).electron.ipcRenderer.on('show-quit-app-password-modal', () => {
+      setShowQuitPasswordModal(true);
+    });
 
     // Listen for clear config password modal request
-    const unsubscribeClearConfigPasswordModal = (window as any).electron.ipcRenderer.on(
-      'show-clear-config-password-modal',
-      () => {
-        setShowClearConfigPasswordModal(true);
-      },
-    );
+    const unsubscribeClearConfigPasswordModal = (
+      window as any
+    ).electron.ipcRenderer.on('show-clear-config-password-modal', () => {
+      setShowClearConfigPasswordModal(true);
+    });
 
     // Listen for camera config modal request
-    const unsubscribeCameraConfigModal = (window as any).electron.ipcRenderer.on(
-      'show-camera-config-modal',
-      () => {
-        setShowCameraConfigModal(true);
-      },
-    );
+    const unsubscribeCameraConfigModal = (
+      window as any
+    ).electron.ipcRenderer.on('show-camera-config-modal', () => {
+      setShowCameraConfigModal(true);
+    });
 
     // Listen for printer config modal request
-    const unsubscribePrinterConfigModal = (window as any).electron.ipcRenderer.on(
-      'show-printer-config-modal',
-      () => {
-        setShowPrinterConfigModal(true);
-      },
-    );
+    const unsubscribePrinterConfigModal = (
+      window as any
+    ).electron.ipcRenderer.on('show-printer-config-modal', () => {
+      setShowPrinterConfigModal(true);
+    });
 
     // Listen for SSE status 502 (Bad Gateway) - navigate to SystemMaintenance
     const unsubscribeSse502 = (window as any).electron.ipcRenderer.on(
@@ -152,30 +154,45 @@ function MaintenanceListener() {
 
           // ดึงรายการกล้องที่เชื่อมต่ออยู่
           const devices = await navigator.mediaDevices.enumerateDevices();
-          const videoDevices = devices.filter(device => device.kind === 'videoinput');
-          const availableDevices = videoDevices.map(d => d.label || d.deviceId);
+          const videoDevices = devices.filter(
+            (device) => device.kind === 'videoinput',
+          );
+          const availableDevices = videoDevices.map(
+            (d) => d.label || d.deviceId,
+          );
 
           console.log('📷 [Renderer] Available cameras:', availableDevices);
 
           // เช็คว่ากล้องที่ตั้งค่าไว้ยังมีอยู่หรือไม่
-          const found = videoDevices.some(d => d.deviceId === data.configuredDeviceId);
+          const found = videoDevices.some(
+            (d) => d.deviceId === data.configuredDeviceId,
+          );
 
           // ส่งผลกลับไป main process
-          (window as any).electron.ipcRenderer.sendMessage('camera-availability-result', {
-            found,
-            configuredDeviceId: data.configuredDeviceId,
-            configuredLabel: data.configuredLabel,
-            availableDevices,
-          });
+          (window as any).electron.ipcRenderer.sendMessage(
+            'camera-availability-result',
+            {
+              found,
+              configuredDeviceId: data.configuredDeviceId,
+              configuredLabel: data.configuredLabel,
+              availableDevices,
+            },
+          );
         } catch (error) {
-          console.error('❌ [Renderer] Error checking camera availability:', error);
+          console.error(
+            '❌ [Renderer] Error checking camera availability:',
+            error,
+          );
           // ส่งผลกลับไป main process (ไม่พบกล้อง)
-          (window as any).electron.ipcRenderer.sendMessage('camera-availability-result', {
-            found: false,
-            configuredDeviceId: data.configuredDeviceId,
-            configuredLabel: data.configuredLabel,
-            availableDevices: [],
-          });
+          (window as any).electron.ipcRenderer.sendMessage(
+            'camera-availability-result',
+            {
+              found: false,
+              configuredDeviceId: data.configuredDeviceId,
+              configuredLabel: data.configuredLabel,
+              availableDevices: [],
+            },
+          );
         }
       },
     );
@@ -184,9 +201,17 @@ function MaintenanceListener() {
     const unsubscribeDeviceNotFound = (window as any).electron.ipcRenderer.on(
       'device-not-found',
       (data: { deviceType: 'camera' | 'printer'; deviceName: string }) => {
-        console.warn(`⚠️ [Renderer] Device not found: ${data.deviceType} - ${data.deviceName}`);
+        console.warn(
+          `⚠️ [Renderer] Device not found: ${data.deviceType} - ${data.deviceName}`,
+        );
         // Navigate to maintenance page
-        navigate('/system-maintenance', { state: { maintenance: true, deviceType: data.deviceType, deviceName: data.deviceName } });
+        navigate('/system-maintenance', {
+          state: {
+            maintenance: true,
+            deviceType: data.deviceType,
+            deviceName: data.deviceName,
+          },
+        });
       },
     );
 
@@ -233,7 +258,10 @@ function MaintenanceListener() {
         // Reload page เพื่อให้แสดง config modal อีกครั้ง
         window.location.reload();
       } else {
-        alert('❌ ไม่สามารถล้างค่า Config ได้: ' + (result?.error || 'Unknown error'));
+        alert(
+          '❌ ไม่สามารถล้างค่า Config ได้: ' +
+            (result?.error || 'Unknown error'),
+        );
       }
     } catch (error) {
       console.error('❌ [App] Error clearing config:', error);
@@ -343,6 +371,15 @@ function ConfigChecker() {
 
 export default function App() {
   useBlockTouchContextMenu();
+  // const { isConnected } = useSseStatus();
+  // const { machineStatus } = useMachineStatus();
+
+  // useEffect(() => {
+  //   console.log('SSE & Machine Status:', {
+  //     isConnected,
+  //     machineStatus,
+  //   });
+  // }, [isConnected, machineStatus]);
 
   return (
     <Router>
