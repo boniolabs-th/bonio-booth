@@ -328,6 +328,10 @@ export default function PhotoFilter() {
           return;
         }
 
+        // ตั้งค่า image rendering quality ให้สูงสุด
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
         canvas.width = img.width;
         canvas.height = img.height;
 
@@ -389,6 +393,10 @@ export default function PhotoFilter() {
         reject(new Error('ไม่สามารถสร้าง canvas context ได้'));
         return;
       }
+
+      // ตั้งค่า image rendering quality ให้สูงสุด
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
       // Load frame image
       const frameImg = new Image();

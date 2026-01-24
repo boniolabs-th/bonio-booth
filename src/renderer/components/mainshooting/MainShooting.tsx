@@ -425,7 +425,10 @@ export default function MainShooting() {
 
     try {
       recordedChunksRef.current = [];
-      const options = { mimeType: 'video/webm;codecs=vp8' };
+      const options = {
+        mimeType: 'video/webm;codecs=vp8',
+        videoBitsPerSecond: 15000000, // 15 Mbps for high quality video
+      };
 
       // Fallback to vp8 if vp9 is not supported
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
@@ -590,7 +593,7 @@ export default function MainShooting() {
         const stream = canvas.captureStream(fps);
         const mediaRecorder = new MediaRecorder(stream, {
           mimeType: 'video/webm;codecs=vp9',
-          videoBitsPerSecond: 5000000, // 5 Mbps
+          videoBitsPerSecond: 15000000, // 15 Mbps for high quality video
         });
 
         const chunks: Blob[] = [];
