@@ -81,6 +81,7 @@ export async function resizeCanonPhoto(
       const ctx = canvas.getContext('2d', {
         alpha: false,
         desynchronized: true,
+        colorSpace: 'srgb',
       });
 
       if (!ctx) {
@@ -127,7 +128,7 @@ export function applySharpen(
   canvas: HTMLCanvasElement,
   amount: number = 0.3,
 ): HTMLCanvasElement {
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const ctx = canvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
   if (!ctx) return canvas;
 
   const { width, height } = canvas;
@@ -138,7 +139,7 @@ export function applySharpen(
   const outputCanvas = document.createElement('canvas');
   outputCanvas.width = width;
   outputCanvas.height = height;
-  const outputCtx = outputCanvas.getContext('2d', { willReadFrequently: true });
+  const outputCtx = outputCanvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
   if (!outputCtx) return canvas;
 
   // Copy original data
@@ -275,7 +276,7 @@ export function applyUnsharpMask(
   amount: number = 0.8,
   radius: number = 1,
 ): HTMLCanvasElement {
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const ctx = canvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
   if (!ctx) return canvas;
 
   const { width, height } = canvas;
@@ -289,7 +290,7 @@ export function applyUnsharpMask(
   const outputCanvas = document.createElement('canvas');
   outputCanvas.width = width;
   outputCanvas.height = height;
-  const outputCtx = outputCanvas.getContext('2d', { willReadFrequently: true });
+  const outputCtx = outputCanvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
   if (!outputCtx) return canvas;
 
   const outputData = outputCtx.createImageData(width, height);

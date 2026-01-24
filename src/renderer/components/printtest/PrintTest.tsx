@@ -420,8 +420,8 @@ export default function PrintTest(): React.JSX.Element {
               dCtx.drawImage(img, 0, 0, frameWidth, frameHeight);
               dCtx.drawImage(img, frameWidth, 0, frameWidth, frameHeight);
 
-              // ใช้ quality 0.90 สำหรับ print output
-              imageDataUrl = doubleCanvas.toDataURL('image/jpeg', 0.90);
+              // ใช้ quality 1.0 สำหรับ print output - คุณภาพสูงสุด
+              imageDataUrl = doubleCanvas.toDataURL('image/jpeg', 1.0);
               console.log(
                 '✅ [PrintTest] Image duplicated successfully (2x6 -> 4x6)',
               );

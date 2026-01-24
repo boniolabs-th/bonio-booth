@@ -111,7 +111,7 @@ export const applyLUTToCanvas = (
   lut: LUT3D,
 ): HTMLCanvasElement => {
   const { width, height } = sourceCanvas;
-  const sourceCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+  const sourceCtx = sourceCanvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
 
   if (!sourceCtx) {
     throw new Error('Failed to get source canvas context');
@@ -120,7 +120,7 @@ export const applyLUTToCanvas = (
   const outputCanvas = document.createElement('canvas');
   outputCanvas.width = width;
   outputCanvas.height = height;
-  const outputCtx = outputCanvas.getContext('2d');
+  const outputCtx = outputCanvas.getContext('2d', { colorSpace: 'srgb' });
 
   if (!outputCtx) {
     throw new Error('Failed to get output canvas context');
@@ -258,7 +258,7 @@ export const applyLUTToImage = async (
   canvas.height =
     image instanceof HTMLVideoElement ? image.videoHeight : image.naturalHeight;
 
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
   if (!ctx) {
     throw new Error('Failed to get canvas context');
   }

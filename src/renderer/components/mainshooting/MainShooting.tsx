@@ -141,7 +141,7 @@ const flipImageHorizontally = (imageDataUrl: string): Promise<string> => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
       if (!ctx) {
         reject(new Error('Cannot create canvas context'));
         return;
@@ -479,7 +479,7 @@ export default function MainShooting() {
 
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const context = canvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
 
     if (context) {
       canvas.width = video.videoWidth;
@@ -574,7 +574,7 @@ export default function MainShooting() {
 
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
       if (!ctx) {
         reject(new Error('Cannot create canvas context'));
         return;

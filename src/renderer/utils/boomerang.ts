@@ -37,7 +37,7 @@ const extractFramesFromVideo = async (
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
-  const context = canvas.getContext('2d', { willReadFrequently: true });
+  const context = canvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
 
   if (!context) {
     video.remove();

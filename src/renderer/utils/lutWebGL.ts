@@ -389,7 +389,7 @@ export const applyLUTWithWebGL = (
   const outputCanvas = document.createElement('canvas');
   outputCanvas.width = sourceCanvas.width;
   outputCanvas.height = sourceCanvas.height;
-  const ctx2d = outputCanvas.getContext('2d');
+  const ctx2d = outputCanvas.getContext('2d', { colorSpace: 'srgb' });
   if (!ctx2d) {
     console.error('[LUT WebGL] Failed to create 2D context for output');
     return null;

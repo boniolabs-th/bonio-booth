@@ -220,7 +220,7 @@ export default function PhotoDecorate() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
     if (!ctx) return;
 
     // Create the final composite image
@@ -268,14 +268,14 @@ export default function PhotoDecorate() {
         // No photos assigned, draw frame only
         ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
 
-        // ใช้ quality 0.90 สำหรับ print output
-        const singleImageData = canvas.toDataURL('image/jpeg', 0.90);
+        // ใช้ quality 1.0 สำหรับ print output - คุณภาพสูงสุด
+        const singleImageData = canvas.toDataURL('image/jpeg', 1.0);
 
         if (shouldDuplicate) {
           const doubleCanvas = document.createElement('canvas');
           doubleCanvas.width = frameWidth * 2;
           doubleCanvas.height = frameHeight;
-          const dCtx = doubleCanvas.getContext('2d');
+          const dCtx = doubleCanvas.getContext('2d', { colorSpace: 'srgb' });
           if (dCtx) {
             dCtx.fillStyle = '#ffffff';
             dCtx.fillRect(0, 0, doubleCanvas.width, doubleCanvas.height);
@@ -286,8 +286,8 @@ export default function PhotoDecorate() {
               proceedToResult(
                 singleImageData,
                 [],
-                // ใช้ quality 0.90 สำหรับ duplicated print
-                doubleCanvas.toDataURL('image/jpeg', 0.90),
+                // ใช้ quality 1.0 สำหรับ duplicated print - คุณภาพสูงสุด
+                doubleCanvas.toDataURL('image/jpeg', 1.0),
               );
             };
             img.src = singleImageData;
@@ -454,14 +454,14 @@ export default function PhotoDecorate() {
           [],
         );
 
-        // ใช้ quality 0.90 สำหรับ print output
-        const singleImageData = canvas.toDataURL('image/jpeg', 0.90);
+        // ใช้ quality 1.0 สำหรับ print output - คุณภาพสูงสุด
+        const singleImageData = canvas.toDataURL('image/jpeg', 1.0);
 
         if (shouldDuplicate) {
           const doubleCanvas = document.createElement('canvas');
           doubleCanvas.width = frameWidth * 2;
           doubleCanvas.height = frameHeight;
-          const dCtx = doubleCanvas.getContext('2d');
+          const dCtx = doubleCanvas.getContext('2d', { colorSpace: 'srgb' });
           if (dCtx) {
             dCtx.fillStyle = '#ffffff';
             dCtx.fillRect(0, 0, doubleCanvas.width, doubleCanvas.height);
@@ -472,8 +472,8 @@ export default function PhotoDecorate() {
               proceedToResult(
                 singleImageData,
                 selectedCaptures,
-                // ใช้ quality 0.90 สำหรับ duplicated print
-                doubleCanvas.toDataURL('image/jpeg', 0.90),
+                // ใช้ quality 1.0 สำหรับ duplicated print - คุณภาพสูงสุด
+                doubleCanvas.toDataURL('image/jpeg', 1.0),
               );
             };
             img.src = singleImageData;

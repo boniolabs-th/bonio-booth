@@ -92,7 +92,7 @@ const applyFilterToPhoto = async (
 
     img.onload = async () => {
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
 
       if (!ctx) {
         reject(new Error('Cannot create canvas context'));

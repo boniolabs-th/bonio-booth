@@ -62,6 +62,15 @@ export const createBoomerangVideo = async (
       '30', // Force 30fps output
       '-pix_fmt',
       'yuv420p',
+      // Color space settings - Force BT.709 (sRGB compatible) to prevent color shift
+      '-colorspace',
+      'bt709',
+      '-color_primaries',
+      'bt709',
+      '-color_trc',
+      'bt709',
+      '-color_range',
+      'tv',
       '-movflags',
       '+faststart',
       '-y', // Overwrite output file
@@ -317,6 +326,15 @@ export const applyLutToVideo = async (
       '30', // Force 30fps output
       '-pix_fmt',
       'yuv420p',
+      // Color space settings - Force BT.709 (sRGB compatible) to prevent color shift
+      '-colorspace',
+      'bt709',
+      '-color_primaries',
+      'bt709',
+      '-color_trc',
+      'bt709',
+      '-color_range',
+      'tv',
       '-movflags',
       '+faststart',
       '-vsync',
@@ -406,6 +424,15 @@ export const createBoomerangWithLut = async (
       '30', // Force 30fps output
       '-pix_fmt',
       'yuv420p',
+      // Color space settings - Force BT.709 (sRGB compatible) to prevent color shift
+      '-colorspace',
+      'bt709',
+      '-color_primaries',
+      'bt709',
+      '-color_trc',
+      'bt709',
+      '-color_range',
+      'tv',
       '-movflags',
       '+faststart',
       '-y',
@@ -490,6 +517,7 @@ export const convertWebmToMp4 = async (
     // - an: No audio (WebM from canvas recording usually has no audio)
     // - movflags +faststart: Optimize for web streaming
     // - t: Force exact output duration
+    // - color settings: Force BT.709 (sRGB) color space to prevent color shift
     const args = [
       '-i',
       inputVideoPath,
@@ -511,6 +539,15 @@ export const convertWebmToMp4 = async (
       'cfr', // Constant frame rate - preserve original duration
       '-pix_fmt',
       'yuv420p', // Required for iPhone compatibility
+      // Color space settings - Force BT.709 (sRGB compatible) to prevent color shift
+      '-colorspace',
+      'bt709',
+      '-color_primaries',
+      'bt709',
+      '-color_trc',
+      'bt709',
+      '-color_range',
+      'tv', // Limited range (16-235) - standard for video
       '-an', // No audio (WebM from canvas usually has no audio track)
       '-movflags',
       '+faststart', // Enable fast start for web playback
