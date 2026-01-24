@@ -200,7 +200,9 @@ export const FILTERS: FilterConfig[] = [
   { id: 'matte-brown-mono', name: 'Matte Brown', lutFile: 'Matte_Brown_Mono.cube', type: 'lut' },
   { id: 'sepia-brown', name: 'Sepia', lutFile: 'Sepia_Brown.cube', type: 'lut' },
   { id: 'timelab-1', name: 'Classic', lutFile: 'Timelab 1.cube', type: 'lut' },
-  { id: 'timelab-4', name: 'Soft', lutFile: 'Timelab 4.cube', type: 'lut' },
-  { id: 'timelab-5', name: 'Vivid', lutFile: 'Timelab 5.cube', type: 'lut' },
-  { id: 'warm-vintage', name: 'Vintage', lutFile: 'Warm_Vintage.cube', type: 'lut' },
+  { id: 'timelab-2', name: 'Cool', lutFile: 'Timelab 2.cube', type: 'lut' },
+  { id: 'warm-light', name: 'Warm Light', lutFile: 'Warm Light.cube', type: 'lut' },
+  { id: 'bw', name: 'Black & White', lutFile: 'B&W.cube', type: 'lut' },
+  { id: 'evolution', name: 'Evolution', lutFile: 'Evolution.cube', type: 'lut' },
+  { id: 'orange-teal', name: 'Orange & Teal', lutFile: 'Orange & Teal.cube', type: 'lut' },
 ];

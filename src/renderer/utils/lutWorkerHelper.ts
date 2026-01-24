@@ -53,7 +53,7 @@ const resizeCanvasIfNeeded = (canvas: HTMLCanvasElement): HTMLCanvasElement => {
   const resizedCanvas = document.createElement('canvas');
   resizedCanvas.width = newWidth;
   resizedCanvas.height = newHeight;
-  const ctx = resizedCanvas.getContext('2d');
+  const ctx = resizedCanvas.getContext('2d', { colorSpace: 'srgb' });
 
   if (ctx) {
     // Use high-quality image smoothing
@@ -136,7 +136,7 @@ export const applyLUTWithWorker = (
   // Use Web Worker (CPU) for smaller images or as fallback
   return new Promise((resolve, reject) => {
     const w = initLUTWorker();
-    const ctx = processCanvas.getContext('2d', { willReadFrequently: true });
+    const ctx = processCanvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
 
     if (!ctx) {
       reject(new Error('Failed to get canvas context'));
@@ -188,7 +188,7 @@ export const applyLUTWithWorker = (
         const resultCanvas = document.createElement('canvas');
         resultCanvas.width = processCanvas.width;
         resultCanvas.height = processCanvas.height;
-        const resultCtx = resultCanvas.getContext('2d');
+        const resultCtx = resultCanvas.getContext('2d', { colorSpace: 'srgb' });
 
         if (!resultCtx) {
           w.removeEventListener('message', handleMessage);

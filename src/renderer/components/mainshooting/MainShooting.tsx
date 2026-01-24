@@ -141,7 +141,7 @@ const flipImageHorizontally = (imageDataUrl: string): Promise<string> => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
       if (!ctx) {
         reject(new Error('Cannot create canvas context'));
         return;
@@ -425,7 +425,10 @@ export default function MainShooting() {
 
     try {
       recordedChunksRef.current = [];
-      const options = { mimeType: 'video/webm;codecs=vp8' };
+      const options = {
+        mimeType: 'video/webm;codecs=vp8',
+        videoBitsPerSecond: 15000000, // 15 Mbps for high quality video
+      };
 
       // Fallback to vp8 if vp9 is not supported
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
@@ -479,7 +482,7 @@ export default function MainShooting() {
 
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const context = canvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
 
     if (context) {
       canvas.width = video.videoWidth;
@@ -574,7 +577,7 @@ export default function MainShooting() {
 
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
       if (!ctx) {
         reject(new Error('Cannot create canvas context'));
         return;
@@ -590,7 +593,7 @@ export default function MainShooting() {
         const stream = canvas.captureStream(fps);
         const mediaRecorder = new MediaRecorder(stream, {
           mimeType: 'video/webm;codecs=vp9',
-          videoBitsPerSecond: 5000000, // 5 Mbps
+          videoBitsPerSecond: 15000000, // 15 Mbps for high quality video
         });
 
         const chunks: Blob[] = [];

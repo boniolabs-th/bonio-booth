@@ -62,6 +62,15 @@ export const createBoomerangVideo = async (
       '30', // Force 30fps output
       '-pix_fmt',
       'yuv420p',
+      // Color space settings - Force BT.709 (sRGB compatible) to prevent color shift
+      '-colorspace',
+      'bt709',
+      '-color_primaries',
+      'bt709',
+      '-color_trc',
+      'bt709',
+      '-color_range',
+      'tv',
       '-movflags',
       '+faststart',
       '-y', // Overwrite output file
@@ -317,6 +326,15 @@ export const applyLutToVideo = async (
       '30', // Force 30fps output
       '-pix_fmt',
       'yuv420p',
+      // Color space settings - Force BT.709 (sRGB compatible) to prevent color shift
+      '-colorspace',
+      'bt709',
+      '-color_primaries',
+      'bt709',
+      '-color_trc',
+      'bt709',
+      '-color_range',
+      'tv',
       '-movflags',
       '+faststart',
       '-vsync',
@@ -406,6 +424,15 @@ export const createBoomerangWithLut = async (
       '30', // Force 30fps output
       '-pix_fmt',
       'yuv420p',
+      // Color space settings - Force BT.709 (sRGB compatible) to prevent color shift
+      '-colorspace',
+      'bt709',
+      '-color_primaries',
+      'bt709',
+      '-color_trc',
+      'bt709',
+      '-color_range',
+      'tv',
       '-movflags',
       '+faststart',
       '-y',
@@ -490,6 +517,7 @@ export const convertWebmToMp4 = async (
     // - an: No audio (WebM from canvas recording usually has no audio)
     // - movflags +faststart: Optimize for web streaming
     // - t: Force exact output duration
+    // - color settings: Force BT.709 (sRGB) color space to prevent color shift
     const args = [
       '-i',
       inputVideoPath,
@@ -500,17 +528,29 @@ export const convertWebmToMp4 = async (
       '-preset',
       'slow', // Better quality encoding (slower but sharper)
       '-crf',
-      '16', // Higher quality (lower = better, 16 is very good)
+      '14', // Very high quality (lower = better, 14 is excellent)
       '-maxrate',
-      '12M', // Higher bitrate for better quality
+      '20M', // Higher bitrate for better quality
       '-bufsize',
-      '24M', // Buffer size for rate control
+      '40M', // Buffer size for rate control
       '-r',
       '30', // Force 30fps output (WebM from canvas has variable fps)
       '-vsync',
       'cfr', // Constant frame rate - preserve original duration
       '-pix_fmt',
       'yuv420p', // Required for iPhone compatibility
+      // Color space settings - Force BT.709 (sRGB compatible) to prevent color shift
+      // colormatrix filter for accurate color conversion from sRGB to BT.709
+      '-vf',
+      'colorspace=all=bt709:iall=bt709:fast=1',
+      '-colorspace',
+      'bt709',
+      '-color_primaries',
+      'bt709',
+      '-color_trc',
+      'bt709',
+      '-color_range',
+      'tv', // Limited range (16-235) - standard for video
       '-an', // No audio (WebM from canvas usually has no audio track)
       '-movflags',
       '+faststart', // Enable fast start for web playback

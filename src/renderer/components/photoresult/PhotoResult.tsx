@@ -92,7 +92,7 @@ const applyFilterToPhoto = async (
 
     img.onload = async () => {
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
 
       if (!ctx) {
         reject(new Error('Cannot create canvas context'));
@@ -519,6 +519,10 @@ const generateFramedVideo = async (
     throw new Error('ไม่สามารถสร้าง canvas context ได้');
   }
 
+  // ตั้งค่า image rendering quality ให้สูงสุด
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
   const frameWidth = frameImg.naturalWidth || frame.width;
   const frameHeight = frameImg.naturalHeight || frame.height;
 
@@ -630,7 +634,7 @@ const generateFramedVideo = async (
       // ช่วยแก้ปัญหา WebM duration ผิดพลาด
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: selectedMimeType,
-        videoBitsPerSecond: 8000000, // 8 Mbps
+        videoBitsPerSecond: 15000000, // 15 Mbps - higher bitrate for sharper video
     });
 
     const chunks: Blob[] = [];

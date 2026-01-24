@@ -228,7 +228,7 @@ export default function PhotoFilter() {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
+          const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
           if (!ctx) {
             reject(new Error('Cannot create canvas context'));
             return;
@@ -261,7 +261,7 @@ export default function PhotoFilter() {
           const canvas = document.createElement('canvas');
           canvas.width = thumbnailCanvas.width;
           canvas.height = thumbnailCanvas.height;
-          const ctx = canvas.getContext('2d');
+          const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
           if (!ctx) return null;
 
           ctx.drawImage(thumbnailCanvas, 0, 0);
@@ -328,6 +328,10 @@ export default function PhotoFilter() {
           return;
         }
 
+        // ตั้งค่า image rendering quality ให้สูงสุด
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
         canvas.width = img.width;
         canvas.height = img.height;
 
@@ -389,6 +393,10 @@ export default function PhotoFilter() {
         reject(new Error('ไม่สามารถสร้าง canvas context ได้'));
         return;
       }
+
+      // ตั้งค่า image rendering quality ให้สูงสุด
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
       // Load frame image
       const frameImg = new Image();
@@ -500,8 +508,8 @@ export default function PhotoFilter() {
             }
           });
 
-          // ใช้ quality 0.90 สำหรับ print output - balance ระหว่าง quality และ file size
-          resolve(canvas.toDataURL('image/jpeg', 0.90));
+          // ใช้ quality 1.0 (100%) สำหรับ print output - คุณภาพสูงสุดเพื่อให้ frame คมชัด
+          resolve(canvas.toDataURL('image/jpeg', 1.0));
         } catch (error) {
           reject(error);
         }
@@ -561,8 +569,8 @@ export default function PhotoFilter() {
               img.onload = () => {
                 dCtx.drawImage(img, 0, 0);
                 dCtx.drawImage(img, frameWidth, 0);
-                // ใช้ quality 0.90 สำหรับ duplicated print image
-                printImage = doubleCanvas.toDataURL('image/jpeg', 0.90);
+                // ใช้ quality 1.0 สำหรับ duplicated print image - คุณภาพสูงสุด
+                printImage = doubleCanvas.toDataURL('image/jpeg', 1.0);
                 resolve();
               };
               img.src = filteredFinalImage;
