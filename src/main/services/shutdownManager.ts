@@ -5,7 +5,8 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import sseClient, { MachineEventType, ShutdownScheduledPayload, ShutdownImmediatePayload } from './sseClient';
+// import sseClient, { MachineEventType, ShutdownScheduledPayload, ShutdownImmediatePayload } from './sseClient';
+import sseClient, { MachineEventType } from './sseClient';
 
 const execAsync = promisify(exec);
 
@@ -55,13 +56,13 @@ export class ShutdownManager {
    */
   private setupSseListeners(): void {
     // Shutdown scheduled (manual - กด Power Off จาก dashboard)
-    sseClient.on(MachineEventType.SHUTDOWN_SCHEDULED, (_, data: ShutdownScheduledPayload) => {
+    sseClient.on(MachineEventType.SHUTDOWN_SCHEDULED, (_, data: any) => {
       console.log('🛑 [ShutdownManager] Received shutdown scheduled:', data);
       this.startCountdown(data.countdownMinutes, data.reason);
     });
 
     // Shutdown immediate (timer schedule)
-    sseClient.on(MachineEventType.SHUTDOWN_IMMEDIATE, (_, data: ShutdownImmediatePayload) => {
+    sseClient.on(MachineEventType.SHUTDOWN_IMMEDIATE, (_, data: any) => {
       console.log('🛑 [ShutdownManager] Received immediate shutdown:', data);
       // ถ้าอยู่ใน transaction ให้รอก่อน
       if (this.isInTransaction) {
@@ -412,6 +413,8 @@ export class ShutdownManager {
 
     // Shutdown OS
     try {
+      await sseClient.destroy();
+
       const platform = process.platform;
       let shutdownCmd: string;
 
