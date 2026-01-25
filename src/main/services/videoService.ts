@@ -1,10 +1,12 @@
-import { spawn } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { app } from 'electron';
 
 // @ts-ignore
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+
+let activeRecordingProcess: ChildProcess | null = null;
 
 /**
  * Get FFmpeg binary path that works in both development and production (packed app)
@@ -563,4 +565,156 @@ export const convertWebmToMp4Base64 = async (
   }
 
   return `data:video/mp4;base64,${base64}`;
+};
+
+/**
+ * List available DirectShow video devices
+ */
+export const listVideoDevices = async (): Promise<string[]> => {
+  return new Promise((resolve, reject) => {
+    // Command: ffmpeg -list_devices true -f dshow -i dummy
+    const args = ['-list_devices', 'true', '-f', 'dshow', '-i', 'dummy'];
+    const ffmpeg = spawn(getFFmpegPath(), args);
+
+    let stderrOutput = '';
+
+    ffmpeg.stderr.on('data', (data) => {
+      stderrOutput += data.toString();
+    });
+
+    ffmpeg.on('close', () => {
+      // Parse output for video devices
+      // Output format example:
+      // [dshow @ ...] DirectShow video devices (some may be both video and audio devices)
+      // [dshow @ ...]  "Integrated Camera"
+      // [dshow @ ...]     Alternative name "@device_pnp_..."
+
+      const devices: string[] = [];
+      const lines = stderrOutput.split('\n');
+      let inVideoSection = false;
+
+      for (const line of lines) {
+        if (line.includes('DirectShow video devices')) {
+          inVideoSection = true;
+          continue;
+        }
+        if (line.includes('DirectShow audio devices')) {
+          inVideoSection = false;
+          continue;
+        }
+
+        if (inVideoSection) {
+          // Match lines starting with [dshow @ ...]  "Device Name"
+          // We look for quotes after the [dshow] prefix
+          const match = line.match(/\[dshow @ [^\]]+\]\s+"([^"]+)"/);
+          if (match && match[1]) {
+             // Exclude "Alternative name" lines
+             if (!line.includes('Alternative name')) {
+               devices.push(match[1]);
+             }
+          }
+        }
+      }
+
+      resolve(devices);
+    });
+
+    // The command always fails with "dummy: Immediate exit requested", so we rely on stderr parsing in 'close'
+  });
+};
+
+/**
+ * Start recording from a DirectShow video device
+ */
+export const startRecordingCallback = (
+  deviceName: string,
+  outputPath: string,
+  options: { saturation?: number; contrast?: number; brightness?: number; gamma?: number } = {}
+): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (activeRecordingProcess) {
+      reject(new Error('Recording is already in progress'));
+      return;
+    }
+
+    const {
+      saturation = 1.7,   // High saturation for deep colors
+      contrast = 1.3,     // High contrast for punchy look
+      brightness = -0.08, // Reduce brightness to fix washout
+      gamma = 0.8         // Lower gamma for richer midtones
+    } = options;
+
+    // Filter string for color correction
+    // brightness: -1.0 to 1.0 (default 0)
+    // gamma: 0.1 to 10.0 (default 1)
+    const vf = `eq=saturation=${saturation}:contrast=${contrast}:brightness=${brightness}:gamma=${gamma},format=yuv420p`;
+
+    const args = [
+      '-f', 'dshow',
+      '-i', `video=${deviceName}`,
+      '-c:v', 'libx264',
+      '-preset', 'ultrafast', // Low CPU usage for real-time
+      '-tune', 'zerolatency',
+      '-vf', vf,
+      '-y',
+      outputPath
+    ];
+
+    console.log(`Starting recording with args: ${args.join(' ')}`);
+
+    activeRecordingProcess = spawn(getFFmpegPath(), args);
+
+    activeRecordingProcess.stderr!.on('data', (data) => {
+      // console.log(`FFmpeg Rec: ${data}`); // Optional: Log ffmpeg output
+    });
+
+    activeRecordingProcess.on('error', (err) => {
+      console.error('FFmpeg recording start error:', err);
+      activeRecordingProcess = null;
+      reject(err);
+    });
+
+    // We consider it started if it doesn't crash immediately (e.g. within 500ms)
+    // But since it's async process, we just resolve immediately and handle errors via events if needed
+    // Better: wait a bit to ensure it started
+    setTimeout(() => {
+        if (activeRecordingProcess && activeRecordingProcess.exitCode === null) {
+            resolve();
+        } else {
+            reject(new Error('Process exited immediately (check device name)'));
+        }
+    }, 1000);
+  });
+};
+
+/**
+ * Stop the current recording
+ */
+export const stopRecordingCallback = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (!activeRecordingProcess) {
+      resolve(); // Nothing to stop
+      return;
+    }
+
+    const proc = activeRecordingProcess;
+    activeRecordingProcess = null; // Clear reference immediately
+
+    proc.on('close', (code) => {
+      console.log(`Recording process exited with code ${code}`);
+      resolve();
+    });
+
+    // Send 'q' to stdin to stop gracefully
+    if (proc.stdin) {
+        try {
+            proc.stdin.write('q');
+        } catch (err) {
+            console.warn("Could not write 'q' to stdin, killing process...", err);
+            proc.kill(); // Fallback
+        }
+    } else {
+        proc.kill();
+    }
+  });
 };

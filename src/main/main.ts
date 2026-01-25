@@ -56,6 +56,9 @@ import {
   createBoomerangWithLut,
   convertWebmToMp4,
   convertWebmToMp4Base64,
+  listVideoDevices,
+  startRecordingCallback,
+  stopRecordingCallback,
 } from './services/videoService';
 import machineService, { StatusResponse } from './services/machineService';
 import { backgroundUploadService } from './services/backgroundUploadService';
@@ -1772,6 +1775,55 @@ ipcMain.handle('convert-to-mp4', async (event, videoPath: string, returnBase64: 
     return {
       success: false,
       error: errorMessage,
+    };
+  }
+});
+
+// Handler สำหรับ List DShow Video Devices
+ipcMain.handle('list-video-devices', async () => {
+  try {
+    const devices = await listVideoDevices();
+    return {
+      success: true,
+      devices,
+    };
+  } catch (error) {
+    console.error('❌ [Main] Error listing video devices:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// Handler สำหรับเริ่มอัด Native (DirectShow)
+ipcMain.handle('start-native-recording', async (event, deviceName: string, outputPath: string, options?: { saturation?: number, contrast?: number, brightness?: number, gamma?: number }) => {
+  try {
+    await startRecordingCallback(deviceName, outputPath, options);
+    return {
+      success: true,
+    };
+  } catch (error) {
+    console.error('❌ [Main] Error start native recording:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// Handler สำหรับหยุดอัด Native
+ipcMain.handle('stop-native-recording', async () => {
+  try {
+    await stopRecordingCallback();
+    return {
+      success: true,
+    };
+  } catch (error) {
+    console.error('❌ [Main] Error stop native recording:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 });
