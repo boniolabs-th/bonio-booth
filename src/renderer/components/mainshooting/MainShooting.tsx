@@ -749,6 +749,7 @@ export default function MainShooting() {
   const startCountdown = (
     duration: number,
     callback: () => void,
+    onStartRecording?: () => void, // callback เมื่อถึงเวลาเริ่มถ่าย video (3 วิสุดท้าย)
   ): Promise<void> => {
     return new Promise((resolve) => {
       // Clear any existing timer
@@ -758,12 +759,24 @@ export default function MainShooting() {
       }
 
       let currentCount = duration;
+      const VIDEO_RECORDING_DURATION = 3; // ถ่าย video 3 วินาทีสุดท้ายเสมอ
+      let recordingStarted = false;
+
       setCountdown(currentCount);
       setShowCountdown(true);
 
       countdownTimerRef.current = setInterval(() => {
         currentCount -= 1;
         setCountdown(currentCount);
+
+        // เริ่มถ่าย video เมื่อ countdown เหลือ 3 วินาที (หรือน้อยกว่า ถ้า duration < 3)
+        // เช่น countdown 5 วิ: 5, 4, [3=เริ่มถ่าย], 2, 1
+        // เช่น countdown 7 วิ: 7, 6, 5, 4, [3=เริ่มถ่าย], 2, 1
+        if (!recordingStarted && currentCount <= VIDEO_RECORDING_DURATION && currentCount > 0) {
+          recordingStarted = true;
+          console.log(`🎬 Starting video recording at countdown ${currentCount}`);
+          onStartRecording?.();
+        }
 
         if (currentCount <= 0) {
           if (countdownTimerRef.current) {
@@ -927,15 +940,20 @@ export default function MainShooting() {
           for (let i = 0; i < requiredCaptures; i += 1) {
             console.log(`📷 Starting capture ${i + 1}/${requiredCaptures}`);
 
-            // Start recording video/frames
-            startRecording();
-
             // Countdown using cameraCountdown from API
+            // Video recording จะเริ่มตอน countdown เหลือ 3 วินาที (ผ่าน onStartRecording callback)
             // eslint-disable-next-line no-await-in-loop
-            await startCountdown(cameraCountdownRef.current, () => {
-              // Callback when countdown reaches 0
-              console.log(`✅ Countdown finished for capture ${i + 1}`);
-            });
+            await startCountdown(
+              cameraCountdownRef.current,
+              () => {
+                // Callback when countdown reaches 0
+                console.log(`✅ Countdown finished for capture ${i + 1}`);
+              },
+              () => {
+                // Callback to start recording when countdown reaches 3
+                startRecording();
+              }
+            );
 
             // Stop recording and get frames data (for Canon) or video URL (for webcam)
             // eslint-disable-next-line no-await-in-loop

@@ -287,9 +287,10 @@ const generateFramedVideo = async (
     return new Promise<string>((resolve, reject) => {
       const stream = canvas.captureStream(fps);
 
+      // VP9 first - better color handling than VP8
       const mimeTypes = [
-        'video/webm;codecs=vp8',
         'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
         'video/webm',
       ];
 
@@ -618,9 +619,11 @@ const generateFramedVideo = async (
   return new Promise<string>((resolve, reject) => {
     const stream = canvas.captureStream(30);
 
+    // VP9 first - better color handling than VP8
+    // VP8 has known issues with color matrix conversion
     const mimeTypes = [
-      'video/webm;codecs=vp8',
       'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
       'video/webm',
     ];
 

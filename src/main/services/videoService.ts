@@ -19,9 +19,6 @@ const getFFmpegPath = (): string => {
     ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
   }
 
-  console.log('🎬 [VideoService] FFmpeg path:', ffmpegPath);
-  console.log('🎬 [VideoService] FFmpeg exists:', fs.existsSync(ffmpegPath));
-
   return ffmpegPath;
 };
 
@@ -34,6 +31,7 @@ export const createBoomerangVideo = async (
   outputPath?: string,
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
+    console.log('========== createBoomerangVideo ==========');
     // Generate output path if not provided
     const output =
       outputPath ||
@@ -57,23 +55,14 @@ export const createBoomerangVideo = async (
       '-preset',
       'medium',
       '-crf',
-      '20',
+      '18',
       '-r',
-      '30', // Force 30fps output
+      '30',
       '-pix_fmt',
       'yuv420p',
-      // Color space settings - Force BT.709 (sRGB compatible) to prevent color shift
-      '-colorspace',
-      'bt709',
-      '-color_primaries',
-      'bt709',
-      '-color_trc',
-      'bt709',
-      '-color_range',
-      'tv',
       '-movflags',
       '+faststart',
-      '-y', // Overwrite output file
+      '-y',
       output,
     ];
 
@@ -125,6 +114,7 @@ export const createBoomerangGif = async (
       );
 
     // Create high-quality boomerang GIF with palette optimization
+    console.log('==========================createBoomerangGif==========================');
     const args = [
       '-i',
       inputVideoPath,
@@ -188,7 +178,7 @@ export const extractFrames = async (
     }
 
     const outputPattern = path.join(tempDir, 'frame-%03d.jpg');
-
+    console.log('==========================extractFrames==========================');
     // Extract frames at even intervals
     const args = [
       '-i',
@@ -302,11 +292,10 @@ export const applyLutToVideo = async (
       return;
     }
 
-    console.log('🎨 [VideoService] Applying LUT from temp:', tempLutPath);
-
     // Get input video duration first using ffprobe-like approach
     // Since WebM from MediaRecorder often has incorrect duration,
     // we'll process the entire input without duration limit
+    console.log('==========================applyLutToVideo==========================');
     const args = [
       '-i',
       inputVideoPath,
@@ -315,30 +304,17 @@ export const applyLutToVideo = async (
       '-c:v',
       'libx264',
       '-preset',
-      'slow', // Better quality encoding (slower but sharper)
+      'medium',
       '-crf',
-      '16', // Higher quality (lower = better, 16 is very good)
-      '-maxrate',
-      '12M', // Higher bitrate for better quality
-      '-bufsize',
-      '24M', // Buffer size for rate control
+      '18',
       '-r',
-      '30', // Force 30fps output
+      '30',
       '-pix_fmt',
       'yuv420p',
-      // Color space settings - Force BT.709 (sRGB compatible) to prevent color shift
-      '-colorspace',
-      'bt709',
-      '-color_primaries',
-      'bt709',
-      '-color_trc',
-      'bt709',
-      '-color_range',
-      'tv',
       '-movflags',
       '+faststart',
       '-vsync',
-      'cfr', // Constant frame rate to ensure consistent duration
+      'cfr',
       '-y',
       output,
     ];
@@ -404,9 +380,7 @@ export const createBoomerangWithLut = async (
       reject(new Error(`Failed to copy LUT file: ${err}`));
       return;
     }
-
-    console.log('🎨 [VideoService] Creating boomerang with LUT from temp:', tempLutPath);
-
+    console.log('==========================createBoomerangWithLut==========================');
     const args = [
       '-i',
       inputVideoPath,
@@ -419,20 +393,11 @@ export const createBoomerangWithLut = async (
       '-preset',
       'medium',
       '-crf',
-      '20',
+      '18',
       '-r',
-      '30', // Force 30fps output
+      '30',
       '-pix_fmt',
       'yuv420p',
-      // Color space settings - Force BT.709 (sRGB compatible) to prevent color shift
-      '-colorspace',
-      'bt709',
-      '-color_primaries',
-      'bt709',
-      '-color_trc',
-      'bt709',
-      '-color_range',
-      'tv',
       '-movflags',
       '+faststart',
       '-y',
@@ -513,52 +478,38 @@ export const convertWebmToMp4 = async (
       );
 
     // FFmpeg command to convert WebM to MP4 (H.264)
-    // - libx264: Most compatible codec for all devices including iPhone
-    // - an: No audio (WebM from canvas recording usually has no audio)
-    // - movflags +faststart: Optimize for web streaming
-    // - t: Force exact output duration
-    // - color settings: Force BT.709 (sRGB) color space to prevent color shift
+    // WebM from MediaRecorder has color issues
+    // Try hue filter to adjust colors
+    console.log('==========================convertWebmToMp4==========================');
     const args = [
       '-i',
       inputVideoPath,
       '-t',
-      String(targetDuration), // Force exact output duration (9 seconds)
+      String(targetDuration),
+      // Adjust hue to fix color shift
+      '-vf',
+      // 'hue=h=350:s=1',
+      'hue=h=-10:s=1',
       '-c:v',
       'libx264',
       '-preset',
-      'slow', // Better quality encoding (slower but sharper)
+      'slow',
       '-crf',
-      '14', // Very high quality (lower = better, 14 is excellent)
-      '-maxrate',
-      '20M', // Higher bitrate for better quality
-      '-bufsize',
-      '40M', // Buffer size for rate control
+      '15',
       '-r',
-      '30', // Force 30fps output (WebM from canvas has variable fps)
+      '30',
       '-vsync',
-      'cfr', // Constant frame rate - preserve original duration
+      'cfr',
       '-pix_fmt',
-      'yuv420p', // Required for iPhone compatibility
-      // Color space settings - Force BT.709 (sRGB compatible) to prevent color shift
-      // colormatrix filter for accurate color conversion from sRGB to BT.709
-      '-vf',
-      'colorspace=all=bt709:iall=bt709:fast=1',
-      '-colorspace',
-      'bt709',
-      '-color_primaries',
-      'bt709',
-      '-color_trc',
-      'bt709',
-      '-color_range',
-      'tv', // Limited range (16-235) - standard for video
-      '-an', // No audio (WebM from canvas usually has no audio track)
+      'yuv420p',
+      '-an',
       '-movflags',
-      '+faststart', // Enable fast start for web playback
-      '-y', // Overwrite output file
+      '+faststart',
+      '-y',
       output,
     ];
 
-    console.log('🎬 [VideoService] Converting WebM to MP4 with args:', args.join(' '));
+    console.log('Converting WebM to MP4 with FFmpeg args:', args);
 
     const ffmpeg = spawn(getFFmpegPath(), args);
 
@@ -569,21 +520,17 @@ export const convertWebmToMp4 = async (
     });
 
     ffmpeg.on('error', (error) => {
-      console.error('❌ [VideoService] FFmpeg process error:', error.message);
       reject(new Error(`FFmpeg process error: ${error.message}`));
     });
 
     ffmpeg.on('close', (code) => {
       if (code === 0) {
         if (fs.existsSync(output)) {
-          console.log('✅ [VideoService] MP4 conversion successful:', output);
           resolve(output);
         } else {
-          console.error('❌ [VideoService] FFmpeg completed but output file not found');
           reject(new Error('FFmpeg completed but output file not found'));
         }
       } else {
-        console.error(`❌ [VideoService] FFmpeg exited with code ${code}:`, stderrOutput);
         reject(
           new Error(
             `FFmpeg exited with code ${code}\nOutput: ${stderrOutput}`,

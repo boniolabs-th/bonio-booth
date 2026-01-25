@@ -121,7 +121,6 @@ let deviceCheckTimeout: NodeJS.Timeout | null = null;
  * Helper function สำหรับเช็คและจัดการ isShutdownReady หลังจากเรียก init()
  */
 function handleShutdownReady(initResponse: any): void {
-  console.log('initResponse:', initResponse);
 
   if (isHandlingShutdownReady) {
     console.log('⚠️ [Main] Already handling shutdown ready, skipping');
