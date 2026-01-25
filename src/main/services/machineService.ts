@@ -1234,6 +1234,8 @@ export class MachineService {
     availableDevices?: string[],
     machineId?: string,
   ): Promise<{ success: boolean; message: string; notificationSent: boolean }> {
+    console.log('sendDeviceAlert', {deviceType,deviceName,availableDevices,machineId});
+
     try {
       const response = await this.makeRequest<{
         success: boolean;

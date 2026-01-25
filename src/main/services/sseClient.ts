@@ -96,6 +96,53 @@ export class SseClient {
     this.onStatus502Callback = callback;
   }
 
+  async updateStatus(status: string): Promise<void> {
+    try {
+      const url = new URL(`${this.apiBaseUrl}/api/machines/${this.machineId}`);
+      const protocol = url.protocol === 'https:' ? https : http;
+
+      const postData = JSON.stringify({
+        status,
+      });
+
+      const options: https.RequestOptions = {
+        hostname: url.hostname,
+        port: url.port || (url.protocol === 'https:' ? 443 : 80),
+        path: url.pathname,
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData),
+        },
+      };
+
+      await new Promise<void>((resolve, reject) => {
+        const req = protocol.request(options, (res) => {
+          let data = '';
+
+          res.on('data', (chunk) => {
+            data += chunk;
+          });
+
+          res.on('end', () => {
+            console.log('📤 [SseClient] Machine set offline:', data);
+            resolve();
+          });
+        });
+
+        req.on('error', (err) => {
+          console.error('❌ [SseClient] Failed to set offline:', err);
+          reject(err);
+        });
+
+        req.write(postData);
+        req.end();
+      });
+    } catch (error) {
+      console.error('❌ [SseClient] notifyOffline error:', error);
+    }
+  }
+
   connect(): void {
     // ⭐ Validate config
     if (!this.apiBaseUrl || !this.machineId) {
@@ -149,7 +196,7 @@ export class SseClient {
         this.scheduleReconnect();
       }, 30000);
 
-      this.request = protocol.request(options, (res) => {
+      this.request = protocol.request(options, async (res) => {
         this.isConnecting = false;
         this.clearConnectionTimeout();
 
@@ -172,6 +219,8 @@ export class SseClient {
         console.log('✅ [SseClient] Connected to SSE');
         this.isConnectedFlag = true;
         this.reconnectAttempts = 0;
+
+        await this.updateStatus('online');
 
         // ⭐ เริ่ม heartbeat monitoring
         this.startHeartbeatMonitoring();
@@ -305,7 +354,7 @@ export class SseClient {
   /**
    * ⭐ ยกเลิกการเชื่อมต่อ - แก้ไขให้ clear timers ทั้งหมด
    */
-  disconnect(manual = true): void {
+  disconnect(manual = true) {
     this.isManualDisconnect = manual;
     console.log('🔌 [SseClient] Disconnecting...');
 
@@ -557,59 +606,14 @@ export class SseClient {
     });
   }
 
-  async notifyOffline(): Promise<void> {
-    try {
-      const url = new URL(`${this.apiBaseUrl}/api/machines/${this.machineId}`);
-      const protocol = url.protocol === 'https:' ? https : http;
 
-      const postData = JSON.stringify({
-        status: 'offline',
-      });
-
-      const options: https.RequestOptions = {
-        hostname: url.hostname,
-        port: url.port || (url.protocol === 'https:' ? 443 : 80),
-        path: url.pathname,
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(postData),
-        },
-      };
-
-      await new Promise<void>((resolve, reject) => {
-        const req = protocol.request(options, (res) => {
-          let data = '';
-
-          res.on('data', (chunk) => {
-            data += chunk;
-          });
-
-          res.on('end', () => {
-            console.log('📤 [SseClient] Machine set offline:', data);
-            resolve();
-          });
-        });
-
-        req.on('error', (err) => {
-          console.error('❌ [SseClient] Failed to set offline:', err);
-          reject(err);
-        });
-
-        req.write(postData);
-        req.end();
-      });
-    } catch (error) {
-      console.error('❌ [SseClient] notifyOffline error:', error);
-    }
-  }
 
   /**
    * ⭐ Cleanup method - เรียกเมื่อปิดแอป
    */
   async destroy(): Promise<void> {
     console.log('🗑️ [SseClient] Destroying instance...');
-    await this.notifyOffline();
+    await this.updateStatus('offline');
     this.disconnect();
     this.eventCallbacks.clear();
     console.log('✅ [SseClient] Instance destroyed');
