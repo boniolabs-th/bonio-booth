@@ -170,6 +170,8 @@ export class SseClient {
     this.isConnecting = true;
 
     try {
+      this.updateStatus('online');
+
       const url = new URL(sseUrl);
       const protocol = url.protocol === 'https:' ? https : http;
 
@@ -220,7 +222,6 @@ export class SseClient {
         this.isConnectedFlag = true;
         this.reconnectAttempts = 0;
 
-        await this.updateStatus('online');
 
         // ⭐ เริ่ม heartbeat monitoring
         this.startHeartbeatMonitoring();
