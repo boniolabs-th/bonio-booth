@@ -765,14 +765,22 @@ export default function MainShooting() {
       setCountdown(currentCount);
       setShowCountdown(true);
 
+      // ถ้า duration <= 3 ให้เริ่มถ่ายทันทีตอนแสดง countdown แรก
+      // เช่น countdown 3 วิ: [3=เริ่มถ่ายทันที], 2, 1, 0=stop (ได้ video 3 วิเต็ม)
+      if (currentCount <= VIDEO_RECORDING_DURATION) {
+        recordingStarted = true;
+        console.log(`🎬 Starting video recording immediately at countdown ${currentCount}`);
+        onStartRecording?.();
+      }
+
       countdownTimerRef.current = setInterval(() => {
         currentCount -= 1;
         setCountdown(currentCount);
 
-        // เริ่มถ่าย video เมื่อ countdown เหลือ 3 วินาที (หรือน้อยกว่า ถ้า duration < 3)
-        // เช่น countdown 5 วิ: 5, 4, [3=เริ่มถ่าย], 2, 1
-        // เช่น countdown 7 วิ: 7, 6, 5, 4, [3=เริ่มถ่าย], 2, 1
-        if (!recordingStarted && currentCount <= VIDEO_RECORDING_DURATION && currentCount > 0) {
+        // เริ่มถ่าย video เมื่อ countdown เหลือ 3 วินาที (สำหรับ duration > 3)
+        // เช่น countdown 5 วิ: 5, 4, [3=เริ่มถ่าย], 2, 1, 0=stop (ได้ video 3 วิเต็ม)
+        // เช่น countdown 7 วิ: 7, 6, 5, 4, [3=เริ่มถ่าย], 2, 1, 0=stop (ได้ video 3 วิเต็ม)
+        if (!recordingStarted && currentCount === VIDEO_RECORDING_DURATION) {
           recordingStarted = true;
           console.log(`🎬 Starting video recording at countdown ${currentCount}`);
           onStartRecording?.();
