@@ -223,8 +223,9 @@ const generateFramedVideo = async (
     boomerangVideoDuration?: number, // Duration in seconds
   ): Promise<string> => {
     const canvas = document.createElement('canvas');
-    // ใช้ srgb color space เพื่อให้สีถูกต้อง
-    const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+    // Using alpha: false improves performance and fixes some color/gamma issues in MediaRecorder
+    // Removed explicit colorSpace: 'srgb' as it can cause color shifts in recorded video
+    const ctx = canvas.getContext('2d', { alpha: false });
 
     if (!ctx) {
       throw new Error('ไม่สามารถสร้าง canvas context ได้');
@@ -513,8 +514,9 @@ const generateFramedVideo = async (
   );
 
   const canvas = document.createElement('canvas');
-  // ใช้ srgb color space เพื่อให้สีถูกต้อง
-  const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+  // Using alpha: false improves performance and fixes some color/gamma issues in MediaRecorder
+  // Removed explicit colorSpace: 'srgb' as it can cause color shifts in recorded video
+  const ctx = canvas.getContext('2d', { alpha: false });
 
   if (!ctx) {
     throw new Error('ไม่สามารถสร้าง canvas context ได้');

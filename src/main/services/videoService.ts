@@ -488,10 +488,13 @@ export const convertWebmToMp4 = async (
       inputVideoPath,
       '-t',
       String(targetDuration),
-      // Adjust hue to fix color shift
-      '-vf',
-      // 'hue=h=350:s=1',
-      'hue=h=-10:s=1',
+      // Use BT.709 Color Space tags to fix Red->Orange shift
+      '-colorspace', 'bt709',
+      '-color_primaries', 'bt709',
+      '-color_trc', 'bt709',
+      '-color_range', 'tv',
+      // Slightly reduce brightness (-0.03) and boost contrast (1.05) to deepen the red
+      // '-vf', 'eq=brightness=-0.00',
       '-c:v',
       'libx264',
       '-preset',
