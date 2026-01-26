@@ -425,15 +425,27 @@ export default function MainShooting() {
 
     try {
       recordedChunksRef.current = [];
+
+      // Try to use MP4 (H.264) first if available (Chrome 107+ supports it)
+      const mimeTypes = [
+        'video/mp4;codecs=avc1', // H.264 in MP4 container (Best for colors/compatibility)
+        'video/mp4',             // Generic MP4
+        'video/webm;codecs=vp9', // Chrome default high quality
+        'video/webm;codecs=vp8', // Chrome default compatibility
+        'video/webm'             // Generic WebM
+      ];
+
+      const supportedType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
+
       const options = {
-        mimeType: 'video/webm;codecs=vp8',
+        mimeType: supportedType || 'video/webm',
         videoBitsPerSecond: 15000000, // 15 Mbps for high quality video
       };
 
-      // Fallback to vp8 if vp9 is not supported
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options.mimeType = 'video/webm;codecs=vp9';
-      }
+      console.log(`🎥 [MainShooting] MediaRecorder using mimeType: ${options.mimeType}`);
+
+      // Save mimeType to ref to use when creating Blob later
+      (mediaRecorderRef as any).mimeType = options.mimeType;
 
       const mediaRecorder = new MediaRecorder(streamRef.current, options);
       mediaRecorderRef.current = mediaRecorder;
@@ -465,8 +477,12 @@ export default function MainShooting() {
       }
 
       mediaRecorderRef.current.onstop = () => {
+        // Use the same mimeType used for recording
+        const mimeType = (mediaRecorderRef as any).mimeType || 'video/webm';
+        console.log(`🎬 [MainShooting] Blob created with type: ${mimeType}`);
+
         const blob = new Blob(recordedChunksRef.current, {
-          type: 'video/webm',
+          type: mimeType,
         });
         const url = URL.createObjectURL(blob);
         setIsRecording(false);
