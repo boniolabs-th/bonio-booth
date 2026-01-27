@@ -19,48 +19,32 @@ export default function Countdown({
   className = '',
 }: CountdownProps): React.JSX.Element | null {
   const [timeLeft, setTimeLeft] = useState<number>(seconds);
+
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const onCompleteRef = useRef(onComplete);
   const hasCompletedRef = useRef(false);
 
-  // อัพเดท onComplete ref เมื่อ prop เปลี่ยน
+  // keep latest onComplete
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
 
-  // Reset countdown เมื่อ seconds prop เปลี่ยน
+  // reset when seconds change
   useEffect(() => {
     setTimeLeft(seconds);
     hasCompletedRef.current = false;
   }, [seconds]);
 
-  // เรียก onComplete เมื่อ timeLeft ถึง 0 (แยกออกจาก countdown logic เพื่อหลีกเลี่ยง setState ใน render)
-  // ไม่ต้องเช็ค visible เพราะต้องการให้ onComplete ทำงานแม้ซ่อนอยู่
+  // main countdown interval (run once)
   useEffect(() => {
-    if (timeLeft === 0 && !hasCompletedRef.current) {
-      hasCompletedRef.current = true;
-      // ใช้ setTimeout เพื่อให้แน่ใจว่าไม่ได้เรียกในระหว่าง render cycle
-      setTimeout(() => {
-        if (onCompleteRef.current) {
-          onCompleteRef.current();
-        }
-      }, 0);
-    }
-  }, [timeLeft]);
-
-  // Countdown logic - ทำงานแม้ visible={false} (แค่ซ่อนการแสดงผล)
-  useEffect(() => {
-    if (timeLeft <= 0) {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      return;
-    }
-
     intervalRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
+          // stop interval
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
           return 0;
         }
         return prev - 1;
@@ -73,16 +57,18 @@ export default function Countdown({
         intervalRef.current = null;
       }
     };
-  }, [timeLeft]);
-
-  // Cleanup เมื่อ component unmount
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
   }, []);
+
+  // fire onComplete when reach 0
+  useEffect(() => {
+    if (timeLeft === 0 && !hasCompletedRef.current) {
+      hasCompletedRef.current = true;
+
+      setTimeout(() => {
+        onCompleteRef.current?.();
+      }, 0);
+    }
+  }, [timeLeft]);
 
   if (!visible) {
     return null;
@@ -90,18 +76,20 @@ export default function Countdown({
 
   const minutes = Math.floor(timeLeft / 60);
   const remainingSeconds = timeLeft % 60;
-  const displayTime = `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const displayTime = `${minutes}:${remainingSeconds
+    .toString()
+    .padStart(2, '0')}`;
 
-  // เพิ่ม warning และ critical classes
   const warningClass = timeLeft <= 10 && timeLeft > 5 ? 'warning' : '';
   const criticalClass = timeLeft <= 5 ? 'critical' : '';
 
   return (
-    <div className={`countdown-container ${warningClass} ${criticalClass} ${className}`}>
+    <div
+      className={`countdown-container ${warningClass} ${criticalClass} ${className}`}
+    >
       <div className="countdown-circle">
         <span className="countdown-text">{displayTime}</span>
       </div>
     </div>
   );
 }
-
