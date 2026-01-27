@@ -18,7 +18,7 @@ export default function PasswordModal({
   title = 'กรอกรหัสผ่าน',
   password: expectedPassword,
 }: PasswordModalProps): React.JSX.Element | null {
-  const [password, setPassword] = useState('');
+  const [inputValue, setInputValue] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -27,50 +27,48 @@ export default function PasswordModal({
 
   const handlePasswordChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      setPassword(e.target.value);
+      setInputValue(e.target.value);
       setPasswordError('');
     },
     [],
   );
 
   const handleSubmit = useCallback(() => {
-    if (password === targetPassword) {
-      setPassword('');
+    if (inputValue === targetPassword) {
+      setInputValue('');
       setPasswordError('');
       onSuccess();
     } else {
       setPasswordError('รหัสผ่านไม่ถูกต้อง');
-      setPassword('');
+      setInputValue('');
       // Focus input อีกครั้งหลังจาก clear
       setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
     }
-  }, [password, targetPassword, onSuccess]);
+  }, [inputValue, targetPassword, onSuccess]);
 
   const handleCancel = useCallback(() => {
-    setPassword('');
+    setInputValue('');
     setPasswordError('');
     onCancel();
   }, [onCancel]);
 
+  // ✅ รวม focus และ Escape handler ไว้ที่เดียว
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      inputRef.current?.focus();
-    }
-  }, [isOpen]);
+    if (!isOpen) return;
 
-  // Focus input เมื่อ modal เปิด และจัดการ Escape key
-  useEffect(() => {
+    // Focus input เมื่อ modal เปิด
+    inputRef.current?.focus();
+
+    // จัดการ Escape key
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape') {
         handleCancel();
       }
     };
 
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-    }
+    document.addEventListener('keydown', handleEscape);
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
@@ -108,7 +106,7 @@ export default function PasswordModal({
             ref={inputRef}
             type="password"
             className="password-input"
-            value={password}
+            value={inputValue} // ✅ ใช้ state ชื่อใหม่
             onChange={handlePasswordChange}
             onKeyDown={handleKeyDown}
             placeholder="กรอกรหัสผ่าน"
@@ -132,7 +130,7 @@ export default function PasswordModal({
             type="button"
             className="password-modal-button password-modal-button-submit"
             onClick={handleSubmit}
-            disabled={password.length === 0}
+            disabled={inputValue.length === 0} // ✅ ใช้ state ชื่อใหม่
           >
             ยืนยัน
           </button>
