@@ -2,8 +2,14 @@
  * @NOTE: Prepend a `~` to css file paths that are in your node_modules
  *        See https://github.com/webpack-contrib/sass-loader#imports
  */
-html{
- touch-action: manipulation;
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap');
+
+* {
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+}
+
+html {
+  touch-action: manipulation;
 }
 
 body {
@@ -21,7 +27,6 @@ body {
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
-  font-family: sans-serif;
   overflow: hidden;
   display: flex;
   justify-content: center;
