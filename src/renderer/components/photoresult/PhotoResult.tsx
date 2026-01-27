@@ -863,9 +863,8 @@ const generateFramedVideo = async (
       animationFrameId = requestAnimationFrame(drawFrame);
     };
 
-    // Start recording without timeslice for more accurate duration
-    // timeslice can cause last chunk to be cut off
-    mediaRecorder.start();
+    // Start recording with 100ms timeslice for better timing and metadata
+    mediaRecorder.start(100);
     drawFrame();
   });
 };

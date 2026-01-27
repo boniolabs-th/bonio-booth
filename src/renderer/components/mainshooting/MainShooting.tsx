@@ -442,10 +442,11 @@ export default function MainShooting() {
         videoBitsPerSecond: 15000000, // 15 Mbps for high quality video
       };
 
-      console.log(`🎥 [MainShooting] MediaRecorder using mimeType: ${options.mimeType}`);
+      console.log(`🎥 [Webcam] MediaRecorder using mimeType: ${options.mimeType}`);
 
-      // Save mimeType to ref to use when creating Blob later
+      // Save mimeType and start timestamp to ref
       (mediaRecorderRef as any).mimeType = options.mimeType;
+      (mediaRecorderRef as any).recordingStartTime = performance.now();
 
       const mediaRecorder = new MediaRecorder(streamRef.current, options);
       mediaRecorderRef.current = mediaRecorder;
@@ -453,43 +454,66 @@ export default function MainShooting() {
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           recordedChunksRef.current.push(event.data);
+          console.log(`🎥 [Webcam] Data chunk received: ${(event.data.size / 1024).toFixed(1)} KB`);
         }
       };
 
-      mediaRecorder.start();
+      // Use 100ms timeslice for precise timing and better metadata
+      mediaRecorder.start(100);
       setIsRecording(true);
-    } catch {
-      // Error starting recording
+      console.log(`🎬 [Webcam] Recording started at t=${performance.now().toFixed(2)}ms`);
+    } catch (error) {
+      console.error('❌ [Webcam] Error starting recording:', error);
     }
   }, []);
 
   const stopWebcamRecording = useCallback((): Promise<string> => {
     return new Promise((resolve) => {
       if (!mediaRecorderRef.current) {
+        console.warn('⚠️ [Webcam] No mediaRecorder to stop');
         resolve('');
         return;
       }
 
       // Check if mediaRecorder is recording
       if (mediaRecorderRef.current.state === 'inactive') {
+        console.warn('⚠️ [Webcam] MediaRecorder already inactive');
         resolve('');
         return;
       }
 
+      const recordingStartTime = (mediaRecorderRef as any).recordingStartTime || 0;
+      const stopTime = performance.now();
+      const actualDuration = stopTime - recordingStartTime;
+
+      console.log(`🎬 [Webcam] Stopping recording after ${actualDuration.toFixed(2)}ms (target: 3000ms, diff: ${(actualDuration - 3000).toFixed(2)}ms)`);
+
       mediaRecorderRef.current.onstop = () => {
         // Use the same mimeType used for recording
         const mimeType = (mediaRecorderRef as any).mimeType || 'video/webm';
-        console.log(`🎬 [MainShooting] Blob created with type: ${mimeType}`);
+        const totalSize = recordedChunksRef.current.reduce((sum, chunk) => sum + chunk.size, 0);
+        console.log(`🎬 [Webcam] Blob created with type: ${mimeType}, size: ${(totalSize / 1024).toFixed(1)} KB, chunks: ${recordedChunksRef.current.length}`);
 
         const blob = new Blob(recordedChunksRef.current, {
           type: mimeType,
         });
         const url = URL.createObjectURL(blob);
         setIsRecording(false);
+        console.log(`✅ [Webcam] Recording completed: ${url.substring(0, 50)}...`);
         resolve(url);
       };
 
-      mediaRecorderRef.current.stop();
+      // Request final data before stopping
+      if (mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.requestData();
+      }
+
+      // Small delay to ensure data is flushed
+      setTimeout(() => {
+        if (mediaRecorderRef.current) {
+          mediaRecorderRef.current.stop();
+        }
+      }, 50);
     });
   }, []);
 
@@ -574,9 +598,12 @@ export default function MainShooting() {
   };
 
   const startCanonFrameRecording = useCallback(() => {
-    console.log('📷 [Canon] Starting frame recording...');
+    const startTime = performance.now();
+    console.log(`📷 [Canon] Starting frame recording at t=${startTime.toFixed(2)}ms`);
     canonCamera.startFrameRecording();
     setIsRecording(true);
+    // Store start time for duration tracking
+    (canonCamera as any).recordingStartTime = startTime;
   }, [canonCamera]);
 
   /**
@@ -585,15 +612,16 @@ export default function MainShooting() {
    */
   const createVideoFromFrames = useCallback(async (frames: string[], fps: number = 30): Promise<string> => {
     if (frames.length === 0) {
-      console.warn('📷 [Canon] No frames to create video from');
+      console.warn('⚠️ [Canon] No frames to create video from');
       return '';
     }
 
-    console.log(`📷 [Canon] Creating video from ${frames.length} frames at ${fps}fps`);
+    const videoDuration = frames.length / fps;
+    console.log(`📷 [Canon] Creating video from ${frames.length} frames at ${fps}fps (duration: ${videoDuration.toFixed(2)}s)`);
 
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+      const ctx = canvas.getContext('2d', { alpha: false, colorSpace: 'srgb' });
       if (!ctx) {
         reject(new Error('Cannot create canvas context'));
         return;
@@ -605,7 +633,7 @@ export default function MainShooting() {
         canvas.width = firstImg.naturalWidth;
         canvas.height = firstImg.naturalHeight;
 
-        // Setup MediaRecorder
+        // Setup MediaRecorder with timeslice for precise timing
         const stream = canvas.captureStream(fps);
         const mediaRecorder = new MediaRecorder(stream, {
           mimeType: 'video/webm;codecs=vp9',
@@ -622,7 +650,7 @@ export default function MainShooting() {
         mediaRecorder.onstop = () => {
           const blob = new Blob(chunks, { type: 'video/webm' });
           const url = URL.createObjectURL(blob);
-          console.log(`✅ [Canon] Video created: ${url} (${(blob.size / 1024).toFixed(1)} KB)`);
+          console.log(`✅ [Canon] Video created: ${url} (size: ${(blob.size / 1024).toFixed(1)} KB, frames: ${frames.length})`);
           resolve(url);
         };
 
@@ -631,30 +659,41 @@ export default function MainShooting() {
           reject(e);
         };
 
-        mediaRecorder.start();
+        // Use 100ms timeslice for better timing
+        mediaRecorder.start(100);
+        const recordingStartTime = performance.now();
 
-        // Draw frames sequentially
+        // Draw frames sequentially with precise timing
         let frameIndex = 0;
         const frameInterval = 1000 / fps;
 
         const drawNextFrame = () => {
           if (frameIndex >= frames.length) {
-            // All frames drawn, stop recording
+            // All frames drawn, stop recording after small delay
+            const elapsed = performance.now() - recordingStartTime;
+            console.log(`📷 [Canon] All frames drawn in ${elapsed.toFixed(2)}ms`);
+
+            // Request final data and stop
             setTimeout(() => {
-              mediaRecorder.stop();
-            }, frameInterval); // Wait one more frame interval before stopping
+              if (mediaRecorder.state === 'recording') {
+                mediaRecorder.requestData();
+              }
+              setTimeout(() => {
+                mediaRecorder.stop();
+              }, 50);
+            }, frameInterval / 2);
             return;
           }
 
           const img = new Image();
           img.onload = () => {
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            frameIndex++;
+            frameIndex += 1;
             setTimeout(drawNextFrame, frameInterval);
           };
           img.onerror = () => {
-            console.warn(`⚠️ [Canon] Failed to load frame ${frameIndex}`);
-            frameIndex++;
+            console.warn(`⚠️ [Canon] Failed to load frame ${frameIndex}, skipping`);
+            frameIndex += 1;
             setTimeout(drawNextFrame, frameInterval);
           };
           img.src = frames[frameIndex];
@@ -671,11 +710,17 @@ export default function MainShooting() {
   }, []);
 
   const stopCanonFrameRecording = useCallback(async (): Promise<string> => {
-    console.log('📷 [Canon] Stopping frame recording...');
+    const stopTime = performance.now();
+    const startTime = (canonCamera as any).recordingStartTime || 0;
+    const actualDuration = stopTime - startTime;
+
+    console.log(`📷 [Canon] Stopping frame recording after ${actualDuration.toFixed(2)}ms (target: 3000ms, diff: ${(actualDuration - 3000).toFixed(2)}ms)`);
+
     const recording = canonCamera.stopFrameRecording();
     setIsRecording(false);
 
-    console.log(`📷 [Canon] Captured ${recording.frames.length} frames`);
+    const fps = recording.frames.length > 0 ? (recording.frames.length / (actualDuration / 1000)) : 0;
+    console.log(`📷 [Canon] Captured ${recording.frames.length} frames (${fps.toFixed(2)} fps avg)`);
 
     // Return frames data for background processing later
     // Instead of blocking here, we'll process video in background
@@ -774,44 +819,75 @@ export default function MainShooting() {
         countdownTimerRef.current = null;
       }
 
-      let currentCount = duration;
       const VIDEO_RECORDING_DURATION = 3; // ถ่าย video 3 วินาทีสุดท้ายเสมอ
       let recordingStarted = false;
+      let recordingStopTimeout: number | null = null;
 
-      setCountdown(currentCount);
+      // Use performance.now() for precise timing
+      const startTime = performance.now();
+      const targetDuration = duration * 1000; // milliseconds
+      const recordingStartTime = (duration - VIDEO_RECORDING_DURATION) * 1000;
+
+      setCountdown(duration);
       setShowCountdown(true);
 
       // ถ้า duration <= 3 ให้เริ่มถ่ายทันทีตอนแสดง countdown แรก
       // เช่น countdown 3 วิ: [3=เริ่มถ่ายทันที], 2, 1, 0=stop (ได้ video 3 วิเต็ม)
-      if (currentCount <= VIDEO_RECORDING_DURATION) {
+      if (duration <= VIDEO_RECORDING_DURATION) {
         recordingStarted = true;
-        console.log(`🎬 Starting video recording immediately at countdown ${currentCount}`);
+        const recordingStartTimestamp = performance.now();
+        console.log(`🎬 [Countdown] Starting video recording immediately at countdown ${duration} (t=0ms)`);
         onStartRecording?.();
+
+        // Set precise timeout to stop recording after exactly 3 seconds
+        recordingStopTimeout = window.setTimeout(() => {
+          const actualDuration = performance.now() - recordingStartTimestamp;
+          console.log(`🎬 [Countdown] Recording duration: ${actualDuration.toFixed(2)}ms (target: ${VIDEO_RECORDING_DURATION * 1000}ms)`);
+        }, VIDEO_RECORDING_DURATION * 1000);
       }
 
-      countdownTimerRef.current = setInterval(() => {
-        currentCount -= 1;
-        setCountdown(currentCount);
+      const checkCountdown = () => {
+        const elapsed = performance.now() - startTime;
+        const remaining = targetDuration - elapsed;
+        const currentCount = Math.ceil(remaining / 1000);
 
-        // เริ่มถ่าย video เมื่อ countdown เหลือ 3 วินาที (สำหรับ duration > 3)
-        // เช่น countdown 5 วิ: 5, 4, [3=เริ่มถ่าย], 2, 1, 0=stop (ได้ video 3 วิเต็ม)
-        // เช่น countdown 7 วิ: 7, 6, 5, 4, [3=เริ่มถ่าย], 2, 1, 0=stop (ได้ video 3 วิเต็ม)
-        if (!recordingStarted && currentCount === VIDEO_RECORDING_DURATION) {
+        // Update countdown display
+        setCountdown(Math.max(0, currentCount));
+
+        // เริ่มถ่าย video เมื่อเหลือเวลา 3 วินาที (สำหรับ duration > 3)
+        if (!recordingStarted && remaining <= VIDEO_RECORDING_DURATION * 1000 && remaining > 0) {
           recordingStarted = true;
-          console.log(`🎬 Starting video recording at countdown ${currentCount}`);
+          const recordingStartTimestamp = performance.now();
+          const actualStartTime = elapsed;
+          console.log(`🎬 [Countdown] Starting video recording at countdown ${currentCount} (elapsed: ${actualStartTime.toFixed(2)}ms, target: ${recordingStartTime.toFixed(2)}ms, diff: ${(actualStartTime - recordingStartTime).toFixed(2)}ms)`);
           onStartRecording?.();
+
+          // Set precise timeout to stop recording after exactly 3 seconds
+          recordingStopTimeout = window.setTimeout(() => {
+            const actualDuration = performance.now() - recordingStartTimestamp;
+            console.log(`🎬 [Countdown] Recording duration: ${actualDuration.toFixed(2)}ms (target: ${VIDEO_RECORDING_DURATION * 1000}ms, diff: ${(actualDuration - VIDEO_RECORDING_DURATION * 1000).toFixed(2)}ms)`);
+          }, VIDEO_RECORDING_DURATION * 1000);
         }
 
-        if (currentCount <= 0) {
+        // Check if countdown finished
+        if (elapsed >= targetDuration) {
           if (countdownTimerRef.current) {
             clearInterval(countdownTimerRef.current);
             countdownTimerRef.current = null;
           }
+          if (recordingStopTimeout) {
+            clearTimeout(recordingStopTimeout);
+          }
           setShowCountdown(false);
+          console.log(`✅ [Countdown] Finished after ${elapsed.toFixed(2)}ms (target: ${targetDuration}ms, diff: ${(elapsed - targetDuration).toFixed(2)}ms)`);
           callback();
           resolve();
         }
-      }, 1000);
+      };
+
+      // Use setInterval with 50ms interval for smoother updates
+      // But rely on performance.now() for accurate timing
+      countdownTimerRef.current = setInterval(checkCountdown, 50);
     });
   };
 
