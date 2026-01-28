@@ -51,16 +51,16 @@ export const createBoomerangVideo = async (
       '-i',
       inputVideoPath,
       '-filter_complex',
-      '[0:v]fps=30,reverse,fifo[r];[0:v]fps=30[o];[o][r]concat=n=2:v=1:a=0,scale=1080:-2,setsar=1',
-      '[0:v]fps=30,unsharp=5:5:1.2:5:5:0.0,reverse,fifo[r];' +
-      '[0:v]fps=30,unsharp=5:5:1.2:5:5:0.0[o];' +
-      '[o][r]concat=n=2:v=1:a=0,scale=1080:-2:flags=lanczos,setsar=1', // added by all
+      // ยุบเหลือชุดเดียว: ลับคมนิดหน่อย (unsharp) + รวมวิดีโอ (concat) + ย่อเป็น 720p เพื่อความลื่น by all
+      '[0:v]fps=30,unsharp=3:3:0.8,reverse,fifo[r];' +
+      '[0:v]fps=30,unsharp=3:3:0.8[o];' +
+      '[o][r]concat=n=2:v=1:a=0,scale=720:-2,setsar=1',
       '-c:v',
       'libx264',
       '-preset',
-      'medium', //tune by all increase compression.
+      'ultrafast', //tune by all increase compression.
       '-crf',
-      '20',
+      '23', // ปรับ 20 เป็น 23
       '-r',
       '30',
       '-pix_fmt',
@@ -195,7 +195,7 @@ export const extractFrames = async (
       '-frames:v',
       frameCount.toString(),
       '-q:v',
-      '2', // tuned freature by all
+      '3', // tuned freature by all
       outputPattern,
     ];
 
