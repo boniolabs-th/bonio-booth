@@ -1,6 +1,6 @@
 .countdown-container {
   position: absolute;
-  top: 3.5rem;
+  top: 4rem;
   right: 5rem;
   z-index: 1000;
   pointer-events: none; /* ไม่ให้ countdown block การคลิก */
