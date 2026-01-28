@@ -54,13 +54,13 @@ export const createBoomerangVideo = async (
       // ยุบเหลือชุดเดียว: ลับคมนิดหน่อย (unsharp) + รวมวิดีโอ (concat) + ย่อเป็น 720p เพื่อความลื่น by all
       '[0:v]fps=30,unsharp=3:3:0.8,reverse,fifo[r];' +
       '[0:v]fps=30,unsharp=3:3:0.8[o];' +
-      '[o][r]concat=n=2:v=1:a=0,scale=640:-2,setsar=1',
+      '[o][r]concat=n=2:v=1:a=0,scale=720:-2,setsar=1',
       '-c:v',
       'libx264',
       '-preset',
       'ultrafast', //tune by all increase compression.
       '-crf',
-      '23', // ปรับ 20 เป็น 23
+      '20', // ปรับ 20 เป็น 23
       '-r',
       '30',
       '-pix_fmt',
@@ -124,7 +124,7 @@ export const createBoomerangGif = async (
       '-i',
       inputVideoPath,
       '-filter_complex',
-      '[0:v]fps=15,reverse,fifo[r];[0:v]fps=15[o];[o][r]concat=n=2:v=1:a=0,scale=640:-2:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3',
+      '[0:v]fps=15,reverse,fifo[r];[0:v]fps=15[o];[o][r]concat=n=2:v=1:a=0,scale=720:-2:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3',
       '-loop',
       '0', // Infinite loop
       '-y',
@@ -189,7 +189,7 @@ export const extractFrames = async (
       '-i',
       inputVideoPath,
       '-vf',
-      `select='not(mod(n\\,${Math.floor(30 / frameCount)}))',unsharp=5:5:1.2:5:5:0.0,scale=640:-2:flags=lanczos`,
+      `select='not(mod(n\\,${Math.floor(30 / frameCount)}))',unsharp=5:5:1.2:5:5:0.0,scale=720:-2:flags=lanczos`,
       '-vsync',
       'vfr',
       '-frames:v',
@@ -311,7 +311,7 @@ export const applyLutToVideo = async (
       '-preset',
       'medium',
       '-crf',
-      '28',
+      '22',
       '-r',
       '30',
       '-pix_fmt',
@@ -390,7 +390,7 @@ export const createBoomerangWithLut = async (
       '-i',
       inputVideoPath,
       '-filter_complex',
-      `[0:v]fps=30,reverse,fifo[r];[0:v]fps=30[o];[o][r]concat=n=2:v=1:a=0,scale=1080:-2,setsar=1,lut3d=${lutFileName}[v]`,
+      `[0:v]fps=30,reverse,fifo[r];[0:v]fps=30[o];[o][r]concat=n=2:v=1:a=0,scale=720:-2,setsar=1,lut3d=${lutFileName}[v]`,
       '-map',
       '[v]',
       '-c:v',
