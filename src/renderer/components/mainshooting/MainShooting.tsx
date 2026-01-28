@@ -286,11 +286,12 @@ export default function MainShooting() {
       const constraints: MediaStreamConstraints = {
         video: finalDeviceId ? {
           deviceId: { exact: finalDeviceId },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
+          width: { ideal: 2560 }, //edit by all 2k
+          height: { ideal: 1440 },
+          frameRate: { ideal: 30 },  // เพิ่มการตั้งค่าเพื่อความคมชัด by all
         } : {
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
+          width: { ideal: 2560 },
+          height: { ideal: 1440 }, //เพิ่มความคมชัด by all 2k
         },
         audio: false,
       };
@@ -503,6 +504,9 @@ export default function MainShooting() {
     if (context) {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
+      // เพิ่ม 2 บรรทัดนี้เพื่อความคมชัด by all
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
 
       // Draw image directly without flipping
       // Live Preview is mirrored via CSS (scaleX(-1)) for selfie-like experience
@@ -510,7 +514,7 @@ export default function MainShooting() {
       context.drawImage(video, 0, 0);
 
       // ใช้ quality 0.92 สำหรับ original webcam capture
-      const photoData = canvas.toDataURL('image/jpeg', 0.92);
+      const photoData = canvas.toDataURL('image/jpeg', 1.0); // edit by all
 
       // Flash effect
       setShowFlash(true);

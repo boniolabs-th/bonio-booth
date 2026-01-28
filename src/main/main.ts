@@ -790,7 +790,7 @@ async function generateImageWithPadding(
               resolved = true;
               clearTimeout(timeout);
               // ใช้ JPEG แทน PNG เพื่อ color profile ที่ถูกต้องและขนาดไฟล์เล็กลง
-              const buffer = image.toJPEG(100);
+              const buffer = image.toJPEG(82); // edit by all เพือควบคุม ขนาดไฟล์
               win.close();
               await cleanup();
               resolve(buffer);

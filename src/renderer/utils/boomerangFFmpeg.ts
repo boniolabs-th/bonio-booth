@@ -25,27 +25,17 @@ export const createBoomerangWithFFmpeg = async (
   format: 'video' | 'gif' = 'video',
 ): Promise<string> => {
   try {
-    // Convert blob URL to file path if needed
-    let videoPath = videoUrl;
+    let finalPath = videoUrl;
 
-    // If it's a blob URL, we need to download it first
+    // ✅ แก้จากเดิมที่หยุดทำงาน (throw Error)
+    // ให้เปลี่ยนมาเซฟไฟล์ลงเครื่องก่อนส่งไปให้ FFmpeg ประมวลผล
     if (videoUrl.startsWith('blob:')) {
-      const response = await fetch(videoUrl);
-      const blob = await response.blob();
-
-      // Create a temporary file
-      const arrayBuffer = await blob.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-
-      // Request main process to save and process
-      // For now, we'll use the blob directly in memory
-      // In production, you might want to save to temp file first
-      throw new Error('Blob URL processing not yet implemented. Please provide file path.');
+      finalPath = await saveBlobToTemp(videoUrl);
     }
 
     const result: BoomerangResult = await window.electron.ipcRenderer.invoke(
       'create-boomerang',
-      videoPath,
+      finalPath, // ส่ง Path ไฟล์จริงที่เซฟแล้วไป
       format,
     );
 
@@ -58,7 +48,7 @@ export const createBoomerangWithFFmpeg = async (
     console.error('Error creating boomerang with FFmpeg:', error);
     throw error;
   }
-};
+}; // edit by all
 
 /**
  * Extract frames from video for preview/display
@@ -69,15 +59,17 @@ export const extractFramesWithFFmpeg = async (
   frameCount: number = 12,
 ): Promise<{ frames: string[]; tempPaths: string[] }> => {
   try {
-    let videoPath = videoUrl;
+    let finalPath = videoUrl;
 
+    // ✅ แก้จุดนี้: ถ้าเป็น blob ให้เซฟลงเครื่องก่อนเพื่อให้ FFmpeg อ่านได้
     if (videoUrl.startsWith('blob:')) {
-      throw new Error('Blob URL processing not yet implemented. Please provide file path.');
+      finalPath = await saveBlobToTemp(videoUrl);
     }
 
+    // เรียก Main Process ให้ใช้ FFmpeg ดึงเฟรม (ความคมอยู่ที่ฝั่ง Main)
     const result: FrameExtractionResult = await window.electron.ipcRenderer.invoke(
       'extract-frames',
-      videoPath,
+      finalPath,
       frameCount,
     );
 
@@ -85,15 +77,16 @@ export const extractFramesWithFFmpeg = async (
       throw new Error(result.error || 'Failed to extract frames');
     }
 
+    // คืนค่า Base64 ของภาพที่ชัดแล้ว และเก็บ path ไว้ลบไฟล์ขยะภายหลัง
     return {
       frames: result.frames,
-      tempPaths: result.paths || [],
+      tempPaths: [...(result.paths || []), finalPath],
     };
   } catch (error) {
     console.error('Error extracting frames with FFmpeg:', error);
     throw error;
   }
-};
+}; // edit by all  saveBlobToTemp เพื่อให้ทำงานกับวิดีโอที่เพิ่งถ่ายได้จริง
 
 /**
  * Cleanup temporary files created during processing

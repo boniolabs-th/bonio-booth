@@ -55,7 +55,7 @@ const extractFramesFromVideo = async (
     await new Promise<void>((resolve) => {
       const handleSeeked = () => {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        frames.push(canvas.toDataURL('image/jpeg', 0.9));
+        frames.push(canvas.toDataURL('image/jpeg', 0.9)); //แก้จาก 0.9 เป็น 1.0
         resolve();
       };
       const targetTime = (duration * i) / Math.max(totalFrames - 1, 1);

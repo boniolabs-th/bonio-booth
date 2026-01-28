@@ -52,12 +52,15 @@ export const createBoomerangVideo = async (
       inputVideoPath,
       '-filter_complex',
       '[0:v]fps=30,reverse,fifo[r];[0:v]fps=30[o];[o][r]concat=n=2:v=1:a=0,scale=1080:-2,setsar=1',
+      '[0:v]fps=30,unsharp=5:5:1.2:5:5:0.0,reverse,fifo[r];' +
+      '[0:v]fps=30,unsharp=5:5:1.2:5:5:0.0[o];' +
+      '[o][r]concat=n=2:v=1:a=0,scale=1080:-2:flags=lanczos,setsar=1', // added by all
       '-c:v',
       'libx264',
       '-preset',
-      'medium',
+      'medium', //tune by all increase compression.
       '-crf',
-      '18',
+      '20',
       '-r',
       '30',
       '-pix_fmt',
@@ -186,13 +189,13 @@ export const extractFrames = async (
       '-i',
       inputVideoPath,
       '-vf',
-      `select='not(mod(n\\,${Math.floor(30 / frameCount)}))',scale=640:-2`,
+      `select='not(mod(n\\,${Math.floor(30 / frameCount)}))',unsharp=5:5:1.2:5:5:0.0,scale=720:-2:flags=lanczos`,
       '-vsync',
       'vfr',
       '-frames:v',
       frameCount.toString(),
       '-q:v',
-      '2',
+      '2', // tuned freature by all
       outputPattern,
     ];
 
