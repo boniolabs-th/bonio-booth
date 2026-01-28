@@ -234,15 +234,19 @@ const generateFramedVideo = async (
     const frameWidth = frameImg.naturalWidth || frame.width;
     const frameHeight = frameImg.naturalHeight || frame.height;
 
-    canvas.width = frameWidth;
-    canvas.height = frameHeight;
+    // Use fixed resolution 1080x720 regardless of frame size
+    const targetWidth = 1080;
+    const targetHeight = 720;
 
-    const scaleX = frameWidth / frame.width;
-    const scaleY = frameHeight / frame.height;
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const scaleX = targetWidth / frame.width;
+    const scaleY = targetHeight / frame.height;
 
     // Fill with white background first (paper color)
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, frameWidth, frameHeight);
+    ctx.fillRect(0, 0, targetWidth, targetHeight);
 
     const loadBoomerangFrames = (capture: Capture, captureIndex: number) => {
       if (!capture.boomerangFrames || capture.boomerangFrames.length === 0) {
@@ -389,7 +393,7 @@ const generateFramedVideo = async (
 
         // Fill with white background first (paper color)
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, frameWidth, frameHeight);
+        ctx.fillRect(0, 0, targetWidth, targetHeight);
 
         const drawSlot = (slot: (typeof frame.slots)[0], slotIndex: number) => {
           const slotFrames = boomerangImages[slotIndex];
@@ -463,7 +467,7 @@ const generateFramedVideo = async (
         });
 
         // 2. Draw frame
-        ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+        ctx.drawImage(frameImg, 0, 0, targetWidth, targetHeight);
 
         // 3. Draw foreground slots (zIndex >= 0)
         frame.slots.forEach((slot, slotIndex) => {
@@ -529,15 +533,19 @@ const generateFramedVideo = async (
   const frameWidth = frameImg.naturalWidth || frame.width;
   const frameHeight = frameImg.naturalHeight || frame.height;
 
-  canvas.width = frameWidth;
-  canvas.height = frameHeight;
+  // Use fixed resolution 1080x720 regardless of frame size
+  const targetWidth = 1080;
+  const targetHeight = 720;
 
-  const scaleX = frameWidth / frame.width;
-  const scaleY = frameHeight / frame.height;
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const scaleX = targetWidth / frame.width;
+  const scaleY = targetHeight / frame.height;
 
   // Fill with white background first (paper color)
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, frameWidth, frameHeight);
+  ctx.fillRect(0, 0, targetWidth, targetHeight);
 
   // Video output: 3 วินาที x 3 รอบ = 9 วินาที
   // MediaRecorder จะ record canvas ไปเรื่อยๆ จนครบ maxDuration (9 วินาที)
@@ -782,7 +790,7 @@ const generateFramedVideo = async (
 
       // Fill with white background first (paper color)
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, frameWidth, frameHeight);
+      ctx.fillRect(0, 0, targetWidth, targetHeight);
 
       const drawSlot = (slot: (typeof frame.slots)[0], index: number) => {
         const video = videoElements[index];
@@ -851,7 +859,7 @@ const generateFramedVideo = async (
       });
 
       // 2. Draw frame
-      ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+      ctx.drawImage(frameImg, 0, 0, targetWidth, targetHeight);
 
       // 3. Draw foreground slots (zIndex >= 0)
       frame.slots.forEach((slot, index) => {
