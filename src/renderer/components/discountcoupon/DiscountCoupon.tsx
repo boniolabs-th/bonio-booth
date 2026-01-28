@@ -68,7 +68,13 @@ export default function DiscountCoupon() {
         await window.electron.payment.checkMachineCoupon(code);
 
       if (!checkResult.valid) {
-        setError(checkResult.message || 'โค้ดส่วนลดไม่ถูกต้อง');
+        setError(
+          checkResult.message.includes(
+            'Invalid coupon code or code not available for this machine',
+          )
+            ? 'โค้ดส่วนลดไม่ถูกต้อง หรือไม่สามารถใช้ได้'
+            : checkResult.message,
+        );
         setIsLoading(false);
         return;
       }
