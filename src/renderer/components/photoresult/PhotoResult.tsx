@@ -234,9 +234,35 @@ const generateFramedVideo = async (
     const frameWidth = frameImg.naturalWidth || frame.width;
     const frameHeight = frameImg.naturalHeight || frame.height;
 
-    // Use fixed resolution 1080x720 regardless of frame size
-    const targetWidth = 1080;
-    const targetHeight = 720;
+    // Determine target resolution based on orientation (Landscape: 1080x720, Portrait: 720x1080)
+    // This reduces resolution while maintaining aspect ratio and avoiding white bars or stretching
+    const isPortrait = frameHeight > frameWidth;
+
+    // Scale to fit within 1080x720 (or 720x1080 for portrait)
+    let targetWidth: number;
+    let targetHeight: number;
+
+    if (isPortrait) {
+       // For portrait, we want width=720 or height=1080
+       // Let's fix width to 720 for portrait (720p equivalent)
+       targetWidth = 720;
+       targetHeight = Math.round(targetWidth * (frameHeight / frameWidth));
+    } else {
+       // For landscape, we want height=720 or width=1080
+       // Let's fix height to 720 for landscape (720p equivalent)
+       targetHeight = 720;
+       targetWidth = Math.round(targetHeight * (frameWidth / frameHeight));
+    }
+
+    // Ensure dimensions are even numbers (required by some video codecs)
+    if (targetWidth % 2 !== 0) targetWidth++;
+    if (targetHeight % 2 !== 0) targetHeight++;
+
+    console.log('🎬 [composeBoomerangVideo] Resolution:', {
+      original: `${frameWidth}x${frameHeight}`,
+      target: `${targetWidth}x${targetHeight}`,
+      isPortrait
+    });
 
     canvas.width = targetWidth;
     canvas.height = targetHeight;
@@ -533,9 +559,35 @@ const generateFramedVideo = async (
   const frameWidth = frameImg.naturalWidth || frame.width;
   const frameHeight = frameImg.naturalHeight || frame.height;
 
-  // Use fixed resolution 1080x720 regardless of frame size
-  const targetWidth = 1080;
-  const targetHeight = 720;
+  // Determine target resolution based on orientation (Landscape: 1080x720, Portrait: 720x1080)
+  // This reduces resolution while maintaining aspect ratio and avoiding white bars or stretching
+  const isPortrait = frameHeight > frameWidth;
+
+  // Scale to fit within 1080x720 (or 720x1080 for portrait)
+  let targetWidth: number;
+  let targetHeight: number;
+
+  if (isPortrait) {
+      // For portrait, we want width=720 or height=1080
+      // Let's fix width to 720 for portrait (720p equivalent)
+      targetWidth = 720;
+      targetHeight = Math.round(targetWidth * (frameHeight / frameWidth));
+  } else {
+      // For landscape, we want height=720 or width=1080
+      // Let's fix height to 720 for landscape (720p equivalent)
+      targetHeight = 720;
+      targetWidth = Math.round(targetHeight * (frameWidth / frameHeight));
+  }
+
+  // Ensure dimensions are even numbers (required by some video codecs)
+  if (targetWidth % 2 !== 0) targetWidth++;
+  if (targetHeight % 2 !== 0) targetHeight++;
+
+  console.log('🎬 [generateFramedVideo] Resolution:', {
+    original: `${frameWidth}x${frameHeight}`,
+    target: `${targetWidth}x${targetHeight}`,
+    isPortrait
+  });
 
   canvas.width = targetWidth;
   canvas.height = targetHeight;
