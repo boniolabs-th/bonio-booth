@@ -54,7 +54,7 @@ export const createBoomerangVideo = async (
       // ยุบเหลือชุดเดียว: ลับคมนิดหน่อย (unsharp) + รวมวิดีโอ (concat) + ย่อเป็น 720p เพื่อความลื่น by all
       '[0:v]fps=30,unsharp=3:3:0.8,reverse,fifo[r];' +
       '[0:v]fps=30,unsharp=3:3:0.8[o];' +
-      '[o][r]concat=n=2:v=1:a=0,scale=720:-2,setsar=1',
+      '[o][r]concat=n=2:v=1:a=0,scale=640:-2,setsar=1',
       '-c:v',
       'libx264',
       '-preset',
@@ -124,7 +124,7 @@ export const createBoomerangGif = async (
       '-i',
       inputVideoPath,
       '-filter_complex',
-      '[0:v]fps=15,reverse,fifo[r];[0:v]fps=15[o];[o][r]concat=n=2:v=1:a=0,scale=720:-2:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3',
+      '[0:v]fps=15,reverse,fifo[r];[0:v]fps=15[o];[o][r]concat=n=2:v=1:a=0,scale=640:-2:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=256[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3',
       '-loop',
       '0', // Infinite loop
       '-y',
@@ -189,13 +189,13 @@ export const extractFrames = async (
       '-i',
       inputVideoPath,
       '-vf',
-      `select='not(mod(n\\,${Math.floor(30 / frameCount)}))',unsharp=5:5:1.2:5:5:0.0,scale=720:-2:flags=lanczos`,
+      `select='not(mod(n\\,${Math.floor(30 / frameCount)}))',unsharp=5:5:1.2:5:5:0.0,scale=640:-2:flags=lanczos`,
       '-vsync',
       'vfr',
       '-frames:v',
       frameCount.toString(),
       '-q:v',
-      '3', // tuned freature by all
+      '6', // tuned freature by all
       outputPattern,
     ];
 
@@ -311,7 +311,7 @@ export const applyLutToVideo = async (
       '-preset',
       'medium',
       '-crf',
-      '18',
+      '28',
       '-r',
       '30',
       '-pix_fmt',
