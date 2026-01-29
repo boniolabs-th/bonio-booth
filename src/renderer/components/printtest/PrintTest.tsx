@@ -511,17 +511,27 @@ export default function PrintTest(): React.JSX.Element {
       });
       // @ts-ignore
       if (window.electron?.print?.printPhoto) {
+        // ลบ listener เก่าก่อนเพื่อป้องกัน listener ซ้อน
+        // @ts-ignore
+        window.electron.print.removePrintResponseListener();
+
         // @ts-ignore
         const response = await new Promise<{
           success: boolean;
           error?: string;
         }>((resolve) => {
+          let resolved = false;
+
           // @ts-ignore
           window.electron.print.onPrintResponse(
             (result: { success: boolean; error?: string }) => {
-              // @ts-ignore
-              window.electron.print.removePrintResponseListener();
-              resolve(result);
+              if (!resolved) {
+                resolved = true;
+                console.log('🖨️ [PrintTest] Print response received:', result);
+                // @ts-ignore
+                window.electron.print.removePrintResponseListener();
+                resolve(result);
+              }
             },
           );
 
@@ -539,12 +549,16 @@ export default function PrintTest(): React.JSX.Element {
 
           // Timeout after 60 seconds
           setTimeout(() => {
-            // @ts-ignore
-            window.electron.print.removePrintResponseListener();
-            resolve({
-              success: false,
-              error: 'Print timeout after 60 seconds',
-            });
+            if (!resolved) {
+              resolved = true;
+              console.warn('⚠️ [PrintTest] Print timeout after 60 seconds');
+              // @ts-ignore
+              window.electron.print.removePrintResponseListener();
+              resolve({
+                success: false,
+                error: 'Print timeout after 60 seconds',
+              });
+            }
           }, 60000);
         });
 
