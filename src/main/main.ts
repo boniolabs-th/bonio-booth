@@ -693,10 +693,10 @@ async function generateImageWithPadding(
 
       // ถ้ามีการ rotate 90° ต้องสลับ horizontal กับ vertical
       // เพราะหลัง rotate แกน X จะกลายเป็น Y และ Y กลายเป็น X
-      // กลับทิศ horizontal ให้ทั้ง portrait และ landscape (ลบ=ซ้าย, บวก=ขวา)
-      const effectiveHorizontal = willRotate ? -vertical : -horizontal;
-      // กลับทิศ vertical ให้ทั้ง portrait และ landscape (บวก=ขึ้น, ลบ=ลง)
-      const effectiveVertical = willRotate ? -horizontal : -vertical;
+      // Horizontal: ลบ=ซ้าย, บวก=ขวา
+      // Vertical: บวก=ขึ้น, ลบ=ลง
+      const effectiveHorizontal = willRotate ? vertical : horizontal;
+      const effectiveVertical = willRotate ? horizontal : -vertical;
 
       console.log('🖼️ [generateImageWithPadding] Position adjustment:', {
         willRotate,
