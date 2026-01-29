@@ -693,8 +693,10 @@ async function generateImageWithPadding(
 
       // ถ้ามีการ rotate 90° ต้องสลับ horizontal กับ vertical
       // เพราะหลัง rotate แกน X จะกลายเป็น Y และ Y กลายเป็น X
-      const effectiveHorizontal = willRotate ? vertical : horizontal;
-      const effectiveVertical = willRotate ? -horizontal : vertical;
+      // กลับทิศ horizontal ให้ทั้ง portrait และ landscape (ลบ=ซ้าย, บวก=ขวา)
+      const effectiveHorizontal = willRotate ? -vertical : -horizontal;
+      // กลับทิศ vertical ให้ทั้ง portrait และ landscape (บวก=ขึ้น, ลบ=ลง)
+      const effectiveVertical = willRotate ? -horizontal : -vertical;
 
       console.log('🖼️ [generateImageWithPadding] Position adjustment:', {
         willRotate,
@@ -1314,8 +1316,17 @@ ipcMain.on("print-photo", async (event, printConfig) => {
   const now = Date.now();
   const imageHash = getImageHash(printConfig.imageDataUrl);
 
+  log.info('🖨️ [Print] Print request received:', {
+    frameId: printConfig.frameId,
+    copies: printConfig.copies,
+    orientation: printConfig.orientation,
+    isPrinting,
+    timeSinceLastPrint: now - lastPrintTime,
+  });
+
   // ตรวจสอบว่ากำลังพิมพ์อยู่หรือไม่
   if (isPrinting) {
+    log.warn('🖨️ [Print] Already printing, rejecting request');
     event.reply("print-response", {
       success: false,
       error: "กำลังพิมพ์อยู่ กรุณารอสักครู่"
@@ -1328,6 +1339,7 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     lastPrintImageHash === imageHash &&
     now - lastPrintTime < PRINT_DEBOUNCE_MS
   ) {
+    log.warn('🖨️ [Print] Duplicate print detected, rejecting request');
     event.reply("print-response", {
       success: false,
       error: "รูปภาพนี้เพิ่งพิมพ์ไปเมื่อสักครู่"
@@ -1446,14 +1458,17 @@ ipcMain.on("print-photo", async (event, printConfig) => {
         setTimeout(() => fs.unlink(jpgPath).catch(() => {}), 2000);
 
         if (hasError) {
+          log.error('🖨️ [Print] Print failed:', { error: errorMessage, completedPrints, totalCopies: copies });
           event.reply("print-response", { success: false, error: errorMessage });
         } else {
+          log.info('🖨️ [Print] Print completed successfully:', { completedPrints, totalCopies: copies });
           event.reply("print-response", { success: true });
         }
 
         // ปลดล็อคหลังพิมพ์เสร็จ (รอสักครู่เพื่อป้องกันการพิมพ์ซ้ำ)
         setTimeout(() => {
           isPrinting = false;
+          log.info('🖨️ [Print] Print lock released');
         }, 1000);
         return;
       }
@@ -1473,13 +1488,16 @@ ipcMain.on("print-photo", async (event, printConfig) => {
         printCmd = `lp -d "${printerName}" "${jpgPath}"`;
       }
 
+      log.info('🖨️ [Print] Executing print command:', { copyNumber, printerName, platform });
+
       exec(printCmd, (err) => {
         if (err) {
-          console.error(`Print error (copy ${copyNumber}):`, err);
+          log.error(`🖨️ [Print] Print error (copy ${copyNumber}):`, err.message);
           hasError = true;
           errorMessage = err.message;
         } else {
           completedPrints++;
+          log.info(`🖨️ [Print] Copy ${copyNumber} sent to printer successfully`);
         }
 
         // พิมพ์ copy ถัดไป (รอสักครู่เพื่อให้เครื่องพิมพ์พร้อม)
@@ -1493,7 +1511,7 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     printNext(1);
 
   } catch (err) {
-    console.error(err);
+    log.error('🖨️ [Print] Exception during print:', err);
     event.reply("print-response", {
       success: false,
       error: err instanceof Error ? err.message : "Unknown error"

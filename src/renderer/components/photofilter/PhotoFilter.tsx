@@ -607,23 +607,27 @@ export default function PhotoFilter() {
             'Using filteredFinalImage from generateFinalImageWithFilteredPhotos',
           );
 
+          // ลบ listener เก่าก่อนเพื่อป้องกัน listener ซ้อน
+          window.electron.print.removePrintResponseListener();
+
           // รอ print response ก่อน navigate
-          await new Promise<void>((resolve, reject) => {
+          await new Promise<void>((resolve) => {
+            let resolved = false;
+
             // Set up listener for print response
             window.electron.print.onPrintResponse((response) => {
-              console.log('=== PRINT RESPONSE RECEIVED ===', response);
-              if (response.success) {
-                setPrintStatus('success');
-                console.log('พิมพ์สำเร็จ - จะ navigate ไปหน้าต่อไป');
+              if (!resolved) {
+                resolved = true;
+                console.log('=== PRINT RESPONSE RECEIVED ===', response);
+                if (response.success) {
+                  setPrintStatus('success');
+                  console.log('พิมพ์สำเร็จ - จะ navigate ไปหน้าต่อไป');
+                } else {
+                  setPrintStatus('error');
+                  console.error('พิมพ์ไม่สำเร็จ:', response.error);
+                }
                 // Clean up listener
                 window.electron?.print?.removePrintResponseListener();
-                resolve();
-              } else {
-                setPrintStatus('error');
-                console.error('พิมพ์ไม่สำเร็จ:', response.error);
-                // Clean up listener
-                window.electron?.print?.removePrintResponseListener();
-                // แม้พิมพ์ไม่สำเร็จก็ยัง navigate ไปหน้า result
                 resolve();
               }
             });
@@ -688,10 +692,24 @@ export default function PhotoFilter() {
                 vertical, // ค่า vertical จาก paper position config
               });
               console.log('Print request sent - waiting for response...');
+
+              // Timeout after 60 seconds
+              setTimeout(() => {
+                if (!resolved) {
+                  resolved = true;
+                  console.warn('⚠️ [PhotoFilter] Print timeout after 60 seconds');
+                  window.electron?.print?.removePrintResponseListener();
+                  setPrintStatus('error');
+                  resolve();
+                }
+              }, 60000);
             } catch (printError) {
-              console.error('Error sending print request:', printError);
-              window.electron?.print?.removePrintResponseListener();
-              reject(printError);
+              if (!resolved) {
+                resolved = true;
+                console.error('Error sending print request:', printError);
+                window.electron?.print?.removePrintResponseListener();
+                resolve();
+              }
             }
           });
 
