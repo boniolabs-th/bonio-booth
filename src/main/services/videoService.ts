@@ -504,7 +504,7 @@ export const convertWebmToMp4 = async (
       '-preset',
       'slow',
       '-crf',
-      '15',
+      '18', // changed 15 to 18
       '-r',
       '30',
       '-vsync',

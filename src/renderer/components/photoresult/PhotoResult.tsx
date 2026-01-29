@@ -245,7 +245,7 @@ const generateFramedVideo = async (
     if (isPortrait) {
        // For portrait, we want width=720 or height=1080
        // Let's fix width to 720 for portrait (720p equivalent)
-       targetWidth = 1080; added by all
+       targetWidth = 1080;  //added by all
        targetHeight = Math.round(targetWidth * (frameHeight / frameWidth));
     } else {
        // For landscape, we want height=720 or width=1080
@@ -470,6 +470,9 @@ const generateFramedVideo = async (
           // LUT filters are already applied to source, no additional CSS filter needed
           // (CSS filters are no longer supported - LUT only)
 
+          //  added contrast and brightness
+          ctx.filter = 'contrast(1.15) saturate(1.2) brightness(0.96)';
+
           ctx.drawImage(
             image,
             sourceX,
@@ -482,6 +485,7 @@ const generateFramedVideo = async (
             targetHeight,
           );
 
+          ctx.filter = 'none'; // added by all
           ctx.restore();
         };
 
