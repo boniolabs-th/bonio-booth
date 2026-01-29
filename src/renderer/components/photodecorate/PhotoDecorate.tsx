@@ -322,11 +322,16 @@ export default function PhotoDecorate() {
         offsetY: number,
       ) => {
         return new Promise<void>((resolve) => {
-          const { slot, photoIndex } = slotData;
-          const targetX = slot.x * scaleX + offsetX;
-          const targetY = slot.y * scaleY + offsetY;
-          const targetWidth = slot.width * scaleX;
-          const targetHeight = slot.height * scaleY;
+          const { slot, photoIndex, zIndex } = slotData;
+
+          // Add bleed for background slots (zIndex < 0) to prevent white lines
+          // 4px bleed (to be safe for high-res) to cover anti-aliasing pixels
+          const bleedPixels = zIndex < 0 ? 2 : 0;
+
+          const targetX = slot.x * scaleX + offsetX - bleedPixels;
+          const targetY = slot.y * scaleY + offsetY - bleedPixels;
+          const targetWidth = slot.width * scaleX + (bleedPixels * 2);
+          const targetHeight = slot.height * scaleY + (bleedPixels * 2);
           const targetRadius = slot.radius * scaleX; // Scale radius with scaleX
           const rotation = slot.rotate || 0; // Rotation in degrees
           const photoImg = new Image();
