@@ -245,7 +245,7 @@ const generateFramedVideo = async (
     if (isPortrait) {
        // For portrait, we want width=720 or height=1080
        // Let's fix width to 720 for portrait (720p equivalent)
-       targetWidth = 720;
+       targetWidth = 1080; added by all
        targetHeight = Math.round(targetWidth * (frameHeight / frameWidth));
     } else {
        // For landscape, we want height=720 or width=1080
@@ -546,7 +546,7 @@ const generateFramedVideo = async (
   const canvas = document.createElement('canvas');
   // Using alpha: false improves performance and fixes some color/gamma issues in MediaRecorder
   // Removed explicit colorSpace: 'srgb' as it can cause color shifts in recorded video
-  const ctx = canvas.getContext('2d', { alpha: false });
+  const ctx = canvas.getContext('2d', { alpha: false } , {desynchronized: true, }); // เพิ่มตัวนี้เพื่อลดความหน่วงและช่วยเรื่องสี by all
 
   if (!ctx) {
     throw new Error('ไม่สามารถสร้าง canvas context ได้');
@@ -570,7 +570,7 @@ const generateFramedVideo = async (
   if (isPortrait) {
       // For portrait, we want width=720 or height=1080
       // Let's fix width to 720 for portrait (720p equivalent)
-      targetWidth = 720;
+      targetWidth = 1080; //added by all
       targetHeight = Math.round(targetWidth * (frameHeight / frameWidth));
   } else {
       // For landscape, we want height=720 or width=1080
