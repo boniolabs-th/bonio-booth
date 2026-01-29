@@ -54,10 +54,13 @@ function Home(): React.JSX.Element {
         if (res.success && res.data) {
           // handleShutdownReady จะถูกเรียกใน main process หลังจาก forceInit
           // ดังนั้น countdown จะเริ่มอัตโนมัติถ้า isShutdownReady หรือ isClosedAppReady เป็น true
+        } else {
+          navigate('/system-maintenance', { state: { maintenance: true } });
         }
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Error checking shutdown status:', error);
+        navigate('/system-maintenance', { state: { maintenance: true } });
       }
     };
 
@@ -135,10 +138,13 @@ function Home(): React.JSX.Element {
           } else if (res.data.machine.paperLevel === 0) {
             navigate('/out-of-paper', { state: { maintenance: true } });
           }
+        } else {
+          navigate('/system-maintenance', { state: { maintenance: true } });
         }
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Error checking machine status in Home:', error);
+        navigate('/system-maintenance', { state: { maintenance: true } });
       }
     };
 
