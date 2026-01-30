@@ -335,7 +335,7 @@ const generateFramedVideo = async (
 
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: selectedMimeType,
-        videoBitsPerSecond: 8000000, // 10 Mbps for high quality
+        videoBitsPerSecond: 10000000, // 10 Mbps for high quality // added to 10 mbps for test by all
       });
 
       const chunks: Blob[] = [];
@@ -554,7 +554,11 @@ const generateFramedVideo = async (
   const canvas = document.createElement('canvas');
   // Using alpha: false improves performance and fixes some color/gamma issues in MediaRecorder
   // Removed explicit colorSpace: 'srgb' as it can cause color shifts in recorded video
-  const ctx = canvas.getContext('2d', { alpha: false } , {desynchronized: true, }); // เพิ่มตัวนี้เพื่อลดความหน่วงและช่วยเรื่องสี by all
+  const ctx = canvas.getContext('2d', {
+  alpha: false,
+  desynchronized: true,
+  colorSpace: 'display-p3'
+  }) as CanvasRenderingContext2D; // added color level and brightness by all
 
   if (!ctx) {
     throw new Error('ไม่สามารถสร้าง canvas context ได้');
