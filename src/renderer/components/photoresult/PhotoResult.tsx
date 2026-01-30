@@ -475,7 +475,7 @@ const generateFramedVideo = async (
           // (CSS filters are no longer supported - LUT only)
 
           //  added contrast and brightness
-          ctx.filter = 'contrast(1.15) saturate(1.2) brightness(1.0)'; // fixed color filter by all
+          ctx.filter = 'contrast(1.08) saturate(1.1) brightness(1.0)'; // fixed color filter by all
 
           ctx.drawImage(
             image,
