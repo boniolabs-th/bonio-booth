@@ -141,7 +141,11 @@ const flipImageHorizontally = (imageDataUrl: string): Promise<string> => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+      const ctx = canvas.getContext('2d', {
+        alpha: false,
+        desynchronized: true,
+        colorSpace: 'display-p3'
+      }) as CanvasRenderingContext2D; // fixed by all added display -p3 help about green and red color
       if (!ctx) {
         reject(new Error('Cannot create canvas context'));
         return;
@@ -511,7 +515,10 @@ export default function MainShooting() {
       // Draw image directly without flipping
       // Live Preview is mirrored via CSS (scaleX(-1)) for selfie-like experience
       // But captured photo should be the actual camera view (readable text/numbers)
+      // ใส่ filter ก่อนวาดภาพเพื่อความฉ่ำแบบใสๆ
+      context.filter = 'contrast(1.08) saturate(1.1) brightness(1.0)';
       context.drawImage(video, 0, 0);
+      context.filter = 'none'; // คืนค่า filter
 
       // ใช้ quality 0.92 สำหรับ original webcam capture
       const photoData = canvas.toDataURL('image/jpeg', 1.0); // edit by all
@@ -597,7 +604,11 @@ export default function MainShooting() {
 
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+      const ctx = canvas.getContext('2d', {
+        alpha: false,
+        desynchronized: true,
+        colorSpace: 'display-p3'
+      }) as CanvasRenderingContext2D;
       if (!ctx) {
         reject(new Error('Cannot create canvas context'));
         return;
