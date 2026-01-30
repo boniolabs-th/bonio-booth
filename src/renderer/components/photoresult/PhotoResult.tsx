@@ -906,10 +906,10 @@ const generateFramedVideo = async (
           sourceY,
           sourceWidth,
           sourceHeight,
-          targetX,
-          targetY,
-          targetWidth,
-          targetHeight,
+          targetX - 2,
+          targetY - 2,
+          targetWidth + 4,
+          targetHeight + 4, // ทำให้รูปกินขอบเข้าไปนิดนึง by all
         );
 
         ctx.restore();
