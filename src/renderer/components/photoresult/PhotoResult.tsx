@@ -245,11 +245,7 @@ const generateFramedVideo = async (
     if (isPortrait) {
        // For portrait, we want width=720 or height=1080
        // Let's fix width to 720 for portrait (720p equivalent)
-<<<<<<< HEAD
-       targetWidth = 1080;  //added by all
-=======
        targetWidth = 1080; //added by all
->>>>>>> e5268ede8962acc511358cef4e6dfc914401e614
        targetHeight = Math.round(targetWidth * (frameHeight / frameWidth));
     } else {
        // For landscape, we want height=720 or width=1080
