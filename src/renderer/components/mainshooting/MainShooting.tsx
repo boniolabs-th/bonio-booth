@@ -510,13 +510,13 @@ export default function MainShooting() {
       canvas.height = video.videoHeight;
       // เพิ่ม 2 บรรทัดนี้เพื่อความคมชัด by all
       context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = 'high';
+      context.imageSmoothingQuality = 'medium'; // edit from high to medium by all
 
       // Draw image directly without flipping
       // Live Preview is mirrored via CSS (scaleX(-1)) for selfie-like experience
       // But captured photo should be the actual camera view (readable text/numbers)
       // ใส่ filter ก่อนวาดภาพเพื่อความฉ่ำแบบใสๆ
-      context.filter = 'contrast(1.2) saturate(1.1) brightness(1.05)';
+      context.filter = 'contrast(1.01) saturate(1.08) brightness(1.08)';
       context.drawImage(video, 0, 0);
       context.filter = 'none'; // คืนค่า filter
 
