@@ -1127,6 +1127,8 @@ export default function MainShooting() {
             useBoomerang: state.useBoomerang || false,
             // ส่ง videoDuration ไปด้วย เพราะ WebM ไม่มี duration metadata
             videoDuration: cameraCountdownRef.current + 1, // countdown + buffer
+            // ส่ง cameraType เพื่อให้ PhotoFilter รู้ว่าต้อง process อย่างไร
+            cameraType,
           },
         });
       }, 1000);

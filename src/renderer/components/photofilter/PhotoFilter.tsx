@@ -23,6 +23,7 @@ interface LocationState {
   selectedCaptures: Capture[];
   useBoomerang?: boolean;
   videoDuration?: number; // Duration in seconds from MainShooting
+  cameraType?: 'webcam' | 'canon'; // ประเภทกล้องสำหรับ processing
 }
 
 export default function PhotoFilter() {
@@ -308,10 +309,13 @@ export default function PhotoFilter() {
   }, [generateLutThumbnails]);
 
   // Filter รูปภาพแต่ละรูป (รองรับทั้ง CSS และ LUT)
+  // Canon camera: สีถูกต้องอยู่แล้ว ข้าม processing เมื่อไม่มี filter
   const applyFilterToPhoto = async (
     photoUrl: string,
   ): Promise<HTMLCanvasElement> => {
     const filter = FILTERS.find((f) => f.id === selectedFilter);
+    const isCanon = state.cameraType === 'canon';
+    const hasNoFilter = selectedFilter === 'none' || !filter;
 
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -333,6 +337,14 @@ export default function PhotoFilter() {
 
         canvas.width = img.width;
         canvas.height = img.height;
+
+        // Canon camera: ข้าม processing ถ้าไม่มี filter เพราะสีถูกต้องอยู่แล้ว
+        if (isCanon && hasNoFilter) {
+          console.log('📷 [PhotoFilter] Canon camera with no filter - using original image');
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas);
+          return;
+        }
 
         // Check filter type
         if (filter?.type === 'lut' && filter.lutFile) {
@@ -731,6 +743,7 @@ export default function PhotoFilter() {
           selectedFilter,
           useBoomerang: state.useBoomerang || false,
           videoDuration: state.videoDuration, // ส่งต่อ videoDuration
+          cameraType: state.cameraType, // ส่งต่อ cameraType สำหรับ upload processing
           alreadyPrinted: true, // บอกว่าเพิ่งพิมพ์แล้ว ไม่ต้อง auto-print อีก
         },
       });
@@ -742,6 +755,7 @@ export default function PhotoFilter() {
           ...state,
           selectedFilter,
           videoDuration: state.videoDuration, // ส่งต่อ videoDuration
+          cameraType: state.cameraType, // ส่งต่อ cameraType สำหรับ upload processing
         },
       });
     } finally {

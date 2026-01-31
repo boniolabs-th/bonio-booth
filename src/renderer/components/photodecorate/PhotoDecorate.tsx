@@ -22,6 +22,7 @@ interface LocationState {
   selectedFrame?: FrameConfig;
   useBoomerang?: boolean;
   videoDuration?: number; // Duration in seconds from MainShooting
+  cameraType?: 'webcam' | 'canon'; // ประเภทกล้องสำหรับ processing
 }
 
 export default function PhotoDecorate() {
@@ -211,6 +212,7 @@ export default function PhotoDecorate() {
         selectedCaptures,
         useBoomerang: state.useBoomerang || false,
         videoDuration: state.videoDuration, // ส่งต่อ videoDuration
+        cameraType: state.cameraType, // ส่งต่อ cameraType สำหรับ processing
       },
     });
   };

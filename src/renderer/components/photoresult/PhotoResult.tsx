@@ -34,6 +34,7 @@ interface LocationState {
   selectedCaptures: Capture[];
   useBoomerang?: boolean;
   videoDuration?: number; // Duration in seconds from MainShooting
+  cameraType?: 'webcam' | 'canon'; // ประเภทกล้องสำหรับ processing
   transactionId?: string; // transactionId จาก payment/create response
   referenceId?: string; // mchOrderNo จาก payment/create response
   paymentDetailsId?: string;
