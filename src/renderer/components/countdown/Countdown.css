@@ -1,17 +1,18 @@
 .countdown-container {
   position: absolute;
-  top: 4rem;
+  top: 9rem;
   right: 3rem;
   z-index: 1000;
   pointer-events: none; /* ไม่ให้ countdown block การคลิก */
+  opacity: 70% !important;
 }
 
 .countdown-circle {
-  width: 80px;
-  height: 80px;
+  width: 76px;
+  height: 76px;
   border-radius: 50%;
   background-color: rgba(0, 0, 0, 0.7);
-  border: 3px solid #ffffff;
+  border: 2px solid #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -70,7 +71,7 @@
 /* Responsive สำหรับหน้าจอเล็ก */
 @media (max-width: 768px) {
   .countdown-container {
-    top: 6rem;
+    top: 9rem;
     right: 3rem;
   }
 
