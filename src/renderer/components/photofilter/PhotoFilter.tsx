@@ -5,7 +5,6 @@ import { FrameConfig, FILTERS } from '../../utils/frameConfig';
 import { getCachedLUT, getLUTFilePath } from '../../utils/lutProcessor';
 import { applyLUTWithWorker } from '../../utils/lutWorkerHelper';
 import { drawPhotoInSlot } from '../../utils/canvasUtils';
-import { sharpenCanvas } from '../../utils/imageProcessing';
 import './PhotoFilter.css';
 import Countdown from '../countdown';
 import { COUNTDOWN } from '../../utils/appConfig';
@@ -347,15 +346,13 @@ export default function PhotoFilter() {
             const lut = await getCachedLUT(lutPath);
             const processedCanvas = await applyLUTWithWorker(canvas, lut);
 
-            // Apply sharpening เพื่อให้ภาพคมชัดขึ้น (amount 0.35 = subtle but noticeable)
-            const sharpenedCanvas = sharpenCanvas(processedCanvas, 0.35);
-            resolve(sharpenedCanvas);
+            // ไม่ใช้ sharpening เพื่อรักษาคุณภาพภาพต้นฉบับ
+            resolve(processedCanvas);
           } catch (error) {
             console.error('Failed to apply LUT:', error);
-            // Fallback to original with sharpening
+            // Fallback to original (no sharpening)
             ctx.drawImage(img, 0, 0);
-            const sharpenedCanvas = sharpenCanvas(canvas, 0.35);
-            resolve(sharpenedCanvas);
+            resolve(canvas);
           }
         } else {
           // Apply CSS filter (traditional)
@@ -363,9 +360,8 @@ export default function PhotoFilter() {
             ctx.filter = filter.filter;
           }
           ctx.drawImage(img, 0, 0);
-          // Apply sharpening เพื่อให้ภาพคมชัดขึ้น
-          const sharpenedCanvas = sharpenCanvas(canvas, 0.35);
-          resolve(sharpenedCanvas);
+          // ไม่ใช้ sharpening เพื่อรักษาคุณภาพภาพต้นฉบับ
+          resolve(canvas);
         }
       };
 
