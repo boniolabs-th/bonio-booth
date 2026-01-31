@@ -845,9 +845,9 @@ async function generateImageWithPadding(
             if (!resolved) {
               resolved = true;
               clearTimeout(timeout);
-              // ใช้ JPEG quality 100 (สูงสุด) เพื่อรักษาความคมชัดสำหรับงาน print
-              // ไม่ต้องกังวลเรื่องขนาดไฟล์เพราะเป็นไฟล์ชั่วคราวสำหรับ print เท่านั้น
-              const buffer = image.toJPEG(100);
+              // ใช้ PNG เพื่อรักษาสีต้นฉบับโดยไม่มี compression loss
+              // printer driver จะจัดการการบีบอัดเอง
+              const buffer = image.toPNG();
               win.close();
               await cleanup();
               resolve(buffer);
@@ -1453,8 +1453,9 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     );
 
     const tempDir = app.getPath("temp");
-    const jpgPath = path.join(tempDir, `photo-${Date.now()}.jpg`);
-    await fs.writeFile(jpgPath, paddedImageBuffer);
+    // ใช้ .png เพื่อรักษาสีต้นฉบับ (ไม่มี compression loss)
+    const pngPath = path.join(tempDir, `photo-${Date.now()}.png`);
+    await fs.writeFile(pngPath, paddedImageBuffer);
 
     // ตรวจสอบว่าเป็น frame 2x6 หรือไม่ (ต้องตัดกระดาษ)
     // ใช้ imageSize เพื่อตรวจสอบ:
@@ -1510,7 +1511,7 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     const printNext = (copyNumber: number) => {
       if (copyNumber > copies) {
         // พิมพ์เสร็จทั้งหมดแล้ว
-        setTimeout(() => fs.unlink(jpgPath).catch(() => {}), 2000);
+        setTimeout(() => fs.unlink(pngPath).catch(() => {}), 2000);
 
         if (hasError) {
           log.error('🖨️ [Print] Print failed:', { error: errorMessage, completedPrints, totalCopies: copies });
@@ -1534,13 +1535,13 @@ ipcMain.on("print-photo", async (event, printConfig) => {
 
       if (platform === 'win32') {
         // Windows
-        printCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${jpgPath}" "${printerName}"`;
+        printCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${pngPath}" "${printerName}"`;
       } else if (platform === 'darwin') {
         // macOS
-        printCmd = `lpr -P "${printerName}" "${jpgPath}"`;
+        printCmd = `lpr -P "${printerName}" "${pngPath}"`;
       } else {
         // Linux และ OS อื่นๆ
-        printCmd = `lp -d "${printerName}" "${jpgPath}"`;
+        printCmd = `lp -d "${printerName}" "${pngPath}"`;
       }
 
       log.info('🖨️ [Print] Executing print command:', { copyNumber, printerName, platform });

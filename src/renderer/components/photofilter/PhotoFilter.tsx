@@ -504,8 +504,9 @@ export default function PhotoFilter() {
             }
           });
 
-          // ใช้ quality 1.0 (100%) สำหรับ print output - คุณภาพสูงสุดเพื่อให้ frame คมชัด
-          resolve(canvas.toDataURL('image/jpeg', 1.0));
+          // ใช้ PNG เพื่อหลีกเลี่ยง compression loss - รักษาสีต้นฉบับ
+          // main.ts จะแปลงเป็น JPEG ครั้งเดียวก่อน print
+          resolve(canvas.toDataURL('image/png'));
         } catch (error) {
           reject(error);
         }
@@ -565,8 +566,8 @@ export default function PhotoFilter() {
               img.onload = () => {
                 dCtx.drawImage(img, 0, 0);
                 dCtx.drawImage(img, frameWidth, 0);
-                // ใช้ quality 1.0 สำหรับ duplicated print image - คุณภาพสูงสุด
-                printImage = doubleCanvas.toDataURL('image/jpeg', 1.0);
+                // ใช้ PNG เพื่อหลีกเลี่ยง compression loss
+                printImage = doubleCanvas.toDataURL('image/png');
                 resolve();
               };
               img.src = filteredFinalImage;
