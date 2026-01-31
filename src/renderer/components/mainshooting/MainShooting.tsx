@@ -516,7 +516,7 @@ export default function MainShooting() {
       // Live Preview is mirrored via CSS (scaleX(-1)) for selfie-like experience
       // But captured photo should be the actual camera view (readable text/numbers)
       // ใส่ filter ก่อนวาดภาพเพื่อความฉ่ำแบบใสๆ
-      context.filter = 'contrast(1.08) saturate(1.1) brightness(1.0)';
+      context.filter = 'contrast(1.2) saturate(1.1) brightness(1.05)';
       context.drawImage(video, 0, 0);
       context.filter = 'none'; // คืนค่า filter
 
