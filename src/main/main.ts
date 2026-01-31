@@ -619,6 +619,38 @@ async function checkPrinter(): Promise<void> {
 }
 
 /**
+ * ดึงขนาดของรูปภาพจาก base64 data URL
+ * @param base64 - Base64 data URL ของรูปภาพ
+ * @returns Promise<{ width: number; height: number }>
+ */
+async function getImageDimensions(base64: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    // ถอด base64 data ออกมา
+    const matches = base64.match(/^data:image\/(\w+);base64,(.+)$/);
+    if (!matches) {
+      reject(new Error('Invalid base64 image format'));
+      return;
+    }
+
+    // Decode base64 และสร้าง buffer
+    const buffer = Buffer.from(matches[2], 'base64');
+
+    // ใช้ nativeImage ของ Electron เพื่อดึงขนาดภาพ
+    const { nativeImage } = require('electron');
+    const image = nativeImage.createFromBuffer(buffer);
+    const size = image.getSize();
+
+    if (size.width === 0 || size.height === 0) {
+      reject(new Error('Failed to get image dimensions'));
+      return;
+    }
+
+    console.log('🖼️ [getImageDimensions] Image size:', size);
+    resolve(size);
+  });
+}
+
+/**
  * สร้างรูปภาพที่มี padding รอบๆ เพื่อป้องกันการล้นและขาดขอบ
  * ใช้ BrowserWindow เพื่อ render รูปภาพให้เหมาะสมกับเครื่องปริ้น
  */
@@ -653,6 +685,18 @@ async function generateImageWithPadding(
     }, 15000); // 15 seconds timeout
 
     try {
+      // ดึงขนาดภาพจริงจาก base64 เพื่อใช้กำหนดขนาด BrowserWindow
+      let imageWidth = 1200;
+      let imageHeight = 1800;
+      try {
+        const dimensions = await getImageDimensions(base64);
+        imageWidth = dimensions.width;
+        imageHeight = dimensions.height;
+        console.log('🖼️ [generateImageWithPadding] Using actual image dimensions:', { imageWidth, imageHeight });
+      } catch (dimError) {
+        console.warn('⚠️ [generateImageWithPadding] Failed to get image dimensions, using defaults:', dimError);
+      }
+
       // โหลด paper position config จากไฟล์
       const paperPositionConfig = await getPaperPositionConfig();
       const landscapeWidth = paperPositionConfig.landscapeWidth;
@@ -775,10 +819,20 @@ async function generateImageWithPadding(
 
       await fs.writeFile(htmlPath, html, 'utf-8');
 
+      // ใช้ขนาดภาพจริงสำหรับ BrowserWindow เพื่อรักษาความละเอียด
+      // เพิ่มขนาด 10% เพื่อให้มี margin สำหรับ CSS positioning
+      const windowWidth = Math.ceil(imageWidth * 1.1);
+      const windowHeight = Math.ceil(imageHeight * 1.1);
+
+      console.log('🖼️ [generateImageWithPadding] Creating BrowserWindow:', {
+        imageSize: `${imageWidth}x${imageHeight}`,
+        windowSize: `${windowWidth}x${windowHeight}`,
+      });
+
       const win = new BrowserWindow({
         show: false,
-        width: 1200,
-        height: 1800,
+        width: windowWidth,
+        height: windowHeight,
         webPreferences: {
           offscreen: true,
         }
@@ -791,8 +845,9 @@ async function generateImageWithPadding(
             if (!resolved) {
               resolved = true;
               clearTimeout(timeout);
-              // ใช้ JPEG แทน PNG เพื่อ color profile ที่ถูกต้องและขนาดไฟล์เล็กลง
-              const buffer = image.toJPEG(82); // edit by all เพือควบคุม ขนาดไฟล์
+              // ใช้ JPEG quality 100 (สูงสุด) เพื่อรักษาความคมชัดสำหรับงาน print
+              // ไม่ต้องกังวลเรื่องขนาดไฟล์เพราะเป็นไฟล์ชั่วคราวสำหรับ print เท่านั้น
+              const buffer = image.toJPEG(100);
               win.close();
               await cleanup();
               resolve(buffer);
