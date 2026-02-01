@@ -530,7 +530,7 @@ export default function MainShooting() {
   // CANON CAMERA Functions
   // ===========================================================================
 
-  const startCanonCamera = async (): Promise<void> => {
+  const startCanonCamera = async (config?: CameraConfig | null): Promise<void> => {
     try {
       setIsCameraLoading(true);
       setCameraError('');
@@ -543,8 +543,15 @@ export default function MainShooting() {
         throw new Error('ไม่สามารถเริ่มต้น Canon SDK ได้');
       }
 
-      // Connect to camera
-      const connected = await canonCamera.connect();
+      // ดึง cameraIndex จาก config (ถ้ามี)
+      let cameraIndex = 0; // default to first camera
+      if (config && config.type === 'canon') {
+        cameraIndex = config.cameraIndex ?? 0;
+        console.log(`📷 [Canon] Using saved camera index: ${cameraIndex} (${config.cameraName})`);
+      }
+
+      // Connect to camera with saved index
+      const connected = await canonCamera.connect(cameraIndex);
       if (!connected) {
         throw new Error('ไม่สามารถเชื่อมต่อกล้อง Canon ได้');
       }
@@ -929,7 +936,8 @@ export default function MainShooting() {
         // Step 2: Start the appropriate camera
         // ========================================
         if (loadedCameraType === 'canon') {
-          await startCanonCamera();
+          // ส่ง loadedConfig ไปให้ startCanonCamera เพื่อใช้ cameraIndex ที่บันทึกไว้
+          await startCanonCamera(loadedConfig);
         } else {
           // ส่ง loadedConfig ไปให้ startWebcam เพื่อให้แน่ใจว่าใช้ config ที่ถูกต้อง
           await startWebcam(loadedConfig);

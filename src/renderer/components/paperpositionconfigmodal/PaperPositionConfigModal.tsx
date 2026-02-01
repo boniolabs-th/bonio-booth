@@ -146,8 +146,8 @@ export default function PaperPositionConfigModal({
       setError('');
 
       const config: PaperPositionConfig = {
-        landscapeScale: Math.round(landscapeScale),
-        portraitScale: Math.round(portraitScale),
+        landscapeScale,
+        portraitScale,
         type,
       };
 

@@ -66,9 +66,21 @@ const resizeCanvasIfNeeded = (canvas: HTMLCanvasElement): HTMLCanvasElement => {
 };
 
 /**
- * Check if WebGL should be used for this image
+ * DEBUG: Set to true to force CPU Worker path (disable WebGL)
+ * This helps isolate whether color issues are in WebGL or CPU code
+ */
+const DEBUG_FORCE_CPU = true;
+
+/**
+ * Check if WebGL should be used based on image size
  */
 const shouldUseWebGL = (width: number, height: number): boolean => {
+  // DEBUG: Force CPU path for testing
+  if (DEBUG_FORCE_CPU) {
+    console.log(`[LUT] DEBUG: Forcing CPU path (WebGL disabled)`);
+    return false;
+  }
+
   const pixelCount = width * height;
 
   // Only use WebGL for large images (likely from Canon camera)

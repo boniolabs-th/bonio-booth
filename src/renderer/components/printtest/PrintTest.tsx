@@ -275,36 +275,40 @@ export default function PrintTest(): React.JSX.Element {
       const configResult =
         await window.electron?.payment?.getPaperPositionConfig();
 
+      console.log('🔍 [PrintTest] Current config before save:', configResult);
+
       if (configResult?.success && configResult.config) {
         const currentConfig = configResult.config;
         // @ts-ignore
-        await window.electron?.payment?.savePaperPositionConfig({
+        const saveResult = await window.electron?.payment?.savePaperPositionConfig({
           landscapeWidth: currentConfig.landscapeWidth || 0,
           landscapeHeight: currentConfig.landscapeHeight || 0,
           portraitWidth: currentConfig.portraitWidth || 0,
           portraitHeight: currentConfig.portraitHeight || 0,
-          landscapeScale: Math.round(landscapeScale),
-          portraitScale: Math.round(portraitScale),
-          type: currentConfig.type || 2,
-        });
-        console.log('✅ [PrintTest] Scale saved to config:', {
           landscapeScale,
           portraitScale,
+          type: currentConfig.type || 2,
+        });
+        console.log('✅ [PrintTest] Scale save result:', saveResult);
+        console.log('✅ [PrintTest] Scale saved to config:', {
+          landscapeScale: Math.round(landscapeScale),
+          portraitScale: Math.round(portraitScale),
         });
       } else {
         // @ts-ignore
-        await window.electron?.payment?.savePaperPositionConfig({
+        const saveResult = await window.electron?.payment?.savePaperPositionConfig({
           landscapeWidth: 0,
           landscapeHeight: 0,
           portraitWidth: 0,
           portraitHeight: 0,
-          landscapeScale: Math.round(landscapeScale),
-          portraitScale: Math.round(portraitScale),
-          type: 2,
-        });
-        console.log('✅ [PrintTest] Scale saved to config (new):', {
           landscapeScale,
           portraitScale,
+          type: 2,
+        });
+        console.log('✅ [PrintTest] Scale save result (new):', saveResult);
+        console.log('✅ [PrintTest] Scale saved to config (new):', {
+          landscapeScale: Math.round(landscapeScale),
+          portraitScale: Math.round(portraitScale),
         });
       }
 
@@ -474,8 +478,8 @@ export default function PrintTest(): React.JSX.Element {
             landscapeHeight: currentConfig.landscapeHeight || 0,
             portraitWidth: currentConfig.portraitWidth || 0,
             portraitHeight: currentConfig.portraitHeight || 0,
-            landscapeScale: Math.round(landscapeScale),
-            portraitScale: Math.round(portraitScale),
+            landscapeScale,
+            portraitScale,
             type: currentConfig.type || 2,
           });
           console.log('✅ [PrintTest] Scale saved to config:', {
@@ -490,8 +494,8 @@ export default function PrintTest(): React.JSX.Element {
             landscapeHeight: 0,
             portraitWidth: 0,
             portraitHeight: 0,
-            landscapeScale: Math.round(landscapeScale),
-            portraitScale: Math.round(portraitScale),
+            landscapeScale,
+            portraitScale,
             type: 2,
           });
           console.log('✅ [PrintTest] Scale saved to config (new):', {
