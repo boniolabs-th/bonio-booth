@@ -652,12 +652,21 @@ async function getImageDimensions(base64: string): Promise<{ width: number; heig
 }
 
 /**
- * สร้างรูปภาพที่มี padding รอบๆ เพื่อป้องกันการล้นและขาดขอบ
- * ใช้ BrowserWindow เพื่อ render รูปภาพให้เหมาะสมกับเครื่องปริ้น
+ * DNP DS-RX1HS Native Resolution @ 300 DPI:
+ * - 2×6 inch = 600×1800 px (single strip, will be duplicated to 4×6)
+ * - 4×6 inch = 1200×1800 px (full print)
+ *
+ * ตาม guide.md: DO NOT resize the image
+ * - Frame edges must remain pixel-perfect
+ * - ส่งภาพขนาดเดิมไป printer แล้วให้ printer จัดการ scaling เอง
+ * - ถ้าต้องการ native resolution ให้ปรับ frame size ใน backend แทน
  */
+
 /**
  * สร้างรูปภาพที่มี padding รอบๆ เพื่อป้องกันการล้นและขาดขอบ
  * ใช้ Sharp library โดยตรงเพื่อรักษา color accuracy และความเร็ว
+ *
+ * หมายเหตุ: ไม่ resize ภาพ ตาม guide.md เพื่อรักษา frame sharpness
  */
 async function generateImageWithPadding(
   base64: string,
@@ -717,46 +726,33 @@ async function generateImageWithPadding(
       effectiveVertical,
     });
 
-    // 🔧 Upscale frame เล็กให้มีความละเอียดสูงพอสำหรับ print คุณภาพดี
-    // กระดาษ 4x6 นิ้ว ที่ 600 DPI = 2400x3600 pixels
-    // ใช้ Sharp Lanczos3 algorithm ซึ่งดีกว่า Canvas bilinear มาก
-    const MIN_PRINT_WIDTH = 2400;
-    let printUpscaleFactor = 1;
+    // ======= ตาม guide.md: DO NOT resize the image =======
+    // ใช้ขนาดเดิมของภาพ ไม่ resize ไปยัง native resolution
+    // เพราะการ resize จะทำให้ frame edges เบลอ
+    // Printer จะจัดการ scaling เอง
+    //
+    // รองรับเฉพาะ user scale จาก paper position config เท่านั้น
+    const totalScaleValue = scaleValue;
 
-    // ตรวจสอบว่า frame เล็กเกินไปหรือไม่ (เช่น 1200x3600)
-    const smallerDimension = Math.min(originalWidth, originalHeight);
-    if (smallerDimension < MIN_PRINT_WIDTH) {
-      printUpscaleFactor = MIN_PRINT_WIDTH / smallerDimension;
-      console.log('🔍 [generateImageWithPadding] Frame needs upscaling for print quality:', {
-        originalWidth,
-        originalHeight,
-        smallerDimension,
-        printUpscaleFactor: printUpscaleFactor.toFixed(2),
-      });
-    }
-
-    // รวม printUpscaleFactor กับ scaleValue จาก config
-    const totalScaleValue = scaleValue * printUpscaleFactor;
-
-    // คำนวณขนาดใหม่หลัง scale
+    // คำนวณขนาดสุดท้ายหลัง scale (ถ้า user ปรับ scale)
     const scaledWidth = Math.round(originalWidth * totalScaleValue);
     const scaledHeight = Math.round(originalHeight * totalScaleValue);
 
-    console.log('🖼️ [generateImageWithPadding] Scale calculation:', {
-      configScale: `${(scaleValue * 100).toFixed(0)}%`,
-      printUpscale: `${(printUpscaleFactor * 100).toFixed(0)}%`,
-      totalScale: `${(totalScaleValue * 100).toFixed(0)}%`,
+    console.log('🖼️ [generateImageWithPadding] Scale calculation (no resize per guide.md):', {
+      originalSize: `${originalWidth}x${originalHeight}`,
+      userScale: `${(scaleValue * 100).toFixed(0)}%`,
       scaledSize: `${scaledWidth}x${scaledHeight}`,
+      note: 'DO NOT resize - frame edges must remain pixel-perfect',
     });
 
     // เริ่มต้น Sharp pipeline
     let image = sharp(inputBuffer);
 
-    // 1. Scale ภาพด้วย Lanczos3 (คุณภาพสูงสุด - ดีกว่า Canvas bilinear มาก)
+    // 1. Scale ภาพด้วย Lanczos3 (เฉพาะถ้า user ปรับ scale)
     if (totalScaleValue !== 1) {
       image = image.resize(scaledWidth, scaledHeight, {
         fit: 'fill',
-        kernel: sharp.kernel.lanczos3, // คุณภาพสูงสุดสำหรับ upscale
+        kernel: sharp.kernel.lanczos3,
       });
     }
 
@@ -797,7 +793,7 @@ async function generateImageWithPadding(
       });
     }
 
-    // 4. Output เป็น PNG เพื่อรักษาสีต้นฉบับ (ไม่มี compression loss)
+    // 4. Output เป็น PNG เพื่อรักษาสีต้นฉบับและ frame sharpness (ตาม guide.md)
     const outputBuffer = await image
       .png({
         compressionLevel: 6, // Balance ระหว่างขนาดไฟล์และความเร็ว
@@ -806,10 +802,11 @@ async function generateImageWithPadding(
       .toBuffer();
 
     const outputMetadata = await sharp(outputBuffer).metadata();
-    console.log('🖼️ [generateImageWithPadding] Sharp output:', {
+    console.log('🖼️ [generateImageWithPadding] Sharp output (no resize per guide.md):', {
       inputSize: `${originalWidth}x${originalHeight}`,
       outputSize: `${outputMetadata.width}x${outputMetadata.height}`,
       bufferSize: `${(outputBuffer.length / 1024 / 1024).toFixed(2)} MB`,
+      userScale: `${(scaleValue * 100).toFixed(0)}%`,
     });
 
     return outputBuffer;

@@ -402,9 +402,10 @@ export default function PhotoFilter() {
         return;
       }
 
-      // ตั้งค่า image rendering quality ให้สูงสุด
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
+      // ตาม guide.md: DO NOT blur frame edges
+      // ปิด imageSmoothingEnabled เพื่อรักษา pixel-perfect frame edges
+      // จะเปิดเฉพาะตอนวาดรูปภาพ แล้วปิดก่อนวาด frame
+      ctx.imageSmoothingEnabled = false;
 
       // Load frame image
       const frameImg = new Image();
@@ -414,9 +415,8 @@ export default function PhotoFilter() {
         let frameHeight =
           frameImg.naturalHeight || state.selectedFrame.height;
 
-        // 🔧 ไม่ทำ upscale ใน Canvas - ใช้ขนาด frame ดั้งเดิม
-        // การ upscale จะทำใน main.ts ด้วย Sharp (Lanczos3 algorithm) เพื่อคุณภาพที่ดีกว่า
-        // Canvas drawImage() ใช้ bilinear interpolation ซึ่งทำให้ภาพเบลอเมื่อ upscale
+        // ตาม guide.md: DO NOT resize the image
+        // ใช้ขนาด frame ดั้งเดิมเพื่อรักษา pixel-perfect quality
         const upscaleFactor = 1; // Always use original size
 
         // Debug: ตรวจสอบขนาด frame ที่โหลดมา
@@ -459,6 +459,10 @@ export default function PhotoFilter() {
             const photoCanvas = filteredPhotos[slotIndex];
 
             ctx.save();
+
+            // เปิด smoothing สำหรับวาดรูปภาพ (photo only, not frame)
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
 
             // Calculate crop dimensions (cover behavior - crop to fit slot)
             const photoAspect = photoCanvas.width / photoCanvas.height;
@@ -513,6 +517,8 @@ export default function PhotoFilter() {
             );
 
             ctx.restore();
+            // ปิด smoothing กลับหลังวาดรูปเสร็จ เพื่อรักษา frame sharpness
+            ctx.imageSmoothingEnabled = false;
           };
 
           // 1. Draw background slots (zIndex < 0)
@@ -522,7 +528,8 @@ export default function PhotoFilter() {
             }
           });
 
-          // 2. Draw frame background
+          // 2. Draw frame background (ไม่ใช้ smoothing - pixel-perfect)
+          ctx.imageSmoothingEnabled = false;
           ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
 
           // 3. Draw foreground slots (zIndex >= 0)
@@ -532,8 +539,8 @@ export default function PhotoFilter() {
             }
           });
 
-          // ใช้ PNG เพื่อหลีกเลี่ยง compression loss - รักษาสีต้นฉบับ
-          // main.ts จะแปลงเป็น JPEG ครั้งเดียวก่อน print
+          // ใช้ PNG เพื่อรักษาความคมชัดของ frame (ตาม guide.md)
+          // DO NOT convert to JPEG - frame edges must remain pixel-perfect
           resolve(canvas.toDataURL('image/png'));
         } catch (error) {
           reject(error);
@@ -594,7 +601,8 @@ export default function PhotoFilter() {
               img.onload = () => {
                 dCtx.drawImage(img, 0, 0);
                 dCtx.drawImage(img, frameWidth, 0);
-                // ใช้ PNG เพื่อหลีกเลี่ยง compression loss
+                // ใช้ PNG เพื่อรักษาความคมชัดของ frame (ตาม guide.md)
+                // DO NOT convert to JPEG - frame edges must remain pixel-perfect
                 printImage = doubleCanvas.toDataURL('image/png');
                 resolve();
               };

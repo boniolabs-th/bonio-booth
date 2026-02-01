@@ -1825,30 +1825,6 @@ export default function PhotoResult() {
           }
         }
 
-        console.log(
-          '📤 [PhotoResult] ========== CALLING UPLOAD API ==========',
-        );
-        console.log('📤 [PhotoResult] Calling queueBackgroundUpload API...');
-        console.log('📤 [PhotoResult] Upload parameters:', {
-          sessionId,
-          photosCount: photos.length,
-          videosCount: videos.length,
-          webmVideoPath,
-        });
-        console.log('📤 [PhotoResult] Photos array:', {
-          length: photos.length,
-          firstPhotoPreview: photos[0]?.substring(0, 100) || 'none',
-        });
-        console.log('📤 [PhotoResult] Videos array:', {
-          length: videos.length,
-          firstVideoPreview: videos[0]?.substring(0, 100) || 'none',
-          hasCompiledVideoUrl: !!compiledVideoUrl,
-          webmVideoPath,
-        });
-        console.log(
-          '📤 [PhotoResult] =========================================',
-        );
-
         // ใช้ queueBackgroundUpload พร้อม webmVideoPath
         // การแปลง WebM → MP4 จะทำในเบื้องหลังโดย backgroundUploadService
         const uploadResult = await window.electron.payment.queueBackgroundUpload(
@@ -1857,12 +1833,6 @@ export default function PhotoResult() {
           videos,
           webmVideoPath, // ส่ง path ไปให้ convert ในเบื้องหลัง
         );
-
-        console.log('📤 [PhotoResult] Background upload queued:', {
-          success: uploadResult.success,
-          jobId: uploadResult.jobId,
-          willConvertInBackground: !!webmVideoPath,
-        });
 
         // qrcodeStorageUrl ควรมีอยู่แล้วจาก createPhotoSession (ไม่ต้องรอจาก upload)
         if (!qrcodeStorageUrl) {
@@ -1895,27 +1865,6 @@ export default function PhotoResult() {
             '✅ [PhotoResult] Print status set to success (simulated)',
           );
         }, 2000); // สมมติว่าพิมพ์เสร็จใน 2 วินาที
-
-        // // Print หลังจาก upload เสร็จ (ถูก comment ออกเพื่อเทส API)
-        // // Set up listener for print response
-        // window.electron?.print?.onPrintResponse((response) => {
-        //   if (response.success) {
-        //     setPrintStatus('success');
-        //   } else {
-        //     setPrintStatus('error');
-        //   }
-
-        //   // Clean up listener
-        //   window.electron?.print?.removePrintResponseListener();
-        // });
-
-        // // Send print request with frame configuration
-        // window.electron?.print?.printPhoto({
-        //   imageDataUrl: state.finalImage,
-        //   frameId: state.selectedFrame?.id || 'classic_2x6',
-        //   frameName: state.selectedFrame?.name || '2x6 Classic',
-        //   copies: state.quantity || 1,
-        // });
       } catch (error) {
         console.error('❌ [PhotoResult] Error in handleAutoPrint:', error);
         setIsUploading(false);
@@ -2170,19 +2119,6 @@ export default function PhotoResult() {
                 }
               }
 
-              console.log('📤 [PhotoResult] Uploading with video:', {
-                photosCount: photos.length,
-                videosCount: videos.length,
-                hasCompiledVideoUrl: !!compiledVideoUrl,
-                webmVideoPath,
-              });
-
-              console.log('📤 [PhotoResult] Final arrays before upload:', {
-                photosCount: photos.length,
-                videosCount: videos.length,
-                hasWebmVideoPath: !!webmVideoPath,
-              });
-
               // ตรวจสอบว่ามี sessionId หรือไม่
               if (!sessionId) {
                 console.warn(
@@ -2205,12 +2141,6 @@ export default function PhotoResult() {
                   videos,
                   webmVideoPath, // ส่ง path ไปให้ convert ในเบื้องหลัง
                 );
-
-              console.log('📤 [PhotoResult] Background upload queued (from useEffect):', {
-                success: uploadResult.success,
-                jobId: uploadResult.jobId,
-                willConvertInBackground: !!webmVideoPath,
-              });
 
               if (uploadResult.success) {
                 console.log('✅ [PhotoResult] Upload queued successfully with video!');
