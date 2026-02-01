@@ -410,9 +410,25 @@ export default function PhotoFilter() {
       const frameImg = new Image();
       frameImg.crossOrigin = 'anonymous';
       frameImg.onload = async () => {
-        const frameWidth = frameImg.naturalWidth || state.selectedFrame.width;
-        const frameHeight =
+        let frameWidth = frameImg.naturalWidth || state.selectedFrame.width;
+        let frameHeight =
           frameImg.naturalHeight || state.selectedFrame.height;
+
+        // 🔧 ไม่ทำ upscale ใน Canvas - ใช้ขนาด frame ดั้งเดิม
+        // การ upscale จะทำใน main.ts ด้วย Sharp (Lanczos3 algorithm) เพื่อคุณภาพที่ดีกว่า
+        // Canvas drawImage() ใช้ bilinear interpolation ซึ่งทำให้ภาพเบลอเมื่อ upscale
+        const upscaleFactor = 1; // Always use original size
+
+        // Debug: ตรวจสอบขนาด frame ที่โหลดมา
+        // หมายเหตุ: ใช้ขนาดดั้งเดิม - Sharp ใน main.ts จะทำ upscale ด้วย Lanczos3
+        console.log('🖼️ [PhotoFilter] Frame loaded (using original size):', {
+          naturalWidth: frameImg.naturalWidth,
+          naturalHeight: frameImg.naturalHeight,
+          canvasWidth: frameWidth,
+          canvasHeight: frameHeight,
+          note: 'Upscaling will be done by Sharp in main.ts for better quality',
+          frameUrl: state.selectedFrame.image,
+        });
 
         canvas.width = frameWidth;
         canvas.height = frameHeight;

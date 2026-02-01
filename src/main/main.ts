@@ -717,18 +717,46 @@ async function generateImageWithPadding(
       effectiveVertical,
     });
 
+    // 🔧 Upscale frame เล็กให้มีความละเอียดสูงพอสำหรับ print คุณภาพดี
+    // กระดาษ 4x6 นิ้ว ที่ 600 DPI = 2400x3600 pixels
+    // ใช้ Sharp Lanczos3 algorithm ซึ่งดีกว่า Canvas bilinear มาก
+    const MIN_PRINT_WIDTH = 2400;
+    let printUpscaleFactor = 1;
+
+    // ตรวจสอบว่า frame เล็กเกินไปหรือไม่ (เช่น 1200x3600)
+    const smallerDimension = Math.min(originalWidth, originalHeight);
+    if (smallerDimension < MIN_PRINT_WIDTH) {
+      printUpscaleFactor = MIN_PRINT_WIDTH / smallerDimension;
+      console.log('🔍 [generateImageWithPadding] Frame needs upscaling for print quality:', {
+        originalWidth,
+        originalHeight,
+        smallerDimension,
+        printUpscaleFactor: printUpscaleFactor.toFixed(2),
+      });
+    }
+
+    // รวม printUpscaleFactor กับ scaleValue จาก config
+    const totalScaleValue = scaleValue * printUpscaleFactor;
+
     // คำนวณขนาดใหม่หลัง scale
-    const scaledWidth = Math.round(originalWidth * scaleValue);
-    const scaledHeight = Math.round(originalHeight * scaleValue);
+    const scaledWidth = Math.round(originalWidth * totalScaleValue);
+    const scaledHeight = Math.round(originalHeight * totalScaleValue);
+
+    console.log('🖼️ [generateImageWithPadding] Scale calculation:', {
+      configScale: `${(scaleValue * 100).toFixed(0)}%`,
+      printUpscale: `${(printUpscaleFactor * 100).toFixed(0)}%`,
+      totalScale: `${(totalScaleValue * 100).toFixed(0)}%`,
+      scaledSize: `${scaledWidth}x${scaledHeight}`,
+    });
 
     // เริ่มต้น Sharp pipeline
     let image = sharp(inputBuffer);
 
-    // 1. Scale ภาพถ้าจำเป็น
-    if (scaleValue !== 1) {
+    // 1. Scale ภาพด้วย Lanczos3 (คุณภาพสูงสุด - ดีกว่า Canvas bilinear มาก)
+    if (totalScaleValue !== 1) {
       image = image.resize(scaledWidth, scaledHeight, {
         fit: 'fill',
-        kernel: sharp.kernel.lanczos3, // คุณภาพสูงสุด
+        kernel: sharp.kernel.lanczos3, // คุณภาพสูงสุดสำหรับ upscale
       });
     }
 
@@ -745,10 +773,11 @@ async function generateImageWithPadding(
     // เพิ่ม margin รอบภาพเพื่อให้สามารถเลื่อนตำแหน่งได้
     // effectiveHorizontal: บวก=ขวา (เพิ่ม padding ซ้าย), ลบ=ซ้าย (เพิ่ม padding ขวา)
     // effectiveVertical: บวก=ขึ้น (เพิ่ม padding ล่าง), ลบ=ลง (เพิ่ม padding บน)
-    const paddingLeft = Math.max(0, effectiveHorizontal);
-    const paddingRight = Math.max(0, -effectiveHorizontal);
-    const paddingTop = Math.max(0, -effectiveVertical);
-    const paddingBottom = Math.max(0, effectiveVertical);
+    // ใช้ Math.round เพราะ Sharp ต้องการค่า integer
+    const paddingLeft = Math.round(Math.max(0, effectiveHorizontal));
+    const paddingRight = Math.round(Math.max(0, -effectiveHorizontal));
+    const paddingTop = Math.round(Math.max(0, -effectiveVertical));
+    const paddingBottom = Math.round(Math.max(0, effectiveVertical));
 
     // เพิ่ม padding รอบภาพด้วยพื้นหลังขาว
     if (paddingLeft > 0 || paddingRight > 0 || paddingTop > 0 || paddingBottom > 0) {
@@ -1431,120 +1460,27 @@ ipcMain.on("print-photo", async (event, printConfig) => {
       const platform = process.platform;
 
       if (platform === 'win32') {
-        // Windows: ใช้ Electron webContents.print() เพื่อรักษาคุณภาพความละเอียดสูง
-        log.info('🖨️ [Print] Using Electron webContents.print():', { copyNumber, printerName });
+        // Windows: ใช้ rundll32 shimgvw.dll เพื่อพิมพ์รูปโดยตรง (รักษาคุณภาพต้นฉบับ)
+        // หมายเหตุ: วิธีนี้ส่งไฟล์รูปไปยัง printer โดยตรงโดยไม่ผ่าน HTML rendering
+        // ทำให้ไม่มีการ scale หรือ resampling ที่อาจทำให้ภาพเบลอ
+        const printCmd = `rundll32 shimgvw.dll,ImageView_PrintTo /pt "${pngPath}" "${printerName}"`;
+        log.info('🖨️ [Print] Using rundll32 shimgvw.dll:', { copyNumber, printerName, pngPath });
 
-        try {
-          // สร้าง hidden BrowserWindow สำหรับ print
-          const printWindow = new BrowserWindow({
-            show: false,
-            width: 1200,
-            height: 1800,
-            webPreferences: {
-              offscreen: true,
-            }
-          });
-
-          // สร้าง HTML ที่แสดงรูปภาพเต็มหน้า
-          const printHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    @page {
-      size: auto;
-      margin: 0;
-    }
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    html, body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      background: white;
-    }
-    body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    img {
-      max-width: 100%;
-      max-height: 100%;
-      width: auto;
-      height: auto;
-      object-fit: contain;
-    }
-  </style>
-</head>
-<body>
-  <img src="file://${pngPath.replace(/\\/g, '/')}" />
-</body>
-</html>
-          `.trim();
-
-          // เขียน HTML ชั่วคราว
-          const printHtmlPath = path.join(app.getPath("temp"), `print-${Date.now()}.html`);
-          await fs.writeFile(printHtmlPath, printHtml, 'utf-8');
-
-          printWindow.webContents.once('did-finish-load', () => {
-            // รอให้รูปภาพโหลดเสร็จ
-            setTimeout(() => {
-              printWindow.webContents.print({
-                silent: true,
-                printBackground: true,
-                deviceName: printerName,
-                margins: {
-                  marginType: 'none'
-                },
-                scaleFactor: 100, // 100% ไม่ scale
-              }, (success, failureReason) => {
-                // Cleanup
-                printWindow.close();
-                fs.unlink(printHtmlPath).catch(() => {});
-
-                if (success) {
-                  completedPrints++;
-                  log.info(`🖨️ [Print] Copy ${copyNumber} sent to printer successfully (Electron print)`);
-                } else {
-                  log.error(`🖨️ [Print] Print error (copy ${copyNumber}):`, failureReason);
-                  hasError = true;
-                  errorMessage = failureReason || 'Unknown print error';
-                }
-
-                // พิมพ์ copy ถัดไป
-                setTimeout(() => {
-                  printNext(copyNumber + 1);
-                }, 1000);
-              });
-            }, 500); // รอ 500ms ให้รูปโหลด
-          });
-
-          printWindow.webContents.once('did-fail-load', (_, errorCode, errorDescription) => {
-            log.error(`🖨️ [Print] Failed to load print HTML:`, { errorCode, errorDescription });
-            printWindow.close();
+        exec(printCmd, (err) => {
+          if (err) {
+            log.error(`🖨️ [Print] Print error (copy ${copyNumber}):`, err.message);
             hasError = true;
-            errorMessage = errorDescription;
-            setTimeout(() => {
-              printNext(copyNumber + 1);
-            }, 1000);
-          });
+            errorMessage = err.message;
+          } else {
+            completedPrints++;
+            log.info(`🖨️ [Print] Copy ${copyNumber} sent to printer successfully (shimgvw.dll)`);
+          }
 
-          await printWindow.loadFile(printHtmlPath);
-
-        } catch (printError) {
-          log.error(`🖨️ [Print] Electron print exception:`, printError);
-          hasError = true;
-          errorMessage = printError instanceof Error ? printError.message : 'Unknown error';
+          // พิมพ์ copy ถัดไป (รอสักครู่เพื่อให้เครื่องพิมพ์พร้อม)
           setTimeout(() => {
             printNext(copyNumber + 1);
           }, 1000);
-        }
+        });
 
       } else {
         // macOS และ Linux: ใช้ command line เหมือนเดิม
