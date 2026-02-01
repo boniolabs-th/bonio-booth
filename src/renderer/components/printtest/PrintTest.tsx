@@ -869,6 +869,7 @@ export default function PrintTest(): React.JSX.Element {
                     type="number"
                     min="-50"
                     max="50"
+                    step="0.5"
                     value={currentHorizontal}
                     onChange={(e) => {
                       const value = Number(e.target.value);
@@ -886,7 +887,7 @@ export default function PrintTest(): React.JSX.Element {
                   <button
                     type="button"
                     className="slider-button-decrement"
-                    onClick={() => setCurrentHorizontal(Math.max(-50, currentHorizontal - 1))}
+                    onClick={() => setCurrentHorizontal(Math.max(-50, currentHorizontal - 0.5))}
                     disabled={isPrinting}
                     aria-label="ลดค่า"
                   >
@@ -898,6 +899,7 @@ export default function PrintTest(): React.JSX.Element {
                     type="range"
                     min="-50"
                     max="50"
+                    step="0.5"
                     value={currentHorizontal}
                     onChange={(e) => setCurrentHorizontal(Number(e.target.value))}
                     className="slider slider-horizontal"
@@ -905,7 +907,7 @@ export default function PrintTest(): React.JSX.Element {
                   <button
                     type="button"
                     className="slider-button-increment"
-                    onClick={() => setCurrentHorizontal(Math.min(50, currentHorizontal + 1))}
+                    onClick={() => setCurrentHorizontal(Math.min(50, currentHorizontal + 0.5))}
                     disabled={isPrinting}
                     aria-label="เพิ่มค่า"
                   >
@@ -926,6 +928,7 @@ export default function PrintTest(): React.JSX.Element {
                     type="number"
                     min="-50"
                     max="50"
+                    step="0.5"
                     value={currentVertical}
                     onChange={(e) => {
                       const value = Number(e.target.value);
@@ -943,7 +946,7 @@ export default function PrintTest(): React.JSX.Element {
                   <button
                     type="button"
                     className="slider-button-decrement-vertical"
-                    onClick={() => setCurrentVertical(Math.max(-50, currentVertical - 1))}
+                    onClick={() => setCurrentVertical(Math.max(-50, currentVertical - 0.5))}
                     disabled={isPrinting}
                     aria-label="ลดค่า"
                   >
@@ -956,6 +959,7 @@ export default function PrintTest(): React.JSX.Element {
                       type="range"
                       min="-50"
                       max="50"
+                      step="0.5"
                       value={currentVertical}
                       onChange={(e) => setCurrentVertical(Number(e.target.value))}
                       className="slider slider-vertical"
@@ -964,7 +968,7 @@ export default function PrintTest(): React.JSX.Element {
                   <button
                     type="button"
                     className="slider-button-increment-vertical"
-                    onClick={() => setCurrentVertical(Math.min(50, currentVertical + 1))}
+                    onClick={() => setCurrentVertical(Math.min(50, currentVertical + 0.5))}
                     disabled={isPrinting}
                     aria-label="เพิ่มค่า"
                   >

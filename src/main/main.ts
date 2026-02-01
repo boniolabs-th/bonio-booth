@@ -14,6 +14,7 @@ import { app, BrowserWindow, shell, ipcMain, session, powerSaveBlocker } from 'e
 import { promises as fs } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import sharp from 'sharp';
 
 const execAsync = promisify(exec);
 
@@ -654,6 +655,10 @@ async function getImageDimensions(base64: string): Promise<{ width: number; heig
  * สร้างรูปภาพที่มี padding รอบๆ เพื่อป้องกันการล้นและขาดขอบ
  * ใช้ BrowserWindow เพื่อ render รูปภาพให้เหมาะสมกับเครื่องปริ้น
  */
+/**
+ * สร้างรูปภาพที่มี padding รอบๆ เพื่อป้องกันการล้นและขาดขอบ
+ * ใช้ Sharp library โดยตรงเพื่อรักษา color accuracy และความเร็ว
+ */
 async function generateImageWithPadding(
   base64: string,
   paddingPercent = 0,
@@ -662,234 +667,128 @@ async function generateImageWithPadding(
   vertical: number = 0,
   scale: number = 100
 ): Promise<Buffer> {
-  return new Promise(async (resolve, reject) => {
-    let htmlPath: string | null = null;
-    let resolved = false;
+  try {
+    // แปลง base64 เป็น buffer
+    const base64Data = base64.replace(/^data:image\/\w+;base64,/, '');
+    const inputBuffer = Buffer.from(base64Data, 'base64');
 
-    const cleanup = async () => {
-      if (htmlPath) {
-        try {
-          await fs.unlink(htmlPath).catch(() => {});
-        } catch {
-          // ignore cleanup errors
-        }
-      }
-    };
+    // ดึงข้อมูลภาพต้นฉบับ
+    const metadata = await sharp(inputBuffer).metadata();
+    const originalWidth = metadata.width || 1200;
+    const originalHeight = metadata.height || 1800;
 
-    const timeout = setTimeout(async () => {
-      if (!resolved) {
-        resolved = true;
-        await cleanup();
-        reject(new Error('Timeout: Failed to generate image with padding'));
-      }
-    }, 15000); // 15 seconds timeout
+    console.log('🖼️ [generateImageWithPadding] Using Sharp - Original dimensions:', {
+      width: originalWidth,
+      height: originalHeight,
+    });
 
-    try {
-      // ดึงขนาดภาพจริงจาก base64 เพื่อใช้กำหนดขนาด BrowserWindow
-      let imageWidth = 1200;
-      let imageHeight = 1800;
-      try {
-        const dimensions = await getImageDimensions(base64);
-        imageWidth = dimensions.width;
-        imageHeight = dimensions.height;
-        console.log('🖼️ [generateImageWithPadding] Using actual image dimensions:', { imageWidth, imageHeight });
-      } catch (dimError) {
-        console.warn('⚠️ [generateImageWithPadding] Failed to get image dimensions, using defaults:', dimError);
-      }
+    // โหลด paper position config จากไฟล์
+    const paperPositionConfig = await getPaperPositionConfig();
+    const typeTransform = paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
 
-      // โหลด paper position config จากไฟล์
-      const paperPositionConfig = await getPaperPositionConfig();
-      const landscapeWidth = paperPositionConfig.landscapeWidth;
-      const landscapeHeight = paperPositionConfig.landscapeHeight;
-      const portraitWidth = paperPositionConfig.portraitWidth;
-      const portraitHeight = paperPositionConfig.portraitHeight;
+    // ดึง scale จาก config ตาม orientation
+    const configScale = orientation === 'landscape'
+      ? (paperPositionConfig.landscapeScale ?? scale ?? 100)
+      : (paperPositionConfig.portraitScale ?? scale ?? 100);
 
-      const typeTransform = paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
+    // ตรวจสอบว่าต้องหมุนภาพหรือไม่
+    const willRotate = orientation !== typeTransform;
 
-      // ใช้ค่าปรับขนาดตาม orientation เดิม (ก่อน rotate)
-      // เพื่อให้ขนาดภาพเท่ากันทั้งเครื่อง develop (type 1) และเครื่องอื่น (type 2)
-      // การหมุนภาพ (rotate) จะทำแค่เพื่อให้ภาพตรงกับกระดาษเท่านั้น
-      const widthPercent = orientation === 'landscape' ? landscapeWidth : portraitWidth;
-      const heightPercent = orientation === 'landscape' ? landscapeHeight : portraitHeight;
+    // แปลง scale จากเปอร์เซ็นต์เป็นตัวเลข
+    const scaleValue = configScale / 100;
 
-      // ดึง scale จาก config ตาม orientation (ถ้าไม่มีใน config ให้ใช้ค่าจาก parameter หรือ default 100)
-      const configScale = orientation === 'landscape'
-        ? (paperPositionConfig.landscapeScale ?? scale ?? 100)
-        : (paperPositionConfig.portraitScale ?? scale ?? 100);
+    console.log('🖼️ [generateImageWithPadding] Sharp processing:', {
+      originalOrientation: orientation,
+      typeTransform,
+      willRotate,
+      configScale,
+      scaleValue,
+    });
 
-      // ตรวจสอบว่าต้องหมุนภาพหรือไม่
-      const willRotate = orientation !== typeTransform;
+    // ถ้ามีการ rotate 90° ต้องสลับ horizontal กับ vertical
+    const effectiveHorizontal = willRotate ? vertical : horizontal;
+    const effectiveVertical = willRotate ? horizontal : -vertical;
 
-      // แปลง scale จากเปอร์เซ็นต์ (100 = 100%) เป็นตัวเลข (1.0 = 100%)
-      const scaleValue = configScale / 100;
+    console.log('🖼️ [generateImageWithPadding] Position adjustment:', {
+      willRotate,
+      originalHorizontal: horizontal,
+      originalVertical: vertical,
+      effectiveHorizontal,
+      effectiveVertical,
+    });
 
-      // Log สำหรับ debug
-      console.log('🖼️ [generateImageWithPadding] Orientation calculation:', {
-        originalOrientation: orientation,
-        typeTransform,
-        willRotate,
-        widthPercent,
-        heightPercent,
-        configScale,
-        scaleValue,
-        note: 'Using original orientation for size adjustment, typeTransform only for rotation',
+    // คำนวณขนาดใหม่หลัง scale
+    const scaledWidth = Math.round(originalWidth * scaleValue);
+    const scaledHeight = Math.round(originalHeight * scaleValue);
+
+    // เริ่มต้น Sharp pipeline
+    let image = sharp(inputBuffer);
+
+    // 1. Scale ภาพถ้าจำเป็น
+    if (scaleValue !== 1) {
+      image = image.resize(scaledWidth, scaledHeight, {
+        fit: 'fill',
+        kernel: sharp.kernel.lanczos3, // คุณภาพสูงสุด
       });
-
-      // ถ้ามีการ rotate 90° ต้องสลับ horizontal กับ vertical
-      // เพราะหลัง rotate แกน X จะกลายเป็น Y และ Y กลายเป็น X
-      // Horizontal: ลบ=ซ้าย, บวก=ขวา
-      // Vertical: บวก=ขึ้น, ลบ=ลง
-      const effectiveHorizontal = willRotate ? vertical : horizontal;
-      const effectiveVertical = willRotate ? horizontal : -vertical;
-
-      console.log('🖼️ [generateImageWithPadding] Position adjustment:', {
-        willRotate,
-        originalHorizontal: horizontal,
-        originalVertical: vertical,
-        effectiveHorizontal,
-        effectiveVertical,
-      });
-
-      // สร้างไฟล์ HTML ชั่วคราว
-      const tempDir = app.getPath("temp");
-      htmlPath = path.join(tempDir, `padded-image-${Date.now()}.html`);
-
-      const html = `
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      html, body {
-        width: 100%;
-        height: 100%;
-        background: white;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        overflow: hidden;
-      }
-      .container {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-      img {
-        // max-width: calc(100% + ${widthPercent}%);
-        // max-height: calc(100% + ${heightPercent}%);
-        max-width: 100%;
-        max-height: 100%;
-        width: auto;
-        height: auto;
-        object-fit: contain;
-        display: block;
-        margin-top: ${effectiveVertical < 0 ? effectiveVertical : 0}px;
-        margin-bottom: ${effectiveVertical > 0 ? -effectiveVertical : 0}px;
-        margin-left: ${effectiveHorizontal < 0 ? effectiveHorizontal : 0}px;
-        margin-right: ${effectiveHorizontal > 0 ? -effectiveHorizontal : 0}px;
-        transform: ${(() => {
-          const transforms = [];
-          if (scaleValue !== 1) {
-            transforms.push(`scale(${scaleValue})`);
-          }
-          if (willRotate) {
-            transforms.push('rotate(90deg)');
-          }
-          return transforms.length > 0 ? transforms.join(' ') : 'none';
-        })()};
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <img src="${base64.replace(/"/g, '&quot;')}"
-           onload="console.log('Image loaded successfully')"
-           onerror="console.error('Image load error', this.src.substring(0, 50))"/>
-    </div>
-  </body>
-</html>
-      `.trim();
-
-      await fs.writeFile(htmlPath, html, 'utf-8');
-
-      // ใช้ขนาดภาพจริงสำหรับ BrowserWindow เพื่อรักษาความละเอียด
-      // เพิ่มขนาด 10% เพื่อให้มี margin สำหรับ CSS positioning
-      const windowWidth = Math.ceil(imageWidth * 1.1);
-      const windowHeight = Math.ceil(imageHeight * 1.1);
-
-      console.log('🖼️ [generateImageWithPadding] Creating BrowserWindow:', {
-        imageSize: `${imageWidth}x${imageHeight}`,
-        windowSize: `${windowWidth}x${windowHeight}`,
-      });
-
-      const win = new BrowserWindow({
-        show: false,
-        width: windowWidth,
-        height: windowHeight,
-        webPreferences: {
-          offscreen: true,
-        }
-      });
-
-      win.webContents.once('did-finish-load', () => {
-        // รอให้รูปภาพ render เสร็จ
-        setTimeout(() => {
-          win.webContents.capturePage().then(async (image) => {
-            if (!resolved) {
-              resolved = true;
-              clearTimeout(timeout);
-              // ใช้ PNG เพื่อรักษาสีต้นฉบับโดยไม่มี compression loss
-              // printer driver จะจัดการการบีบอัดเอง
-              const buffer = image.toPNG();
-              win.close();
-              await cleanup();
-              resolve(buffer);
-            }
-          }).catch(async (err) => {
-            if (!resolved) {
-              resolved = true;
-              clearTimeout(timeout);
-              win.close();
-              await cleanup();
-              reject(err);
-            }
-          });
-        }, 1000); // รอ 1 วินาทีเพื่อให้รูปภาพ render เสร็จ
-      });
-
-      win.webContents.once('did-fail-load', async (event, errorCode, errorDescription) => {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeout);
-          win.close();
-          await cleanup();
-          reject(new Error(`Failed to load HTML: ${errorDescription} (code: ${errorCode})`));
-        }
-      });
-
-      win.on('closed', async () => {
-        await cleanup();
-      });
-
-      // ใช้ loadFile แทน loadURL เพื่อหลีกเลี่ยงปัญหา URL ยาวเกินไป
-      await win.loadFile(htmlPath);
-
-    } catch (err) {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeout);
-        await cleanup();
-        reject(err instanceof Error ? err : new Error(String(err)));
-      }
     }
-  });
+
+    // 2. Rotate ถ้าจำเป็น (90 องศา clockwise)
+    if (willRotate) {
+      image = image.rotate(90);
+    }
+
+    // ขนาดหลัง rotate
+    const finalWidth = willRotate ? scaledHeight : scaledWidth;
+    const finalHeight = willRotate ? scaledWidth : scaledHeight;
+
+    // 3. คำนวณ padding สำหรับ offset (horizontal/vertical)
+    // เพิ่ม margin รอบภาพเพื่อให้สามารถเลื่อนตำแหน่งได้
+    // effectiveHorizontal: บวก=ขวา (เพิ่ม padding ซ้าย), ลบ=ซ้าย (เพิ่ม padding ขวา)
+    // effectiveVertical: บวก=ขึ้น (เพิ่ม padding ล่าง), ลบ=ลง (เพิ่ม padding บน)
+    const paddingLeft = Math.max(0, effectiveHorizontal);
+    const paddingRight = Math.max(0, -effectiveHorizontal);
+    const paddingTop = Math.max(0, -effectiveVertical);
+    const paddingBottom = Math.max(0, effectiveVertical);
+
+    // เพิ่ม padding รอบภาพด้วยพื้นหลังขาว
+    if (paddingLeft > 0 || paddingRight > 0 || paddingTop > 0 || paddingBottom > 0) {
+      image = image.extend({
+        top: paddingTop,
+        bottom: paddingBottom,
+        left: paddingLeft,
+        right: paddingRight,
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      });
+
+      console.log('🖼️ [generateImageWithPadding] Applied padding:', {
+        top: paddingTop,
+        bottom: paddingBottom,
+        left: paddingLeft,
+        right: paddingRight,
+      });
+    }
+
+    // 4. Output เป็น PNG เพื่อรักษาสีต้นฉบับ (ไม่มี compression loss)
+    const outputBuffer = await image
+      .png({
+        compressionLevel: 6, // Balance ระหว่างขนาดไฟล์และความเร็ว
+        adaptiveFiltering: true,
+      })
+      .toBuffer();
+
+    const outputMetadata = await sharp(outputBuffer).metadata();
+    console.log('🖼️ [generateImageWithPadding] Sharp output:', {
+      inputSize: `${originalWidth}x${originalHeight}`,
+      outputSize: `${outputMetadata.width}x${outputMetadata.height}`,
+      bufferSize: `${(outputBuffer.length / 1024 / 1024).toFixed(2)} MB`,
+    });
+
+    return outputBuffer;
+
+  } catch (err) {
+    console.error('❌ [generateImageWithPadding] Sharp error:', err);
+    throw err instanceof Error ? err : new Error(String(err));
+  }
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -1508,7 +1407,7 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     let hasError = false;
     let errorMessage = "";
 
-    const printNext = (copyNumber: number) => {
+    const printNext = async (copyNumber: number) => {
       if (copyNumber > copies) {
         // พิมพ์เสร็จทั้งหมดแล้ว
         setTimeout(() => fs.unlink(pngPath).catch(() => {}), 2000);
@@ -1529,38 +1428,154 @@ ipcMain.on("print-photo", async (event, printConfig) => {
         return;
       }
 
-      // สร้าง print command ตาม OS
-      let printCmd: string;
       const platform = process.platform;
 
       if (platform === 'win32') {
-        // Windows
-        printCmd = `rundll32.exe C:\\WINDOWS\\system32\\shimgvw.dll,ImageView_PrintTo "${pngPath}" "${printerName}"`;
-      } else if (platform === 'darwin') {
-        // macOS
-        printCmd = `lpr -P "${printerName}" "${pngPath}"`;
-      } else {
-        // Linux และ OS อื่นๆ
-        printCmd = `lp -d "${printerName}" "${pngPath}"`;
-      }
+        // Windows: ใช้ Electron webContents.print() เพื่อรักษาคุณภาพความละเอียดสูง
+        log.info('🖨️ [Print] Using Electron webContents.print():', { copyNumber, printerName });
 
-      log.info('🖨️ [Print] Executing print command:', { copyNumber, printerName, platform });
+        try {
+          // สร้าง hidden BrowserWindow สำหรับ print
+          const printWindow = new BrowserWindow({
+            show: false,
+            width: 1200,
+            height: 1800,
+            webPreferences: {
+              offscreen: true,
+            }
+          });
 
-      exec(printCmd, (err) => {
-        if (err) {
-          log.error(`🖨️ [Print] Print error (copy ${copyNumber}):`, err.message);
+          // สร้าง HTML ที่แสดงรูปภาพเต็มหน้า
+          const printHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @page {
+      size: auto;
+      margin: 0;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: white;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    img {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <img src="file://${pngPath.replace(/\\/g, '/')}" />
+</body>
+</html>
+          `.trim();
+
+          // เขียน HTML ชั่วคราว
+          const printHtmlPath = path.join(app.getPath("temp"), `print-${Date.now()}.html`);
+          await fs.writeFile(printHtmlPath, printHtml, 'utf-8');
+
+          printWindow.webContents.once('did-finish-load', () => {
+            // รอให้รูปภาพโหลดเสร็จ
+            setTimeout(() => {
+              printWindow.webContents.print({
+                silent: true,
+                printBackground: true,
+                deviceName: printerName,
+                margins: {
+                  marginType: 'none'
+                },
+                scaleFactor: 100, // 100% ไม่ scale
+              }, (success, failureReason) => {
+                // Cleanup
+                printWindow.close();
+                fs.unlink(printHtmlPath).catch(() => {});
+
+                if (success) {
+                  completedPrints++;
+                  log.info(`🖨️ [Print] Copy ${copyNumber} sent to printer successfully (Electron print)`);
+                } else {
+                  log.error(`🖨️ [Print] Print error (copy ${copyNumber}):`, failureReason);
+                  hasError = true;
+                  errorMessage = failureReason || 'Unknown print error';
+                }
+
+                // พิมพ์ copy ถัดไป
+                setTimeout(() => {
+                  printNext(copyNumber + 1);
+                }, 1000);
+              });
+            }, 500); // รอ 500ms ให้รูปโหลด
+          });
+
+          printWindow.webContents.once('did-fail-load', (_, errorCode, errorDescription) => {
+            log.error(`🖨️ [Print] Failed to load print HTML:`, { errorCode, errorDescription });
+            printWindow.close();
+            hasError = true;
+            errorMessage = errorDescription;
+            setTimeout(() => {
+              printNext(copyNumber + 1);
+            }, 1000);
+          });
+
+          await printWindow.loadFile(printHtmlPath);
+
+        } catch (printError) {
+          log.error(`🖨️ [Print] Electron print exception:`, printError);
           hasError = true;
-          errorMessage = err.message;
-        } else {
-          completedPrints++;
-          log.info(`🖨️ [Print] Copy ${copyNumber} sent to printer successfully`);
+          errorMessage = printError instanceof Error ? printError.message : 'Unknown error';
+          setTimeout(() => {
+            printNext(copyNumber + 1);
+          }, 1000);
         }
 
-        // พิมพ์ copy ถัดไป (รอสักครู่เพื่อให้เครื่องพิมพ์พร้อม)
-        setTimeout(() => {
-          printNext(copyNumber + 1);
-        }, 1000);
-      });
+      } else {
+        // macOS และ Linux: ใช้ command line เหมือนเดิม
+        let printCmd: string;
+
+        if (platform === 'darwin') {
+          // macOS
+          printCmd = `lpr -P "${printerName}" "${pngPath}"`;
+        } else {
+          // Linux และ OS อื่นๆ
+          printCmd = `lp -d "${printerName}" "${pngPath}"`;
+        }
+
+        log.info('🖨️ [Print] Executing print command:', { copyNumber, printerName, platform });
+
+        exec(printCmd, (err) => {
+          if (err) {
+            log.error(`🖨️ [Print] Print error (copy ${copyNumber}):`, err.message);
+            hasError = true;
+            errorMessage = err.message;
+          } else {
+            completedPrints++;
+            log.info(`🖨️ [Print] Copy ${copyNumber} sent to printer successfully`);
+          }
+
+          // พิมพ์ copy ถัดไป (รอสักครู่เพื่อให้เครื่องพิมพ์พร้อม)
+          setTimeout(() => {
+            printNext(copyNumber + 1);
+          }, 1000);
+        });
+      }
     };
 
     // เริ่มพิมพ์ copy แรก
