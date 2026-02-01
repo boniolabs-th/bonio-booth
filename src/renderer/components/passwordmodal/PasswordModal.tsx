@@ -8,7 +8,7 @@ interface PasswordModalProps {
   onSuccess: () => void;
   onCancel: () => void;
   title?: string;
-  password?: string; // รองรับ custom password
+  password?: string;
 }
 
 export default function PasswordModal({
@@ -22,7 +22,6 @@ export default function PasswordModal({
   const [passwordError, setPasswordError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // ใช้ custom password ถ้ามี ไม่เช่นนั้นใช้ default
   const targetPassword = expectedPassword || TEST_PRINT_PASSWORD;
 
   const handlePasswordChange = useCallback(
@@ -41,10 +40,11 @@ export default function PasswordModal({
     } else {
       setPasswordError('รหัสผ่านไม่ถูกต้อง');
       setInputValue('');
-      // Focus input อีกครั้งหลังจาก clear
+      // ✅ เพิ่ม delay สำหรับ AnyDesk
       setTimeout(() => {
         inputRef.current?.focus();
-      }, 100);
+        inputRef.current?.click();
+      }, 200);
     }
   }, [inputValue, targetPassword, onSuccess]);
 
@@ -54,14 +54,16 @@ export default function PasswordModal({
     onCancel();
   }, [onCancel]);
 
-  // ✅ รวม focus และ Escape handler ไว้ที่เดียว
+  // ✅ จัดการ focus และ Escape
   useEffect(() => {
     if (!isOpen) return;
 
-    // Focus input เมื่อ modal เปิด
-    inputRef.current?.focus();
+    // ✅ เพิ่ม delay เพื่อให้ modal render เสร็จก่อน (สำคัญสำหรับ AnyDesk)
+    const focusTimer = setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.click();
+    }, 150);
 
-    // จัดการ Escape key
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         handleCancel();
@@ -71,6 +73,7 @@ export default function PasswordModal({
     document.addEventListener('keydown', handleEscape);
 
     return () => {
+      clearTimeout(focusTimer);
       document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen, handleCancel]);
@@ -85,10 +88,37 @@ export default function PasswordModal({
     [handleSubmit],
   );
 
+  // ✅ จัดการเมื่อ click overlay -> focus กลับมาที่ input
+  const handleOverlayClick = useCallback((e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+    }
+  }, []);
+
+  // ✅ จัดการเมื่อ click backdrop -> focus กลับมาที่ input
+  const handleBackdropClick = useCallback(() => {
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+  }, []);
+
   if (!isOpen) return null;
 
   return (
-    <div className="password-modal-overlay" role="presentation">
+    <div
+      className="password-modal-overlay"
+      onClick={handleOverlayClick}
+      role="presentation"
+    >
+      {/* ✅ เพิ่ม backdrop แยกต่างหาก */}
+      <div
+        className="password-modal-backdrop"
+        onClick={handleBackdropClick}
+        aria-hidden="true"
+      />
+
       <div
         className="password-modal-content"
         role="dialog"
@@ -105,8 +135,9 @@ export default function PasswordModal({
           <input
             ref={inputRef}
             type="password"
+            autoFocus // ✅ เพิ่ม native autofocus
             className="password-input"
-            value={inputValue} // ✅ ใช้ state ชื่อใหม่
+            value={inputValue}
             onChange={handlePasswordChange}
             onKeyDown={handleKeyDown}
             placeholder="กรอกรหัสผ่าน"
@@ -130,7 +161,7 @@ export default function PasswordModal({
             type="button"
             className="password-modal-button password-modal-button-submit"
             onClick={handleSubmit}
-            disabled={inputValue.length === 0} // ✅ ใช้ state ชื่อใหม่
+            disabled={inputValue.length === 0}
           >
             ยืนยัน
           </button>
