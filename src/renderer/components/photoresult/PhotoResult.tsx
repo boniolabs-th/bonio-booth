@@ -542,7 +542,8 @@ const generateFramedVideo = async (
   const canvas = document.createElement('canvas');
   // Using alpha: false improves performance and fixes some color/gamma issues in MediaRecorder
   // Removed explicit colorSpace: 'srgb' as it can cause color shifts in recorded video
-  const ctx = canvas.getContext('2d', { alpha: false } , {desynchronized: true, }); // เพิ่มตัวนี้เพื่อลดความหน่วงและช่วยเรื่องสี by all
+  // desynchronized: true - ลดความหน่วงโดยให้ canvas render แยกจาก DOM
+  const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
 
   if (!ctx) {
     throw new Error('ไม่สามารถสร้าง canvas context ได้');
@@ -647,6 +648,8 @@ const generateFramedVideo = async (
     video.playsInline = true; // Ensure inline playback
     // eslint-disable-next-line no-param-reassign
     video.playbackRate = 1.0; // Ensure normal speed
+    // eslint-disable-next-line no-param-reassign
+    video.preload = 'auto'; // Ensure video is fully buffered
 
     // Fallback: ถ้า video จบจริงๆ (ended event) ให้ loop กลับทันที
     // กรณี WebM/MP4 ที่ native loop ไม่ทำงาน
@@ -691,28 +694,29 @@ const generateFramedVideo = async (
 
     console.log('🎬 [generateFramedVideo] Using codec:', selectedMimeType);
 
-// ใช้ timeslice 1000ms เพื่อให้ generated blobs มี timestamp ที่ถูกต้องมากขึ้น
-      // ช่วยแก้ปัญหา WebM duration ผิดพลาด
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: selectedMimeType,
-        videoBitsPerSecond: 15000000, // 15 Mbps - higher bitrate for sharper video
+    // ใช้ timeslice เพื่อให้ได้ data อย่างสม่ำเสมอ ป้องกัน data loss
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: selectedMimeType,
+      videoBitsPerSecond: 15000000, // 15 Mbps - higher bitrate for sharper video
     });
 
     const chunks: Blob[] = [];
-    let animationFrameId: number | null = null;
+    let drawIntervalId: number | null = null; // เปลี่ยนจาก animationFrameId เป็น interval
     // ใช้ FIXED_OUTPUT_DURATION (9 วินาที) แทน maxDuration เพื่อให้แน่ใจว่า output ยาว 9 วินาทีเสมอ
     const recordingDuration = FIXED_OUTPUT_DURATION; // 9 seconds fixed
     const startTime = performance.now();
     let recording = true;
     let frameCount = 0;
     let actualElapsedMs = 0; // เก็บ elapsed time จริงสำหรับ fix-webm-duration
+    const TARGET_FPS = 30;
+    const FRAME_INTERVAL = 1000 / TARGET_FPS; // ~33.33ms per frame
 
     console.log('🎬 [generateFramedVideo] Starting recording with duration:', recordingDuration, 'seconds');
 
     const cleanup = () => {
       recording = false;
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
+      if (drawIntervalId !== null) {
+        clearInterval(drawIntervalId);
       }
       stream.getTracks().forEach((track) => track.stop());
       videoElements.forEach((video) => {
@@ -741,6 +745,21 @@ const generateFramedVideo = async (
     mediaRecorder.onstop = async () => {
       cleanup();
       const rawBlob = new Blob(chunks, { type: selectedMimeType });
+
+      // ⚠️ Validation: ตรวจสอบขนาดไฟล์ - ไฟล์ที่สมบูรณ์ควรมีขนาดอย่างน้อย 3 MB
+      // ไฟล์ที่เสียมักมีขนาดแค่ 1-2 MB (ประมาณ 2-3 วินาที แทนที่จะเป็น 9 วินาที)
+      const MIN_VALID_SIZE = 3 * 1024 * 1024; // 3 MB minimum
+      if (rawBlob.size < MIN_VALID_SIZE) {
+        console.error('❌ [generateFramedVideo] Video file too small! Recording may be incomplete:', {
+          actualSize: `${(rawBlob.size / 1024 / 1024).toFixed(2)} MB`,
+          expectedMinSize: `${(MIN_VALID_SIZE / 1024 / 1024).toFixed(2)} MB`,
+          frameCount,
+          actualElapsedMs,
+          chunksCount: chunks.length,
+        });
+        // ยังคง resolve เพื่อไม่ให้ crash แต่ log warning
+        // ในอนาคตอาจเพิ่ม retry logic
+      }
 
       // Fix WebM duration metadata (MediaRecorder สร้าง WebM ที่มี duration: Infinity)
       // ใช้ actualElapsedMs ที่เก็บไว้ตอน recording เสร็จ
@@ -788,9 +807,18 @@ const generateFramedVideo = async (
       frameCount++;
 
       // ตรวจสอบว่า video ยังเล่นอยู่หรือไม่ - ถ้าหยุดให้ restart
-      // ไม่ใช้ sync time เพราะอาจทำให้ stutter
-      videoElements.forEach((video) => {
-        if (video.paused || video.ended) {
+      // ตรวจสอบทุก video element และ force play ถ้าจำเป็น
+      videoElements.forEach((video, idx) => {
+        // ตรวจสอบหลายเงื่อนไข: paused, ended, หรือ readyState ไม่พร้อม
+        const needsRestart = video.paused || video.ended || video.readyState < 3;
+
+        if (needsRestart) {
+          console.log(`⚠️ [generateFramedVideo] Video ${idx} needs restart:`, {
+            paused: video.paused,
+            ended: video.ended,
+            readyState: video.readyState,
+            currentTime: video.currentTime.toFixed(2),
+          });
           // eslint-disable-next-line no-param-reassign
           video.currentTime = 0;
           video.play().catch(() => undefined);
@@ -916,12 +944,19 @@ const generateFramedVideo = async (
         }
       });
 
-      animationFrameId = requestAnimationFrame(drawFrame);
+      // ไม่ต้อง schedule frame ถัดไป เพราะใช้ setInterval แล้ว
     };
 
-    // Start recording without timeslice for more accurate duration
-    // timeslice can cause last chunk to be cut off
-    mediaRecorder.start();
+    // Start recording with timeslice เพื่อให้ได้ data อย่างสม่ำเสมอ
+    // timeslice 500ms ช่วยป้องกัน data loss ถ้า recording หยุดกลางคัน
+    mediaRecorder.start(500);
+
+    // ใช้ setInterval แทน requestAnimationFrame
+    // เพราะ setInterval ทำงานต่อเนื่องแม้ tab ไม่ active
+    // และให้ timing ที่สม่ำเสมอกว่า
+    drawIntervalId = window.setInterval(drawFrame, FRAME_INTERVAL);
+
+    // Draw first frame immediately
     drawFrame();
   });
 };
