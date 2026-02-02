@@ -1513,7 +1513,9 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     };
 
     // เริ่มพิมพ์ copy แรก
-    printNext(1);
+    printNext(1).then(() => {
+      machineService.reducePaperLevel(copies);
+    });
 
   } catch (err) {
     log.error('🖨️ [Print] Exception during print:', err);
