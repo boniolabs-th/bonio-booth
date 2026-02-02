@@ -47,6 +47,7 @@ export const createBoomerangVideo = async (
     // 2. Concatenate original + reversed
     // 3. Scale to reasonable size for performance
     // 4. Use fast encoding preset
+    // 5. Apply BT.709 colorspace contract (guideVideo.md)
     const args = [
       '-i',
       inputVideoPath,
@@ -54,7 +55,12 @@ export const createBoomerangVideo = async (
       // ยุบเหลือชุดเดียว: ลับคมนิดหน่อย (unsharp) + รวมวิดีโอ (concat) + ย่อเป็น 720p เพื่อความลื่น by all
       '[0:v]fps=30,unsharp=3:3:0.8,reverse,fifo[r];' +
       '[0:v]fps=30,unsharp=3:3:0.8[o];' +
-      '[o][r]concat=n=2:v=1:a=0,scale=1280:-2,setsar=1',
+      '[o][r]concat=n=2:v=1:a=0,scale=1280:-2,setsar=1,format=yuv420p',
+      // BT.709 Colorspace Contract (guideVideo.md Section 7)
+      '-colorspace', 'bt709',
+      '-color_primaries', 'bt709',
+      '-color_trc', 'bt709',
+      '-color_range', 'tv',
       '-c:v',
       'libx264',
       '-preset',
@@ -301,12 +307,19 @@ export const applyLutToVideo = async (
     // Get input video duration first using ffprobe-like approach
     // Since WebM from MediaRecorder often has incorrect duration,
     // we'll process the entire input without duration limit
+    // Apply LUT with BT.709 colorspace (guideVideo.md Section 9)
     console.log('==========================applyLutToVideo==========================');
     const args = [
       '-i',
       inputVideoPath,
       '-vf',
-      `lut3d=${lutFileName}`,
+      // LUT + format in one pass (guideVideo.md Section 9)
+      `lut3d=${lutFileName},format=yuv420p`,
+      // BT.709 Colorspace Contract (guideVideo.md Section 7)
+      '-colorspace', 'bt709',
+      '-color_primaries', 'bt709',
+      '-color_trc', 'bt709',
+      '-color_range', 'tv',
       '-c:v',
       'libx264',
       '-preset',
@@ -391,9 +404,15 @@ export const createBoomerangWithLut = async (
       '-i',
       inputVideoPath,
       '-filter_complex',
-      `[0:v]fps=30,reverse,fifo[r];[0:v]fps=30[o];[o][r]concat=n=2:v=1:a=0,scale=1280:-2,setsar=1,lut3d=${lutFileName}[v]`,
+      // Boomerang + LUT in one pass (guideVideo.md Section 10)
+      `[0:v]fps=30,reverse,fifo[r];[0:v]fps=30[o];[o][r]concat=n=2:v=1:a=0,scale=1280:-2,setsar=1,format=yuv420p,lut3d=${lutFileName}[v]`,
       '-map',
       '[v]',
+      // BT.709 Colorspace Contract (guideVideo.md Section 7)
+      '-colorspace', 'bt709',
+      '-color_primaries', 'bt709',
+      '-color_trc', 'bt709',
+      '-color_range', 'tv',
       '-c:v',
       'libx264',
       '-preset',
@@ -466,6 +485,11 @@ export const cleanupTempFiles = async (filePaths: string[]): Promise<void> => {
 /**
  * Convert WebM video to MP4 (H.264) for iPhone/Safari compatibility
  * iPhone/Safari does not support WebM format, so we need to convert to MP4
+ *
+ * NOTE (guideVideo.md Section 8):
+ * WebM -> MP4 can only get "close" to original colors, never exact.
+ * For best results, use FFmpeg Native Recording instead of MediaRecorder.
+ *
  * @param inputVideoPath - Path to input WebM file
  * @param outputPath - Optional output path
  * @param targetDuration - Optional target duration in seconds (default: 9)
@@ -484,21 +508,20 @@ export const convertWebmToMp4 = async (
       );
 
     // FFmpeg command to convert WebM to MP4 (H.264)
-    // WebM from MediaRecorder has color issues
-    // Try hue filter to adjust colors
+    // BT.709 Colorspace Contract (guideVideo.md Section 7)
     console.log('==========================convertWebmToMp4==========================');
     const args = [
       '-i',
       inputVideoPath,
       '-t',
       String(targetDuration),
-      // Use BT.709 Color Space tags to fix Red->Orange shift
+      // BT.709 Colorspace Contract - CRITICAL for color accuracy
       '-colorspace', 'bt709',
       '-color_primaries', 'bt709',
       '-color_trc', 'bt709',
       '-color_range', 'tv',
-      // Slightly reduce brightness (-0.03) and boost contrast (1.05) to deepen the red
-      // '-vf', 'eq=brightness=-0.00',
+      // Scale and format (guideVideo.md Section 8)
+      '-vf', 'scale=1280:-2,format=yuv420p',
       '-c:v',
       'libx264',
       '-preset',
@@ -651,18 +674,25 @@ export const startRecordingCallback = (
       gamma = 0.8         // Lower gamma for richer midtones
     } = options;
 
-    // Filter string for color correction
+    // Filter string for color correction (guideVideo.md Section 6)
     // brightness: -1.0 to 1.0 (default 0)
     // gamma: 0.1 to 10.0 (default 1)
     const vf = `eq=saturation=${saturation}:contrast=${contrast}:brightness=${brightness}:gamma=${gamma},format=yuv420p`;
 
+    // Native Recording with BT.709 colorspace (guideVideo.md Section 7)
     const args = [
       '-f', 'dshow',
       '-i', `video=${deviceName}`,
+      '-vf', vf,
+      // BT.709 Colorspace Contract - CRITICAL for color accuracy
+      '-colorspace', 'bt709',
+      '-color_primaries', 'bt709',
+      '-color_trc', 'bt709',
+      '-color_range', 'tv',
       '-c:v', 'libx264',
       '-preset', 'ultrafast', // Low CPU usage for real-time
       '-tune', 'zerolatency',
-      '-vf', vf,
+      '-r', '30',
       '-y',
       outputPath
     ];
