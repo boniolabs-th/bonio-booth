@@ -525,9 +525,9 @@ export const convertWebmToMp4 = async (
       '-c:v',
       'libx264',
       '-preset',
-      'veryfast', // edit from slow to veryfast
+      'fast', // edit from slow to fast
       '-crf',
-      '28', // edit from 15 to 28 by all
+      '20', // edit from 28 to 20 by all
       '-r',
       '30',
       '-vsync',
