@@ -116,7 +116,7 @@ const applyFilterToPhoto = async (
 
           // ไม่ใช้ sharpening เพื่อรักษาคุณภาพภาพต้นฉบับ
           // ใช้ quality 0.88 เพื่อลดขนาดไฟล์โดยคงคุณภาพ
-          resolve(processedCanvas.toDataURL('image/jpeg', 0.88));
+          resolve(processedCanvas.toDataURL('image/jpeg', 1.0)); // edit by all
         } catch (error) {
           console.error('Failed to apply LUT:', error);
           // Fallback to original (no sharpening)
