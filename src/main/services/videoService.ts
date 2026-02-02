@@ -418,7 +418,7 @@ export const createBoomerangWithLut = async (
       '-preset',
       'medium',
       '-crf',
-      '18',
+      '26',
       '-r',
       '30',
       '-pix_fmt',
@@ -525,9 +525,9 @@ export const convertWebmToMp4 = async (
       '-c:v',
       'libx264',
       '-preset',
-      'slow',
+      'veryfast', // edit from slow to veryfast
       '-crf',
-      '15',
+      '28', // edit from 15 to 28 by all
       '-r',
       '30',
       '-vsync',
