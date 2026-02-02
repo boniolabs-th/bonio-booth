@@ -970,6 +970,7 @@ const createWindow = async () => {
       label: 'Print Test',
       click: () => {
         if (mainWindow) {
+          mainWindow.focus();
           // ส่ง IPC message ไปที่ renderer เพื่อแสดง password modal
           mainWindow.webContents.send('show-print-test-password-modal');
         }
@@ -983,6 +984,7 @@ const createWindow = async () => {
       label: 'ปริ้นย้อนหลัง',
       click: () => {
         if (mainWindow) {
+          mainWindow.focus();
           // ส่ง IPC message ไปที่ renderer เพื่อ navigate ไปที่หน้า request-image
           mainWindow.webContents.send('navigate-to', '/request-image');
         }
@@ -996,6 +998,7 @@ const createWindow = async () => {
       label: 'Camera Config',
       click: () => {
         if (mainWindow) {
+          mainWindow.focus();
           // ส่ง IPC message ไปที่ renderer เพื่อแสดง camera config modal
           mainWindow.webContents.send('show-camera-config-modal');
         }
@@ -1009,6 +1012,7 @@ const createWindow = async () => {
       label: 'Printer Config',
       click: () => {
         if (mainWindow) {
+          mainWindow.focus();
           // ส่ง IPC message ไปที่ renderer เพื่อแสดง printer config modal
           mainWindow.webContents.send('show-printer-config-modal');
         }
@@ -1022,6 +1026,7 @@ const createWindow = async () => {
       label: 'Format Reset',
       click: () => {
         if (mainWindow) {
+          mainWindow.focus();
           // ส่ง IPC message ไปที่ renderer เพื่อแสดง password modal
           mainWindow.webContents.send('show-clear-config-password-modal');
         }
@@ -1062,6 +1067,7 @@ const createWindow = async () => {
       click: () => {
         // ส่ง IPC message ไปที่ renderer เพื่อแสดง password modal
         if (mainWindow) {
+          mainWindow.focus();
           mainWindow.webContents.send('show-quit-app-password-modal');
         }
       },
