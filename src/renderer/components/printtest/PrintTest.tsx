@@ -20,6 +20,7 @@ export default function PrintTest(): React.JSX.Element {
     'idle' | 'printing' | 'success' | 'error'
   >('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   // Position Paper States
   const [landscapeScale, setLandscapeScale] = useState<number>(100);
@@ -320,10 +321,12 @@ export default function PrintTest(): React.JSX.Element {
       setSavedPortraitHorizontal(portraitHorizontal);
       setSavedPortraitVertical(portraitVertical);
 
-      alert('บันทึกการตั้งค่าสำเร็จ');
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error) {
       console.error('❌ [PrintTest] Failed to save position:', error);
-      alert('บันทึกการตั้งค่าไม่สำเร็จ');
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
     }
   };
 
@@ -705,6 +708,16 @@ export default function PrintTest(): React.JSX.Element {
             <div className="position-paper-header">
               <h2 id="position-paper-title" className="section-title">
                 Position Paper {orientation === 'portrait' ? 'Portrait' : orientation === 'landscape' ? 'Landscape' : 'Portrait Cut'}
+                {saveStatus === 'success' && (
+                  <span style={{ fontSize: '0.6em', color: '#2ecc71', marginLeft: '10px', verticalAlign: 'middle', fontWeight: 'normal' }}>
+                    ✅ บันทึกแล้ว
+                  </span>
+                )}
+                {saveStatus === 'error' && (
+                  <span style={{ fontSize: '0.6em', color: '#e74c3c', marginLeft: '10px', verticalAlign: 'middle', fontWeight: 'normal' }}>
+                    ❌ บันทึกไม่สำเร็จ
+                  </span>
+                )}
               </h2>
               {hasChanges && (
                 <div className="position-paper-actions">
@@ -1021,7 +1034,8 @@ export default function PrintTest(): React.JSX.Element {
         isOpen={isPaperPositionConfigModalOpen}
         onSave={() => {
           setIsPaperPositionConfigModalOpen(false);
-          alert('บันทึกการตั้งค่าสำเร็จ');
+          setSaveStatus('success');
+          setTimeout(() => setSaveStatus('idle'), 3000);
         }}
         onCancel={() => setIsPaperPositionConfigModalOpen(false)}
       />
