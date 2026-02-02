@@ -327,7 +327,7 @@ const generateFramedVideo = async (
 
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: selectedMimeType,
-        videoBitsPerSecond: 8000000, // 10 Mbps for high quality
+        videoBitsPerSecond: 10000000, // 10 Mbps for high quality // added to 10 mbps for test by all
       });
 
       const chunks: Blob[] = [];
@@ -466,6 +466,9 @@ const generateFramedVideo = async (
           // LUT filters are already applied to source, no additional CSS filter needed
           // (CSS filters are no longer supported - LUT only)
 
+          //  added contrast and brightness
+          ctx.filter = 'contrast(1.01) saturate(1.08) brightness(1.05)'; // fixed color filter by all
+
           ctx.drawImage(
             image,
             sourceX,
@@ -478,6 +481,7 @@ const generateFramedVideo = async (
             targetHeight,
           );
 
+          ctx.filter = 'none'; // added by all
           ctx.restore();
         };
 
@@ -918,10 +922,10 @@ const generateFramedVideo = async (
           sourceY,
           sourceWidth,
           sourceHeight,
-          targetX,
-          targetY,
-          targetWidth,
-          targetHeight,
+          targetX - 2,
+          targetY - 2,
+          targetWidth + 4,
+          targetHeight + 4, // ทำให้รูปกินขอบเข้าไปนิดนึง by all
         );
 
         ctx.restore();
