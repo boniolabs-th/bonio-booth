@@ -758,7 +758,7 @@ export default function PrintTest(): React.JSX.Element {
                       type="number"
                       min="50"
                       max="150"
-                      step="0.5"
+                      step="1"
                       value={landscapeScale}
                       onChange={(e) => {
                         const value = Number(e.target.value);
@@ -777,7 +777,7 @@ export default function PrintTest(): React.JSX.Element {
                       type="button"
                       className="slider-button-decrement"
                       onClick={() =>
-                        setLandscapeScale(Math.max(50, landscapeScale - 0.5))
+                        setLandscapeScale(Math.max(50, landscapeScale - 1))
                       }
                       disabled={isPrinting}
                       aria-label="ลดค่า"
@@ -790,7 +790,7 @@ export default function PrintTest(): React.JSX.Element {
                       type="range"
                       min="50"
                       max="150"
-                      step="0.5"
+                      step="1"
                       value={landscapeScale}
                       onChange={(e) => setLandscapeScale(Number(e.target.value))}
                       className="slider slider-horizontal"
@@ -799,7 +799,7 @@ export default function PrintTest(): React.JSX.Element {
                       type="button"
                       className="slider-button-increment"
                       onClick={() =>
-                        setLandscapeScale(Math.min(150, landscapeScale + 0.5))
+                        setLandscapeScale(Math.min(150, landscapeScale + 1))
                       }
                       disabled={isPrinting}
                       aria-label="เพิ่มค่า"
@@ -823,7 +823,7 @@ export default function PrintTest(): React.JSX.Element {
                       type="number"
                       min="50"
                       max="150"
-                      step="0.5"
+                      step="1"
                       value={portraitScale}
                       onChange={(e) => {
                         const value = Number(e.target.value);
@@ -842,7 +842,7 @@ export default function PrintTest(): React.JSX.Element {
                       type="button"
                       className="slider-button-decrement"
                       onClick={() =>
-                        setPortraitScale(Math.max(50, portraitScale - 0.5))
+                        setPortraitScale(Math.max(50, portraitScale - 1))
                       }
                       disabled={isPrinting}
                       aria-label="ลดค่า"
@@ -855,7 +855,7 @@ export default function PrintTest(): React.JSX.Element {
                       type="range"
                       min="50"
                       max="150"
-                      step="0.5"
+                      step="1"
                       value={portraitScale}
                       onChange={(e) => setPortraitScale(Number(e.target.value))}
                       className="slider slider-horizontal"
@@ -864,7 +864,7 @@ export default function PrintTest(): React.JSX.Element {
                       type="button"
                       className="slider-button-increment"
                       onClick={() =>
-                        setPortraitScale(Math.min(150, portraitScale + 0.5))
+                        setPortraitScale(Math.min(150, portraitScale + 1))
                       }
                       disabled={isPrinting}
                       aria-label="เพิ่มค่า"
