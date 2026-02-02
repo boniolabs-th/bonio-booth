@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import BackButton from '../backbutton';
 import PaperPositionConfigModal from '../paperpositionconfigmodal';
 import './PrintTest.css';
+import machineService from '../../../main/services/machineService';
 
 const TEST_IMAGE_PORTRAIT_URL = '../../../assets/images/print-test-4x6.png';
 const TEST_IMAGE_PORTRAIT_URL_2X6 = '../../../assets/images/print-test-2x6.png';
@@ -563,6 +564,7 @@ export default function PrintTest(): React.JSX.Element {
         });
 
         if (response.success) {
+          await machineService.reducePaperLevel(copies);
           console.log('✅ [PrintTest] Print successful!');
           setPrintStatus('success');
         } else {

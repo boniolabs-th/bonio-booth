@@ -4,6 +4,7 @@ import BackButton from '../backbutton';
 import PaperPositionConfigModal from '../paperpositionconfigmodal';
 import Countdown from '../countdown';
 import './RequestImage.css';
+import machineService from '../../../main/services/machineService';
 
 interface EnvConfig {
   apiUrl: string;
@@ -357,6 +358,7 @@ export default function RequestImage(): React.JSX.Element {
         });
 
         if (response.success) {
+          await machineService.reducePaperLevel(copies);
           console.log('✅ [RequestImage] Print successful!');
           setPrintStatus('success');
         } else {

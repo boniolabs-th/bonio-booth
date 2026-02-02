@@ -644,6 +644,22 @@ export class MachineService {
     }
   }
 
+  async reducePaperLevel(
+    reduceBy: number,
+  ): Promise<PaperLevelResponse> {
+    try {
+      const response = await this.makeRequest<PaperLevelResponse>(
+        '/api/machines-public/paper-level/reduce ',
+        'POST',
+        { reduceBy },
+      );
+      return response;
+    } catch (error) {
+      console.error('❌ [MachineService] Update paper level failed:', error);
+      throw error;
+    }
+  }
+
   /**
    * 8. POST /api/machines-public/payment/create
    * สร้าง payment และรับ QR code สำหรับชำระเงิน
