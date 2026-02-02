@@ -4,6 +4,7 @@ import BackButton from '../backbutton';
 import PaperPositionConfigModal from '../paperpositionconfigmodal';
 import Countdown from '../countdown';
 import './RequestImage.css';
+import AlertModal from '../alertmodal';
 
 interface EnvConfig {
   apiUrl: string;
@@ -38,6 +39,8 @@ export default function RequestImage(): React.JSX.Element {
   const [isSaving, setIsSaving] = useState(false);
   const [isPaperPositionConfigModalOpen, setIsPaperPositionConfigModalOpen] =
     useState(false);
+
+  const [alertText, setAlertText] = useState('');
 
   // Load environment config and paper position
   useEffect(() => {
@@ -178,7 +181,7 @@ export default function RequestImage(): React.JSX.Element {
       setIsPositionModalOpen(false);
     } catch (error) {
       console.error('❌ [RequestImage] Error updating paper position:', error);
-      alert('ไม่สามารถบันทึกการตั้งค่าได้ กรุณาลองอีกครั้ง');
+      setAlertText('ไม่สามารถบันทึกการตั้งค่าได้ กรุณาลองอีกครั้ง');
     } finally {
       setIsSaving(false);
     }
@@ -321,7 +324,10 @@ export default function RequestImage(): React.JSX.Element {
             (result: { success: boolean; error?: string }) => {
               if (!resolved) {
                 resolved = true;
-                console.log('🖨️ [RequestImage] Print response received:', result);
+                console.log(
+                  '🖨️ [RequestImage] Print response received:',
+                  result,
+                );
                 // @ts-ignore
                 window.electron.print.removePrintResponseListener();
                 resolve(result);
@@ -664,9 +670,18 @@ export default function RequestImage(): React.JSX.Element {
         isOpen={isPaperPositionConfigModalOpen}
         onSave={() => {
           setIsPaperPositionConfigModalOpen(false);
-          alert('บันทึกการตั้งค่าสำเร็จ');
+          setAlertText('บันทึกการตั้งค่าสำเร็จ');
         }}
         onCancel={() => setIsPaperPositionConfigModalOpen(false)}
+      />
+
+      <AlertModal
+        isOpen={!!alertText}
+        title={printStatus === 'error' ? 'เกิดข้อผิดพลาด' : 'สำเร็จ'}
+        message={alertText}
+        onConfirm={() => {
+          setAlertText('');
+        }}
       />
     </div>
   );

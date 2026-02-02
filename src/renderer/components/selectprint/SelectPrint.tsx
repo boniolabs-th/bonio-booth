@@ -7,6 +7,7 @@ import { COUNTDOWN } from '../../utils/appConfig';
 import './SelectPrint.css';
 import couponIcon from '../../../../assets/icons/svg/coupon.svg';
 import qrIcon from '../../../../assets/icons/svg/qrcode.svg';
+import AlertModal from '../alertmodal';
 
 interface LocationState {
   quantity?: number;
@@ -29,6 +30,7 @@ export default function SelectPrint() {
   const [prices, setPrices] = useState<Price[]>([]);
   const [quantity, setQuantity] = useState(state?.quantity || 1);
   const [discountCode] = useState(state?.discountCode || undefined);
+  const [alertText, setAlertText] = useState('');
 
   // รับ prices จาก main process
   useEffect(() => {
@@ -191,11 +193,11 @@ export default function SelectPrint() {
         });
       } else {
         console.error('Failed to create payment:', result.error);
-        alert('ไม่สามารถสร้าง QR Code ได้ กรุณาลองใหม่อีกครั้ง');
+        setAlertText('ไม่สามารถสร้าง QR Code ได้ กรุณาลองใหม่อีกครั้ง');
       }
     } catch (error) {
       console.error('Error creating payment:', error);
-      alert('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+      setAlertText('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     }
   };
 
@@ -296,6 +298,15 @@ export default function SelectPrint() {
           </button>
         </div>
       </div>
+
+      <AlertModal
+        isOpen={!!alertText}
+        title="เกิดข้อผิดพลาด"
+        message={alertText}
+        onConfirm={() => {
+          setAlertText('');
+        }}
+      />
     </div>
   );
 }

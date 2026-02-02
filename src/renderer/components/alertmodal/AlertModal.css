@@ -1,0 +1,79 @@
+.alert-modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.alert-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1;
+}
+
+.alert-modal-content {
+  position: relative;
+  background: white;
+  padding: 40px;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 680px;
+  text-align: center;
+  z-index: 2;
+  animation: modalFadeIn 0.25s ease;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.alert-modal-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.alert-modal-message {
+  font-size: 1.6rem;
+  margin-bottom: 32px;
+  color: #444;
+}
+
+.alert-modal-actions {
+  display: flex;
+  gap: 16px;
+}
+
+.alert-modal-button {
+  flex: 1;
+  min-height: 60px;
+  border-radius: 16px;
+  font-size: 1.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+
+.alert-modal-button.confirm {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+}
+
+.alert-modal-button.cancel {
+  background: #f3f4f6;
+  border: 2px solid #d1d5db;
+}
+
+.alert-modal-button:focus {
+  outline: 3px solid rgba(37, 99, 235, 0.4);
+}

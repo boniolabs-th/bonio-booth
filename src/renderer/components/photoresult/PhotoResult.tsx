@@ -16,6 +16,7 @@ import { COUNTDOWN } from '../../utils/appConfig';
 import './PhotoResult.css';
 import BackButton from '../backbutton';
 import Countdown from '../countdown';
+import AlertModal from '../alertmodal';
 
 interface Capture {
   video: string;
@@ -80,7 +81,6 @@ const applyFilterToPhoto = async (
   selectedFilterId: string,
 ): Promise<string> => {
   const filter = FILTERS.find((f) => f.id === selectedFilterId);
-
   // If no filter or 'none' filter, return original
   if (!filter || selectedFilterId === 'none') {
     return photoUrl;
@@ -179,13 +179,16 @@ const generateFramedVideo = async (
         if (resolved) return;
         resolved = true;
         clearTimeout(timeout);
-        console.log(`🎬 [loadVideoElement] Video ${index + 1} ready (${source}):`, {
-          duration: videoElement.duration,
-          videoWidth: videoElement.videoWidth,
-          videoHeight: videoElement.videoHeight,
-          readyState: videoElement.readyState,
-          src: capture.video.substring(0, 50),
-        });
+        console.log(
+          `🎬 [loadVideoElement] Video ${index + 1} ready (${source}):`,
+          {
+            duration: videoElement.duration,
+            videoWidth: videoElement.videoWidth,
+            videoHeight: videoElement.videoHeight,
+            readyState: videoElement.readyState,
+            src: capture.video.substring(0, 50),
+          },
+        );
         resolve(videoElement);
       };
 
@@ -239,15 +242,15 @@ const generateFramedVideo = async (
     let targetHeight: number;
 
     if (isPortrait) {
-       // For portrait, we want width=720 or height=1080
-       // Let's fix width to 720 for portrait (720p equivalent)
-       targetWidth = 1080; //added by all
-       targetHeight = Math.round(targetWidth * (frameHeight / frameWidth));
+      // For portrait, we want width=720 or height=1080
+      // Let's fix width to 720 for portrait (720p equivalent)
+      targetWidth = 1080; //added by all
+      targetHeight = Math.round(targetWidth * (frameHeight / frameWidth));
     } else {
-       // For landscape, we want height=720 or width=1080
-       // Let's fix height to 720 for landscape (720p equivalent)
-       targetHeight = 720;
-       targetWidth = Math.round(targetHeight * (frameWidth / frameHeight));
+      // For landscape, we want height=720 or width=1080
+      // Let's fix height to 720 for landscape (720p equivalent)
+      targetHeight = 720;
+      targetWidth = Math.round(targetHeight * (frameWidth / frameHeight));
     }
 
     // Ensure dimensions are even numbers (required by some video codecs)
@@ -257,7 +260,7 @@ const generateFramedVideo = async (
     console.log('🎬 [composeBoomerangVideo] Resolution:', {
       original: `${frameWidth}x${frameHeight}`,
       target: `${targetWidth}x${targetHeight}`,
-      isPortrait
+      isPortrait,
     });
 
     canvas.width = targetWidth;
@@ -355,14 +358,25 @@ const generateFramedVideo = async (
 
         // Fix WebM duration metadata สำหรับ boomerang video
         const durationMs = totalDurationSeconds * 1000;
-        console.log('🎬 [composeBoomerangVideo] Fixing WebM duration:', durationMs, 'ms');
+        console.log(
+          '🎬 [composeBoomerangVideo] Fixing WebM duration:',
+          durationMs,
+          'ms',
+        );
 
         try {
-          const fixedBlob = await fixWebmDuration(rawBlob, durationMs, { logger: false });
-          console.log('✅ [composeBoomerangVideo] WebM duration fixed successfully');
+          const fixedBlob = await fixWebmDuration(rawBlob, durationMs, {
+            logger: false,
+          });
+          console.log(
+            '✅ [composeBoomerangVideo] WebM duration fixed successfully',
+          );
           resolve(URL.createObjectURL(fixedBlob));
         } catch (err) {
-          console.warn('⚠️ [composeBoomerangVideo] Failed to fix WebM duration, using original:', err);
+          console.warn(
+            '⚠️ [composeBoomerangVideo] Failed to fix WebM duration, using original:',
+            err,
+          );
           resolve(URL.createObjectURL(rawBlob));
         }
       };
@@ -569,15 +583,15 @@ const generateFramedVideo = async (
   let targetHeight: number;
 
   if (isPortrait) {
-      // For portrait, we want width=720 or height=1080
-      // Let's fix width to 720 for portrait (720p equivalent)
-      targetWidth = 1080; //added by all
-      targetHeight = Math.round(targetWidth * (frameHeight / frameWidth));
+    // For portrait, we want width=720 or height=1080
+    // Let's fix width to 720 for portrait (720p equivalent)
+    targetWidth = 1080; //added by all
+    targetHeight = Math.round(targetWidth * (frameHeight / frameWidth));
   } else {
-      // For landscape, we want height=720 or width=1080
-      // Let's fix height to 720 for landscape (720p equivalent)
-      targetHeight = 720;
-      targetWidth = Math.round(targetHeight * (frameWidth / frameHeight));
+    // For landscape, we want height=720 or width=1080
+    // Let's fix height to 720 for landscape (720p equivalent)
+    targetHeight = 720;
+    targetWidth = Math.round(targetHeight * (frameWidth / frameHeight));
   }
 
   // Ensure dimensions are even numbers (required by some video codecs)
@@ -587,7 +601,7 @@ const generateFramedVideo = async (
   console.log('🎬 [generateFramedVideo] Resolution:', {
     original: `${frameWidth}x${frameHeight}`,
     target: `${targetWidth}x${targetHeight}`,
-    isPortrait
+    isPortrait,
   });
 
   canvas.width = targetWidth;
@@ -637,7 +651,11 @@ const generateFramedVideo = async (
   // IMPORTANT: Always use fixed 9-second output duration
   // regardless of source video duration
   const FIXED_OUTPUT_DURATION = 9; // seconds
-  console.log('🎬 [generateFramedVideo] Using FIXED output duration:', FIXED_OUTPUT_DURATION, 'seconds');
+  console.log(
+    '🎬 [generateFramedVideo] Using FIXED output duration:',
+    FIXED_OUTPUT_DURATION,
+    'seconds',
+  );
 
   // ใช้ native loop เป็นหลัก + manual sync เพื่อ smooth loop
   // สำหรับ MP4 ที่ผ่าน LUT filter, native loop อาจมี stutter
@@ -715,7 +733,11 @@ const generateFramedVideo = async (
     const TARGET_FPS = 30;
     const FRAME_INTERVAL = 1000 / TARGET_FPS; // ~33.33ms per frame
 
-    console.log('🎬 [generateFramedVideo] Starting recording with duration:', recordingDuration, 'seconds');
+    console.log(
+      '🎬 [generateFramedVideo] Starting recording with duration:',
+      recordingDuration,
+      'seconds',
+    );
 
     const cleanup = () => {
       recording = false;
@@ -754,13 +776,16 @@ const generateFramedVideo = async (
       // ไฟล์ที่เสียมักมีขนาดแค่ 1-2 MB (ประมาณ 2-3 วินาที แทนที่จะเป็น 9 วินาที)
       const MIN_VALID_SIZE = 3 * 1024 * 1024; // 3 MB minimum
       if (rawBlob.size < MIN_VALID_SIZE) {
-        console.error('❌ [generateFramedVideo] Video file too small! Recording may be incomplete:', {
-          actualSize: `${(rawBlob.size / 1024 / 1024).toFixed(2)} MB`,
-          expectedMinSize: `${(MIN_VALID_SIZE / 1024 / 1024).toFixed(2)} MB`,
-          frameCount,
-          actualElapsedMs,
-          chunksCount: chunks.length,
-        });
+        console.error(
+          '❌ [generateFramedVideo] Video file too small! Recording may be incomplete:',
+          {
+            actualSize: `${(rawBlob.size / 1024 / 1024).toFixed(2)} MB`,
+            expectedMinSize: `${(MIN_VALID_SIZE / 1024 / 1024).toFixed(2)} MB`,
+            frameCount,
+            actualElapsedMs,
+            chunksCount: chunks.length,
+          },
+        );
         // ยังคง resolve เพื่อไม่ให้ crash แต่ log warning
         // ในอนาคตอาจเพิ่ม retry logic
       }
@@ -779,7 +804,7 @@ const generateFramedVideo = async (
       try {
         // Enable logger to see what fix-webm-duration is doing
         const fixedBlob = await fixWebmDuration(rawBlob, durationMs, {
-          logger: (msg: string) => console.log('🔧 [fix-webm-duration]', msg)
+          logger: (msg: string) => console.log('🔧 [fix-webm-duration]', msg),
         });
         console.log('✅ [generateFramedVideo] WebM duration fixed:', {
           originalSize: rawBlob.size,
@@ -789,7 +814,10 @@ const generateFramedVideo = async (
         const url = URL.createObjectURL(fixedBlob);
         resolve(url);
       } catch (err) {
-        console.error('❌ [generateFramedVideo] Failed to fix WebM duration:', err);
+        console.error(
+          '❌ [generateFramedVideo] Failed to fix WebM duration:',
+          err,
+        );
         const url = URL.createObjectURL(rawBlob);
         resolve(url);
       }
@@ -814,7 +842,8 @@ const generateFramedVideo = async (
       // ตรวจสอบทุก video element และ force play ถ้าจำเป็น
       videoElements.forEach((video, idx) => {
         // ตรวจสอบหลายเงื่อนไข: paused, ended, หรือ readyState ไม่พร้อม
-        const needsRestart = video.paused || video.ended || video.readyState < 3;
+        const needsRestart =
+          video.paused || video.ended || video.readyState < 3;
 
         if (needsRestart) {
           console.log(`⚠️ [generateFramedVideo] Video ${idx} needs restart:`, {
@@ -983,8 +1012,13 @@ export default function PhotoResult() {
   const [previewBoomerangGif, setPreviewBoomerangGif] = useState<string | null>(
     null,
   );
+
+  const [alertText, setAlertText] = useState('');
+
   // Video ที่ผ่าน LUT filter แล้ว สำหรับใช้แสดง preview
-  const [processedPreviewVideoUrl, setProcessedPreviewVideoUrl] = useState<string | null>(null);
+  const [processedPreviewVideoUrl, setProcessedPreviewVideoUrl] = useState<
+    string | null
+  >(null);
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [qrcodeStorageUrl, setQrcodeStorageUrl] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null); // เก็บ sessionId สำหรับ upload files
@@ -1029,9 +1063,7 @@ export default function PhotoResult() {
               '✅ [PhotoResult] Session ID:',
               sessionResult.photoSession.id,
             );
-            console.log(
-              '✅ [PhotoResult] QR code should be visible now!',
-            );
+            console.log('✅ [PhotoResult] QR code should be visible now!');
           } else {
             console.error(
               '❌ [PhotoResult] Failed to create photo session:',
@@ -1463,7 +1495,7 @@ export default function PhotoResult() {
         // eslint-disable-next-line no-console
         console.error('❌ [PhotoResult] Error creating framed video:', error);
         // eslint-disable-next-line no-alert
-        alert(
+        setAlertText(
           `เกิดข้อผิดพลาดในการสร้างวิดีโอ: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
         hasGeneratedVideo.current = false;
@@ -1735,10 +1767,7 @@ export default function PhotoResult() {
               throw new Error(`Failed to save temp video: ${saveResult.error}`);
             }
             webmVideoPath = saveResult.path;
-            console.log(
-              '📤 [PhotoResult] WebM saved to temp:',
-              webmVideoPath,
-            );
+            console.log('📤 [PhotoResult] WebM saved to temp:', webmVideoPath);
             console.log(
               '✅ [PhotoResult] WebM saved! Will convert to MP4 in background after navigation.',
             );
@@ -1835,12 +1864,13 @@ export default function PhotoResult() {
 
         // ใช้ queueBackgroundUpload พร้อม webmVideoPath
         // การแปลง WebM → MP4 จะทำในเบื้องหลังโดย backgroundUploadService
-        const uploadResult = await window.electron.payment.queueBackgroundUpload(
-          sessionId,
-          photos,
-          videos,
-          webmVideoPath, // ส่ง path ไปให้ convert ในเบื้องหลัง
-        );
+        const uploadResult =
+          await window.electron.payment.queueBackgroundUpload(
+            sessionId,
+            photos,
+            videos,
+            webmVideoPath, // ส่ง path ไปให้ convert ในเบื้องหลัง
+          );
 
         // qrcodeStorageUrl ควรมีอยู่แล้วจาก createPhotoSession (ไม่ต้องรอจาก upload)
         if (!qrcodeStorageUrl) {
@@ -1858,7 +1888,10 @@ export default function PhotoResult() {
           // User สามารถกด Done ได้เลย
           setIsUploadQueued(true); // Mark upload as queued - enable Done button
         } else {
-          console.error('❌ [PhotoResult] Failed to queue upload:', uploadResult);
+          console.error(
+            '❌ [PhotoResult] Failed to queue upload:',
+            uploadResult,
+          );
           // Still allow Done button even if queue failed (user shouldn't be stuck)
           setIsUploadQueued(true);
         }
@@ -2151,12 +2184,17 @@ export default function PhotoResult() {
                 );
 
               if (uploadResult.success) {
-                console.log('✅ [PhotoResult] Upload queued successfully with video!');
+                console.log(
+                  '✅ [PhotoResult] Upload queued successfully with video!',
+                );
                 console.log('✅ [PhotoResult] Job ID:', uploadResult.jobId);
                 // Background upload จะทำงานเบื้องหลัง ไม่ต้องรอ
                 setIsUploadQueued(true); // Mark upload as queued - enable Done button
               } else {
-                console.error('❌ [PhotoResult] Failed to queue upload (useEffect):', uploadResult);
+                console.error(
+                  '❌ [PhotoResult] Failed to queue upload (useEffect):',
+                  uploadResult,
+                );
                 // Still allow Done button even if queue failed (user shouldn't be stuck)
                 setIsUploadQueued(true);
               }
@@ -2197,7 +2235,6 @@ export default function PhotoResult() {
     );
     handleFinish();
   }, [handleFinish]);
-
 
   const handleDownloadGif = () => {
     // Download compiled video
@@ -2332,8 +2369,11 @@ export default function PhotoResult() {
           onClick={handleFinish}
           disabled={printStatus === 'printing' || !isUploadQueued}
           style={{
-            opacity: (printStatus === 'printing' || !isUploadQueued) ? 0.5 : 1,
-            cursor: (printStatus === 'printing' || !isUploadQueued) ? 'not-allowed' : 'pointer',
+            opacity: printStatus === 'printing' || !isUploadQueued ? 0.5 : 1,
+            cursor:
+              printStatus === 'printing' || !isUploadQueued
+                ? 'not-allowed'
+                : 'pointer',
           }}
         >
           {!isUploadQueued ? 'กำลังเตรียมข้อมูล...' : 'Done'}
@@ -2344,6 +2384,15 @@ export default function PhotoResult() {
       {/* {orientationLog && (
         <div className="orientation-log">{orientationLog}</div>
       )} */}
+
+      <AlertModal
+        isOpen={!!alertText}
+        title="เกิดข้อผิดพลาด"
+        message={alertText}
+        onConfirm={() => {
+          setAlertText('');
+        }}
+      />
     </div>
   );
 }

@@ -32,6 +32,7 @@ import {
 } from './components';
 import './App.css';
 import { useBlockTouchContextMenu } from './hooks/useBlockTouchContextMenu';
+import AlertModal from './components/alertmodal';
 // import machineService from '../main/services/machineService';
 // import { getEnvConfig } from '../main/config/env.config';
 // import sseClient from '../main/services/sseClient';
@@ -54,12 +55,42 @@ function RouteListener() {
 
 function MaintenanceListener() {
   const navigate = useNavigate();
+
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showQuitPasswordModal, setShowQuitPasswordModal] = useState(false);
   const [showClearConfigPasswordModal, setShowClearConfigPasswordModal] =
     useState(false);
   const [showCameraConfigModal, setShowCameraConfigModal] = useState(false);
   const [showPrinterConfigModal, setShowPrinterConfigModal] = useState(false);
+
+  // ✅ Alert modal state
+  const [alertState, setAlertState] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+  }>({
+    open: false,
+    title: '',
+    message: '',
+  });
+
+  const showAlert = (
+    title: string,
+    message: string,
+    onConfirm?: () => void,
+  ) => {
+    setAlertState({
+      open: true,
+      title,
+      message,
+      onConfirm,
+    });
+  };
+
+  const closeAlert = () => {
+    setAlertState((prev) => ({ ...prev, open: false }));
+  };
 
   useEffect(() => {
     // Check status on mount
@@ -77,9 +108,9 @@ function MaintenanceListener() {
         console.error('Failed to check machine status:', error);
       }
     };
+
     checkStatus();
 
-    // Listen for init event
     const unsubscribe = (window as any).electron.ipcRenderer.on(
       'machine-init',
       (arg: any) => {
@@ -91,17 +122,13 @@ function MaintenanceListener() {
       },
     );
 
-    // Listen for navigate command from context menu
     const unsubscribeNavigate = (window as any).electron.ipcRenderer.on(
       'navigate-to',
       (path: string) => {
-        if (path) {
-          navigate(path);
-        }
+        if (path) navigate(path);
       },
     );
 
-    // Listen for print test password modal request
     const unsubscribePasswordModal = (window as any).electron.ipcRenderer.on(
       'show-print-test-password-modal',
       () => {
@@ -109,35 +136,30 @@ function MaintenanceListener() {
       },
     );
 
-    // Listen for quit app password modal request
     const unsubscribeQuitPasswordModal = (
       window as any
     ).electron.ipcRenderer.on('show-quit-app-password-modal', () => {
       setShowQuitPasswordModal(true);
     });
 
-    // Listen for clear config password modal request
     const unsubscribeClearConfigPasswordModal = (
       window as any
     ).electron.ipcRenderer.on('show-clear-config-password-modal', () => {
       setShowClearConfigPasswordModal(true);
     });
 
-    // Listen for camera config modal request
     const unsubscribeCameraConfigModal = (
       window as any
     ).electron.ipcRenderer.on('show-camera-config-modal', () => {
       setShowCameraConfigModal(true);
     });
 
-    // Listen for printer config modal request
     const unsubscribePrinterConfigModal = (
       window as any
     ).electron.ipcRenderer.on('show-printer-config-modal', () => {
       setShowPrinterConfigModal(true);
     });
 
-    // Listen for SSE status 502 (Bad Gateway) - navigate to SystemMaintenance
     const unsubscribeSse502 = (window as any).electron.ipcRenderer.on(
       'sse-status-502',
       () => {
@@ -145,45 +167,29 @@ function MaintenanceListener() {
       },
     );
 
-    // Listen for camera availability check request from main process
     const unsubscribeCameraCheck = (window as any).electron.ipcRenderer.on(
       'check-camera-availability',
       async (data: { configuredDeviceId: string; configuredLabel: string }) => {
         try {
-          console.log('📷 [Renderer] Checking camera availability:', data);
-
-          // ดึงรายการกล้องที่เชื่อมต่ออยู่
           const devices = await navigator.mediaDevices.enumerateDevices();
           const videoDevices = devices.filter(
             (device) => device.kind === 'videoinput',
           );
-          const availableDevices = videoDevices.map(
-            (d) => d.label || d.deviceId,
-          );
 
-          console.log('📷 [Renderer] Available cameras:', availableDevices);
-
-          // เช็คว่ากล้องที่ตั้งค่าไว้ยังมีอยู่หรือไม่
           const found = videoDevices.some(
             (d) => d.deviceId === data.configuredDeviceId,
           );
 
-          // ส่งผลกลับไป main process
           (window as any).electron.ipcRenderer.sendMessage(
             'camera-availability-result',
             {
               found,
               configuredDeviceId: data.configuredDeviceId,
               configuredLabel: data.configuredLabel,
-              availableDevices,
+              availableDevices: videoDevices.map((d) => d.label || d.deviceId),
             },
           );
-        } catch (error) {
-          console.error(
-            '❌ [Renderer] Error checking camera availability:',
-            error,
-          );
-          // ส่งผลกลับไป main process (ไม่พบกล้อง)
+        } catch {
           (window as any).electron.ipcRenderer.sendMessage(
             'camera-availability-result',
             {
@@ -197,14 +203,9 @@ function MaintenanceListener() {
       },
     );
 
-    // Listen for device not found event from main process
     const unsubscribeDeviceNotFound = (window as any).electron.ipcRenderer.on(
       'device-not-found',
       (data: { deviceType: 'camera' | 'printer'; deviceName: string }) => {
-        console.warn(
-          `⚠️ [Renderer] Device not found: ${data.deviceType} - ${data.deviceName}`,
-        );
-        // Navigate to maintenance page
         navigate('/system-maintenance', {
           state: {
             maintenance: true,
@@ -229,6 +230,8 @@ function MaintenanceListener() {
     };
   }, [navigate]);
 
+  // ---------------- PASSWORD HANDLERS ----------------
+
   const handlePasswordSuccess = () => {
     setShowPasswordModal(false);
     navigate('/print-test');
@@ -240,7 +243,6 @@ function MaintenanceListener() {
 
   const handleQuitPasswordSuccess = () => {
     setShowQuitPasswordModal(false);
-    // ส่ง IPC message ไปที่ main process เพื่อปิดแอป
     (window as any).electron.ipcRenderer.sendMessage('quit-app');
   };
 
@@ -250,22 +252,23 @@ function MaintenanceListener() {
 
   const handleClearConfigPasswordSuccess = async () => {
     setShowClearConfigPasswordModal(false);
+
     try {
-      // @ts-ignore
       const result = await window.electron?.payment?.deleteMachineConfig();
+
       if (result?.success) {
-        alert('✅ ล้างค่า Config สำเร็จ! แอปจะรีโหลด...');
-        // Reload page เพื่อให้แสดง config modal อีกครั้ง
-        window.location.reload();
+        showAlert('สำเร็จ', '✅ ล้างค่า Config สำเร็จ! แอปจะรีโหลด...', () =>
+          window.location.reload(),
+        );
       } else {
-        alert(
-          '❌ ไม่สามารถล้างค่า Config ได้: ' +
-            (result?.error || 'Unknown error'),
+        showAlert(
+          'เกิดข้อผิดพลาด',
+          `❌ ไม่สามารถล้างค่า Config ได้: ${result?.error || 'Unknown error'}`,
         );
       }
     } catch (error) {
       console.error('❌ [App] Error clearing config:', error);
-      alert('❌ เกิดข้อผิดพลาดในการล้างค่า Config');
+      showAlert('เกิดข้อผิดพลาด', '❌ เกิดข้อผิดพลาดในการล้างค่า Config');
     }
   };
 
@@ -291,12 +294,14 @@ function MaintenanceListener() {
 
   return (
     <>
+      {/* PASSWORD MODALS */}
       <PasswordModal
         isOpen={showPasswordModal}
         onSuccess={handlePasswordSuccess}
         onCancel={handlePasswordCancel}
         title="กรอกรหัสผ่านเพื่อเข้าสู่หน้า Print Test"
       />
+
       <PasswordModal
         isOpen={showQuitPasswordModal}
         onSuccess={handleQuitPasswordSuccess}
@@ -304,6 +309,7 @@ function MaintenanceListener() {
         title="กรอกรหัสผ่านเพื่อปิดแอป"
         password="7053"
       />
+
       <PasswordModal
         isOpen={showClearConfigPasswordModal}
         onSuccess={handleClearConfigPasswordSuccess}
@@ -311,15 +317,29 @@ function MaintenanceListener() {
         title="กรอกรหัสผ่านเพื่อล้างค่า Config"
         password="7053"
       />
+
+      {/* CONFIG MODALS */}
       <CameraConfigModal
         isOpen={showCameraConfigModal}
         onClose={handleCameraConfigClose}
         onSuccess={handleCameraConfigSuccess}
       />
+
       <PrinterConfigModal
         isOpen={showPrinterConfigModal}
         onClose={handlePrinterConfigClose}
         onSuccess={handlePrinterConfigSuccess}
+      />
+
+      {/* ✅ ALERT MODAL */}
+      <AlertModal
+        isOpen={alertState.open}
+        title={alertState.title}
+        message={alertState.message}
+        onConfirm={() => {
+          closeAlert();
+          alertState.onConfirm?.();
+        }}
       />
     </>
   );
