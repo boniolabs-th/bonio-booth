@@ -2,7 +2,7 @@
 /* eslint no-unused-vars: off */
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
-export type Channels = 'ipc-example' | 'print-photo' | 'print-response' | 'theme-loaded' | 'machine-init' | 'navigate-to' | 'show-print-test-password-modal' | 'show-quit-app-password-modal' | 'show-clear-config-password-modal' | 'show-camera-config-modal' | 'show-printer-config-modal' | 'quit-app' | 'sse-connected' | 'sse-disconnected' | 'sse-status-502' | 'shutdown-log' | 'shutdown-countdown-update' | 'shutdown-starting' | 'shutdown-cancelled' | 'shutdown-countdown-reset' | 'app-close-countdown-update' | 'app-close-starting' | 'app-close-cancelled' | 'app-close-countdown-reset' | 'home-page-active' | 'home-page-inactive' | 'check-camera-availability' | 'camera-availability-result' | 'get-machine-data';
+export type Channels = 'ipc-example' | 'print-photo' | 'print-response' | 'theme-loaded' | 'machine-init' | 'navigate-to' | 'show-print-test-password-modal' | 'show-quit-app-password-modal' | 'show-clear-config-password-modal' | 'show-camera-config-modal' | 'show-printer-config-modal' | 'quit-app' | 'sse-connected' | 'sse-disconnected' | 'sse-status-502' | 'shutdown-log' | 'shutdown-countdown-update' | 'shutdown-starting' | 'shutdown-cancelled' | 'shutdown-countdown-reset' | 'app-close-countdown-update' | 'app-close-starting' | 'app-close-cancelled' | 'app-close-countdown-reset' | 'home-page-active' | 'home-page-inactive' | 'check-camera-availability' | 'camera-availability-result' | 'get-machine-data' | 'native-camera-frame';
 
 const electronHandler = {
   ipcRenderer: {
@@ -247,6 +247,32 @@ const electronHandler = {
       return ipcRenderer.invoke('convert-to-mp4', videoPath, returnBase64);
     },
   },
+  // Sharp Image Encoding API (ใช้ libjpeg-turbo/libpng แทน canvas.toDataURL)
+  imageEncode: {
+    /**
+     * Encode raw RGBA pixel data to PNG/JPEG using Sharp
+     * @param rawData - RGBA pixel data array
+     * @param width - Image width
+     * @param height - Image height
+     * @param format - Output format: 'png' or 'jpeg'
+     * @param quality - JPEG quality 1-100 (default: 92)
+     */
+    encode: (
+      rawData: number[],
+      width: number,
+      height: number,
+      format: 'png' | 'jpeg',
+      quality?: number
+    ) => {
+      return ipcRenderer.invoke('encode-image-sharp', {
+        rawData,
+        width,
+        height,
+        format,
+        quality
+      });
+    },
+  },
   canonCamera: {
     /** Initialize Canon EDSDK */
     initialize: () => ipcRenderer.invoke('canon:initialize'),
@@ -327,6 +353,108 @@ const electronHandler = {
     getCameraInfo: () => ipcRenderer.invoke('canon-v2:getCameraInfo'),
     /** Set save directory for captured images */
     setSaveDirectory: (directory: string) => ipcRenderer.invoke('canon-v2:setSaveDirectory', directory),
+  },
+  /**
+   * Native Camera API - FFmpeg dshow based
+   *
+   * Architecture:
+   *   Camera
+   *     ↓
+   *   FFmpeg (dshow)
+   *     ├─ pipe → raw frames → Electron (Live View)
+   *     └─ encode → MP4/JPEG (Record / Capture)
+   */
+  nativeCamera: {
+    /** List available DirectShow video devices */
+    listDevices: () => ipcRenderer.invoke('list-video-devices'),
+
+    // ========== Live View (FFmpeg pipes JPEG frames to Electron) ==========
+
+    /** Start live view - FFmpeg pipes JPEG frames via 'native-camera-frame' event */
+    startLiveView: (deviceName: string, options?: {
+      width?: number;
+      height?: number;
+      frameRate?: number;
+      quality?: number;
+    }) => ipcRenderer.invoke('native-camera-start-live-view', deviceName, options),
+
+    /** Stop live view */
+    stopLiveView: () => ipcRenderer.invoke('native-camera-stop-live-view'),
+
+    /** Get live view status */
+    getLiveViewStatus: () => ipcRenderer.invoke('native-camera-get-live-view-status'),
+
+    /**
+     * Subscribe to live view frames
+     * @returns Unsubscribe function
+     */
+    onFrame: (callback: (frameDataUrl: string) => void) => {
+      const handler = (_event: IpcRendererEvent, frameData: string) => {
+        callback(frameData);
+      };
+      ipcRenderer.on('native-camera-frame', handler);
+      return () => {
+        ipcRenderer.removeListener('native-camera-frame', handler);
+      };
+    },
+
+    // ========== Recording (FFmpeg encodes directly to MP4) ==========
+
+    /** Start recording to MP4 file */
+    startRecording: (deviceName: string, outputPath: string, options?: {
+      width?: number;
+      height?: number;
+      frameRate?: number;
+      duration?: number;
+      saturation?: number;
+      contrast?: number;
+      brightness?: number;
+      gamma?: number;
+    }) => ipcRenderer.invoke('native-camera-start-recording', deviceName, outputPath, options),
+
+    /** Stop recording - returns output file path */
+    stopRecording: () => ipcRenderer.invoke('native-camera-stop-recording'),
+
+    /** Get recording status */
+    getRecordingStatus: () => ipcRenderer.invoke('native-camera-get-recording-status'),
+
+    // ========== Capture (Single JPEG frame) ==========
+
+    /** Capture single JPEG frame - returns base64 data URL */
+    captureFrame: (deviceName: string, options?: {
+      width?: number;
+      height?: number;
+      quality?: number;
+    }) => ipcRenderer.invoke('native-camera-capture-frame', deviceName, options),
+
+    /** Capture single frame to file */
+    captureFrameToFile: (deviceName: string, outputPath: string, options?: {
+      width?: number;
+      height?: number;
+      quality?: number;
+    }) => ipcRenderer.invoke('native-camera-capture-frame-to-file', deviceName, outputPath, options),
+
+    // ========== Combined Operations ==========
+
+    /** Start live view AND recording simultaneously */
+    startLiveAndRecord: (deviceName: string, recordingPath: string, liveViewOptions?: {
+      width?: number;
+      height?: number;
+      frameRate?: number;
+      quality?: number;
+    }, recordingOptions?: {
+      width?: number;
+      height?: number;
+      frameRate?: number;
+      duration?: number;
+      saturation?: number;
+      contrast?: number;
+      brightness?: number;
+      gamma?: number;
+    }) => ipcRenderer.invoke('native-camera-start-live-and-record', deviceName, recordingPath, liveViewOptions, recordingOptions),
+
+    /** Stop all (live view + recording) */
+    stopAll: () => ipcRenderer.invoke('native-camera-stop-all'),
   },
 };
 

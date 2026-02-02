@@ -539,9 +539,48 @@ export default function PhotoFilter() {
             }
           });
 
-          // ใช้ PNG เพื่อรักษาความคมชัดของ frame (ตาม guide.md)
-          // DO NOT convert to JPEG - frame edges must remain pixel-perfect
-          resolve(canvas.toDataURL('image/png'));
+          // ============ ใช้ Sharp แทน canvas.toDataURL ============
+          // Sharp ใช้ mozjpeg (JPEG) ซึ่งให้คุณภาพดีกว่า browser ในขนาดไฟล์ที่เล็กกว่า
+          if (window.electron?.imageEncode) {
+            try {
+              console.log('🖼️ [PhotoFilter] Using Sharp encoder (JPEG for upload)...');
+              const imageData = ctx.getImageData(0, 0, frameWidth, frameHeight);
+              const rawData = Array.from(imageData.data);
+
+              const startTime = performance.now();
+
+              // ใช้ JPEG สำหรับ upload/download - ไฟล์เล็กกว่า PNG มาก
+              // mozjpeg + chromaSubsampling 4:4:4 = คุณภาพสูงในขนาดเล็ก
+              const result = await window.electron.imageEncode.encode(
+                rawData,
+                frameWidth,
+                frameHeight,
+                'jpeg',
+                92  // Quality 92% - balance ระหว่างคุณภาพและขนาด
+              );
+
+              const endTime = performance.now();
+
+              if (result.success) {
+                console.log('🖼️ [PhotoFilter] Sharp JPEG encode success:', {
+                  duration: `${(endTime - startTime).toFixed(0)}ms`,
+                  inputSize: `${(result.stats.inputSize / 1024 / 1024).toFixed(2)} MB`,
+                  outputSize: `${(result.stats.outputSize / 1024 / 1024).toFixed(2)} MB`,
+                  compression: `${result.stats.compressionRatio.toFixed(1)}%`,
+                });
+                resolve(result.dataUrl);
+                return;
+              } else {
+                console.warn('⚠️ [PhotoFilter] Sharp encode failed, falling back to canvas:', result.error);
+              }
+            } catch (sharpError) {
+              console.warn('⚠️ [PhotoFilter] Sharp error, falling back to canvas:', sharpError);
+            }
+          }
+
+          // Fallback: ใช้ canvas.toDataURL ถ้า Sharp ไม่พร้อม
+          console.log('🖼️ [PhotoFilter] Using canvas.toDataURL (fallback)...');
+          resolve(canvas.toDataURL('image/jpeg', 0.92));
         } catch (error) {
           reject(error);
         }
@@ -598,11 +637,38 @@ export default function PhotoFilter() {
 
             await new Promise<void>((resolve) => {
               const img = new Image();
-              img.onload = () => {
+              img.onload = async () => {
                 dCtx.drawImage(img, 0, 0);
                 dCtx.drawImage(img, frameWidth, 0);
-                // ใช้ PNG เพื่อรักษาความคมชัดของ frame (ตาม guide.md)
-                // DO NOT convert to JPEG - frame edges must remain pixel-perfect
+
+                // ============ ใช้ Sharp แทน canvas.toDataURL ============
+                if (window.electron?.imageEncode) {
+                  try {
+                    console.log('🖼️ [PhotoFilter] Using Sharp for printImage...');
+                    const imageData = dCtx.getImageData(0, 0, doubleCanvas.width, doubleCanvas.height);
+                    const rawData = Array.from(imageData.data);
+
+                    const result = await window.electron.imageEncode.encode(
+                      rawData,
+                      doubleCanvas.width,
+                      doubleCanvas.height,
+                      'png'
+                    );
+
+                    if (result.success) {
+                      console.log('🖼️ [PhotoFilter] Sharp printImage encode success:', {
+                        outputSize: `${(result.stats.outputSize / 1024 / 1024).toFixed(2)} MB`,
+                      });
+                      printImage = result.dataUrl;
+                      resolve();
+                      return;
+                    }
+                  } catch (sharpError) {
+                    console.warn('⚠️ [PhotoFilter] Sharp error for printImage:', sharpError);
+                  }
+                }
+
+                // Fallback
                 printImage = doubleCanvas.toDataURL('image/png');
                 resolve();
               };

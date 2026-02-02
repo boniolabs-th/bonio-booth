@@ -61,6 +61,7 @@ import {
   startRecordingCallback,
   stopRecordingCallback,
 } from './services/videoService';
+import * as nativeCameraService from './services/nativeCameraService';
 import machineService, { StatusResponse } from './services/machineService';
 import { backgroundUploadService } from './services/backgroundUploadService';
 import sseClient, { MachineEventType } from './services/sseClient';
@@ -1524,6 +1525,98 @@ ipcMain.on("print-photo", async (event, printConfig) => {
   }
 });
 
+// ============ Sharp Image Encoding IPC Handler ============
+// ใช้ Sharp (libjpeg-turbo/libpng) แทน canvas.toDataURL เพื่อคุณภาพที่ดีกว่า
+ipcMain.handle('encode-image-sharp', async (
+  _event,
+  options: {
+    rawData: number[];  // RGBA pixel data
+    width: number;
+    height: number;
+    format: 'png' | 'jpeg';
+    quality?: number;  // JPEG quality 1-100
+  }
+) => {
+  try {
+    const startTime = Date.now();
+    const { rawData, width, height, format, quality = 92 } = options;
+
+    // แปลง array เป็น Buffer
+    const inputBuffer = Buffer.from(rawData);
+
+    console.log(`🖼️ [Sharp Encode] Starting ${format.toUpperCase()} encode:`, {
+      width,
+      height,
+      inputSize: `${(inputBuffer.length / 1024 / 1024).toFixed(2)} MB`,
+      quality: format === 'jpeg' ? quality : 'N/A (PNG)',
+    });
+
+    // สร้าง Sharp instance จาก raw RGBA data
+    let image = sharp(inputBuffer, {
+      raw: {
+        width,
+        height,
+        channels: 4  // RGBA
+      }
+    });
+
+    let outputBuffer: Buffer;
+    let mimeType: string;
+
+    if (format === 'jpeg') {
+      // JPEG: ใช้ mozjpeg encoder (คุณภาพดีกว่า standard libjpeg)
+      outputBuffer = await image
+        .jpeg({
+          quality,
+          mozjpeg: true,  // ใช้ mozjpeg สำหรับ compression ที่ดีกว่า
+          chromaSubsampling: '4:4:4',  // ไม่ลด chroma สำหรับคุณภาพสูงสุด
+        })
+        .toBuffer();
+      mimeType = 'image/jpeg';
+    } else {
+      // PNG: lossless
+      outputBuffer = await image
+        .png({
+          compressionLevel: 6,
+          adaptiveFiltering: true,
+        })
+        .toBuffer();
+      mimeType = 'image/png';
+    }
+
+    // แปลงเป็น base64 data URL
+    const base64 = outputBuffer.toString('base64');
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+
+    const endTime = Date.now();
+    const compressionRatio = ((1 - outputBuffer.length / inputBuffer.length) * 100).toFixed(1);
+
+    console.log(`🖼️ [Sharp Encode] ${format.toUpperCase()} encode complete:`, {
+      outputSize: `${(outputBuffer.length / 1024 / 1024).toFixed(2)} MB`,
+      compressionRatio: `${compressionRatio}%`,
+      duration: `${endTime - startTime}ms`,
+    });
+
+    return {
+      success: true,
+      dataUrl,
+      stats: {
+        inputSize: inputBuffer.length,
+        outputSize: outputBuffer.length,
+        compressionRatio: parseFloat(compressionRatio),
+        duration: endTime - startTime,
+      }
+    };
+
+  } catch (err) {
+    console.error('❌ [Sharp Encode] Error:', err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error'
+    };
+  }
+});
+
 
 // // KSher Payment IPC handlers
 // ipcMain.handle(
@@ -1843,6 +1936,193 @@ ipcMain.handle('stop-native-recording', async () => {
     };
   } catch (error) {
     console.error('❌ [Main] Error stop native recording:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// ============================================================================
+// Native Camera Service IPC Handlers
+// Architecture: Camera → FFmpeg (dshow) → pipe frames → Electron (Live View)
+//                                       → encode → MP4/JPEG (Record/Capture)
+// ============================================================================
+
+// Start native camera live view (FFmpeg pipes JPEG frames)
+ipcMain.handle('native-camera-start-live-view', async (event, deviceName: string, options?: {
+  width?: number;
+  height?: number;
+  frameRate?: number;
+  quality?: number;
+}) => {
+  try {
+    await nativeCameraService.startLiveView(deviceName, options);
+
+    // Setup frame forwarding to renderer
+    const forwardFrame = (frameData: string) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('native-camera-frame', frameData);
+      }
+    };
+    nativeCameraService.addFrameListener(forwardFrame);
+
+    return { success: true };
+  } catch (error) {
+    console.error('❌ [Main] Error starting native camera live view:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// Stop native camera live view
+ipcMain.handle('native-camera-stop-live-view', async () => {
+  try {
+    await nativeCameraService.stopLiveView();
+    return { success: true };
+  } catch (error) {
+    console.error('❌ [Main] Error stopping native camera live view:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// Get native camera live view status
+ipcMain.handle('native-camera-get-live-view-status', async () => {
+  return nativeCameraService.getLiveViewStatus();
+});
+
+// Start native camera recording (FFmpeg encodes directly to MP4)
+ipcMain.handle('native-camera-start-recording', async (event, deviceName: string, outputPath: string, options?: {
+  width?: number;
+  height?: number;
+  frameRate?: number;
+  duration?: number;
+  saturation?: number;
+  contrast?: number;
+  brightness?: number;
+  gamma?: number;
+}) => {
+  try {
+    await nativeCameraService.startRecording(deviceName, outputPath, options);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ [Main] Error starting native camera recording:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// Stop native camera recording
+ipcMain.handle('native-camera-stop-recording', async () => {
+  try {
+    const outputPath = await nativeCameraService.stopRecording();
+    return { success: true, outputPath };
+  } catch (error) {
+    console.error('❌ [Main] Error stopping native camera recording:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// Get native camera recording status
+ipcMain.handle('native-camera-get-recording-status', async () => {
+  return nativeCameraService.getRecordingStatus();
+});
+
+// Capture single JPEG frame from camera
+ipcMain.handle('native-camera-capture-frame', async (event, deviceName: string, options?: {
+  width?: number;
+  height?: number;
+  quality?: number;
+}) => {
+  try {
+    const dataUrl = await nativeCameraService.captureFrame(deviceName, options);
+    return { success: true, dataUrl };
+  } catch (error) {
+    console.error('❌ [Main] Error capturing frame:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// Capture single frame to file
+ipcMain.handle('native-camera-capture-frame-to-file', async (event, deviceName: string, outputPath: string, options?: {
+  width?: number;
+  height?: number;
+  quality?: number;
+}) => {
+  try {
+    const filePath = await nativeCameraService.captureFrameToFile(deviceName, outputPath, options);
+    return { success: true, filePath };
+  } catch (error) {
+    console.error('❌ [Main] Error capturing frame to file:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// Start live view and recording simultaneously
+ipcMain.handle('native-camera-start-live-and-record', async (event, deviceName: string, recordingPath: string, liveViewOptions?: {
+  width?: number;
+  height?: number;
+  frameRate?: number;
+  quality?: number;
+}, recordingOptions?: {
+  width?: number;
+  height?: number;
+  frameRate?: number;
+  duration?: number;
+  saturation?: number;
+  contrast?: number;
+  brightness?: number;
+  gamma?: number;
+}) => {
+  try {
+    await nativeCameraService.startLiveViewAndRecording(
+      deviceName,
+      recordingPath,
+      liveViewOptions,
+      recordingOptions
+    );
+
+    // Setup frame forwarding
+    const forwardFrame = (frameData: string) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('native-camera-frame', frameData);
+      }
+    };
+    nativeCameraService.addFrameListener(forwardFrame);
+
+    return { success: true };
+  } catch (error) {
+    console.error('❌ [Main] Error starting live view and recording:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// Stop all native camera processes
+ipcMain.handle('native-camera-stop-all', async () => {
+  try {
+    const result = await nativeCameraService.stopAll();
+    return { success: true, ...result };
+  } catch (error) {
+    console.error('❌ [Main] Error stopping all native camera processes:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
