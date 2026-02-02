@@ -467,7 +467,7 @@ const generateFramedVideo = async (
           // (CSS filters are no longer supported - LUT only)
 
           //  added contrast and brightness
-          ctx.filter = 'contrast(1.01) saturate(1.08) brightness(1.05)'; // fixed color filter by all
+          // ctx.filter = 'contrast(1.01) saturate(1.08) brightness(1.05)'; // fixed color filter by all
 
           ctx.drawImage(
             image,
@@ -922,10 +922,14 @@ const generateFramedVideo = async (
           sourceY,
           sourceWidth,
           sourceHeight,
-          targetX - 2,
-          targetY - 2,
-          targetWidth + 4,
-          targetHeight + 4, // ทำให้รูปกินขอบเข้าไปนิดนึง by all
+          // targetX - 2,
+          // targetY - 2,
+          // targetWidth + 4,
+          // targetHeight + 4, // ทำให้รูปกินขอบเข้าไปนิดนึง by all
+          targetX,
+          targetY,
+          targetWidth,
+          targetHeight,
         );
 
         ctx.restore();
