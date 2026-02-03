@@ -494,6 +494,10 @@ async function checkCamera(): Promise<void> {
 
       // รอผล
       const found = await checkPromise;
+
+      if (found && mainWindow) {
+        mainWindow.webContents.send('device-found');
+      }
       console.log(`📷 [Main] Webcam check result: ${found ? 'Found' : 'Not found'}`);
 
     } else if (cameraConfig.type === 'canon') {
@@ -522,6 +526,10 @@ async function checkCamera(): Promise<void> {
           });
         }
       } else {
+        if (mainWindow) {
+          mainWindow.webContents.send('device-found');
+        }
+
         console.log(`✅ [Main] Canon camera connected: ${cameraConfig.cameraName}`);
       }
     }
@@ -536,6 +544,8 @@ async function checkCamera(): Promise<void> {
 async function checkPrinter(): Promise<void> {
   try {
     console.log('ℹ️ [Main] Checking printer config...');
+
+    let isConnected = false
 
     const printerConfig = await getPrinterConfig();
     if (!printerConfig) {
@@ -587,7 +597,10 @@ async function checkPrinter(): Promise<void> {
           deviceName: `Main: ${printerConfig.main.printerName}`,
         });
       }
+
+      isConnected = false
     } else {
+      isConnected = true
       console.log(`✅ [Main] Main printer found: ${printerConfig.main.printerName}`);
     }
 
@@ -612,9 +625,15 @@ async function checkPrinter(): Promise<void> {
             deviceName: `Secondary: ${printerConfig.secondary.printerName}`,
           });
         }
+        isConnected = false
       } else {
-        console.log(`✅ [Main] Secondary printer found: ${printerConfig.secondary.printerName}`);
+        isConnected = true
+          console.log(`✅ [Main] Secondary printer found: ${printerConfig.secondary.printerName}`);
       }
+    }
+
+    if (isConnected && mainWindow) {
+      mainWindow.webContents.send('device-found');
     }
   } catch (error) {
     console.error('❌ [Main] Error checking printer config:', error);

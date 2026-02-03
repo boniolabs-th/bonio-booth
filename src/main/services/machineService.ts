@@ -3,7 +3,12 @@ import http from 'http';
 import { URL } from 'url';
 import fs from 'fs';
 import path from 'path';
-import { getEnvConfig, DEFAULT_MACHINE_ID, DEFAULT_PORT, DEFAULT_API_TIMEOUT } from '../config/env.config';
+import {
+  getEnvConfig,
+  DEFAULT_MACHINE_ID,
+  DEFAULT_PORT,
+  DEFAULT_API_TIMEOUT,
+} from '../config/env.config';
 import sseClient from './sseClient';
 
 // ==================== Type Definitions ====================
@@ -309,27 +314,31 @@ export class MachineService {
   constructor(options: MachineServiceOptions = {}) {
     // ใช้ค่า default จาก env.config.ts (จะถูกอัปเดตเมื่อเรียก loadEnvConfig)
     this.apiBaseUrl = options.apiBaseUrl ? options.apiBaseUrl : '';
-    this.machinePort = options.machinePort ? options.machinePort : Number(DEFAULT_PORT);
+    this.machinePort = options.machinePort
+      ? options.machinePort
+      : Number(DEFAULT_PORT);
     this.machineId = options.machineId ? options.machineId : DEFAULT_MACHINE_ID;
     this.timeout = options.timeout ? options.timeout : DEFAULT_API_TIMEOUT;
 
     // โหลด config จาก env.config.ts (async แต่ไม่ต้องรอ)
-    loadEnvConfig().then((config) => {
-      if (!options.apiBaseUrl) {
-        this.apiBaseUrl = config.API_BASE_URL;
-      }
-      if (!options.machinePort) {
-        this.machinePort = Number(config.PORT);
-      }
-      if (!options.machineId) {
-        this.machineId = config.MACHINE_ID;
-      }
-      if (!options.timeout) {
-        this.timeout = config.API_TIMEOUT;
-      }
-    }).catch((error) => {
-      console.error('❌ [MachineService] Failed to load env config:', error);
-    });
+    loadEnvConfig()
+      .then((config) => {
+        if (!options.apiBaseUrl) {
+          this.apiBaseUrl = config.API_BASE_URL;
+        }
+        if (!options.machinePort) {
+          this.machinePort = Number(config.PORT);
+        }
+        if (!options.machineId) {
+          this.machineId = config.MACHINE_ID;
+        }
+        if (!options.timeout) {
+          this.timeout = config.API_TIMEOUT;
+        }
+      })
+      .catch((error) => {
+        console.error('❌ [MachineService] Failed to load env config:', error);
+      });
   }
 
   /**
@@ -483,9 +492,12 @@ export class MachineService {
       );
 
       // Access paperPosition with type assertion to handle optional property
-      const paperPosition = (response as any).paperPosition || response.paperPosition;
-      const isShutdownReady = (response as any).isShutdownReady || response.isShutdownReady;
-      const isClosedAppReady = (response as any).isClosedAppReady || response.isClosedAppReady;
+      const paperPosition =
+        (response as any).paperPosition || response.paperPosition;
+      const isShutdownReady =
+        (response as any).isShutdownReady || response.isShutdownReady;
+      const isClosedAppReady =
+        (response as any).isClosedAppReady || response.isClosedAppReady;
       console.log('🔍 [MachineService] Init response:', {
         isShutdownReady,
         isShutdownReadyType: typeof isShutdownReady,
@@ -495,8 +507,12 @@ export class MachineService {
         isClosedAppReadyValue: isClosedAppReady,
       });
 
-      await sseClient.updateMachineInfo({ status: 'online' })
-      console.log('⚠️ [MachineService] ⚠️⚠️⚠️ IMPORTANT: handleShutdownReady() MUST be called after this! ⚠️⚠️⚠️');
+      await sseClient.updateMachineInfo({
+        status: 'online',
+      });
+      console.log(
+        '⚠️ [MachineService] ⚠️⚠️⚠️ IMPORTANT: handleShutdownReady() MUST be called after this! ⚠️⚠️⚠️',
+      );
       return { ...response, isShutdownReady, isClosedAppReady };
     } catch (error) {
       console.error('❌ [MachineService] Init failed:', error);
@@ -647,9 +663,7 @@ export class MachineService {
     }
   }
 
-  async reducePaperLevel(
-    reduceBy: number,
-  ): Promise<PaperLevelResponse> {
+  async reducePaperLevel(reduceBy: number): Promise<PaperLevelResponse> {
     try {
       const response = await this.makeRequest<PaperLevelResponse>(
         '/api/machines-public/paper-level/reduce',
@@ -767,12 +781,16 @@ export class MachineService {
         dataUrl: string,
       ): { buffer: Buffer; filename: string; mimeType: string } => {
         if (!dataUrl.startsWith('data:')) {
-          throw new Error(`Invalid data URL format: ${dataUrl.substring(0, 50)}...`);
+          throw new Error(
+            `Invalid data URL format: ${dataUrl.substring(0, 50)}...`,
+          );
         }
 
         const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
         if (!matches) {
-          throw new Error(`Invalid data URL format: ${dataUrl.substring(0, 50)}...`);
+          throw new Error(
+            `Invalid data URL format: ${dataUrl.substring(0, 50)}...`,
+          );
         }
 
         const mimeType = matches[1];
@@ -810,7 +828,10 @@ export class MachineService {
           formData.push(buffer);
           formData.push(Buffer.from('\r\n'));
         } catch (error) {
-          console.error(`❌ [MachineService] Failed to process photo ${i + 1}:`, error);
+          console.error(
+            `❌ [MachineService] Failed to process photo ${i + 1}:`,
+            error,
+          );
         }
       }
 
@@ -826,7 +847,10 @@ export class MachineService {
           formData.push(buffer);
           formData.push(Buffer.from('\r\n'));
         } catch (error) {
-          console.error(`❌ [MachineService] Failed to process video ${i + 1}:`, error);
+          console.error(
+            `❌ [MachineService] Failed to process video ${i + 1}:`,
+            error,
+          );
         }
       }
 
@@ -891,11 +915,19 @@ export class MachineService {
                   } catch {
                     errorMessage = data || errorMessage;
                   }
-                  console.error('❌ [MachineService] Upload to session failed:', errorMessage);
+                  console.error(
+                    '❌ [MachineService] Upload to session failed:',
+                    errorMessage,
+                  );
                   reject(new Error(errorMessage));
                 }
               } catch (parseError) {
-                console.error('❌ [MachineService] Parse error:', parseError, 'Data:', data);
+                console.error(
+                  '❌ [MachineService] Parse error:',
+                  parseError,
+                  'Data:',
+                  data,
+                );
                 reject(new Error(`Failed to parse response: ${data}`));
               }
             });
@@ -912,9 +944,13 @@ export class MachineService {
           const uploadTimeout = Math.min(calculatedTimeout, 300000); // สูงสุด 5 นาที
 
           req.setTimeout(uploadTimeout, () => {
-            console.error(`❌ [MachineService] Upload timeout after ${uploadTimeout / 1000}s`);
+            console.error(
+              `❌ [MachineService] Upload timeout after ${uploadTimeout / 1000}s`,
+            );
             req.destroy();
-            reject(new Error(`Upload timeout after ${uploadTimeout / 1000} seconds`));
+            reject(
+              new Error(`Upload timeout after ${uploadTimeout / 1000} seconds`),
+            );
           });
 
           // Write form buffer in chunks
@@ -927,7 +963,10 @@ export class MachineService {
               return;
             }
 
-            const chunk = formBuffer.slice(bytesWritten, bytesWritten + chunkSize);
+            const chunk = formBuffer.slice(
+              bytesWritten,
+              bytesWritten + chunkSize,
+            );
             const canContinue = req.write(chunk);
             bytesWritten += chunk.length;
 
@@ -944,7 +983,10 @@ export class MachineService {
         }
       });
     } catch (error) {
-      console.error('❌ [MachineService] Upload files to session failed:', error);
+      console.error(
+        '❌ [MachineService] Upload files to session failed:',
+        error,
+      );
       throw error;
     }
   }
@@ -960,7 +1002,6 @@ export class MachineService {
     transactionId?: string, // transactionId จาก payment/create response
     machineId?: string,
   ): Promise<UploadFilesResponse> {
-
     try {
       // Create multipart form data
       const boundary = `----WebKitFormBoundary${Date.now()}`;
@@ -984,12 +1025,16 @@ export class MachineService {
         dataUrl: string,
       ): { buffer: Buffer; filename: string; mimeType: string } => {
         if (!dataUrl.startsWith('data:')) {
-          throw new Error(`Invalid data URL format: ${dataUrl.substring(0, 50)}...`);
+          throw new Error(
+            `Invalid data URL format: ${dataUrl.substring(0, 50)}...`,
+          );
         }
 
         const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
         if (!matches) {
-          throw new Error(`Invalid data URL format: ${dataUrl.substring(0, 50)}...`);
+          throw new Error(
+            `Invalid data URL format: ${dataUrl.substring(0, 50)}...`,
+          );
         }
 
         const mimeType = matches[1];
@@ -1034,7 +1079,10 @@ export class MachineService {
           photosAddedCount++;
           photoFilenames.push(filename);
         } catch (error) {
-          console.error(`❌ [MachineService] Failed to process photo ${i + 1}:`, error);
+          console.error(
+            `❌ [MachineService] Failed to process photo ${i + 1}:`,
+            error,
+          );
           // Continue with other photos
         }
       }
@@ -1042,7 +1090,9 @@ export class MachineService {
       if (photos.length === 0) {
         console.warn('⚠️ [MachineService] No photos to upload');
       } else if (photosAddedCount === 0) {
-        console.error('❌ [MachineService] Failed to add any photos to form data!');
+        console.error(
+          '❌ [MachineService] Failed to add any photos to form data!',
+        );
       } else {
         // console.log(`✅ [MachineService] Successfully added ${photosAddedCount} of ${photos.length} photos to form data`);
       }
@@ -1066,7 +1116,10 @@ export class MachineService {
           videosAddedCount++;
           videoFilenames.push(filename);
         } catch (error) {
-          console.error(`❌ [MachineService] Failed to process video ${i + 1}:`, error);
+          console.error(
+            `❌ [MachineService] Failed to process video ${i + 1}:`,
+            error,
+          );
           // Continue with other videos
         }
       }
@@ -1074,7 +1127,9 @@ export class MachineService {
       if (videos.length === 0) {
         console.warn('⚠️ [MachineService] No videos to upload');
       } else if (videosAddedCount === 0) {
-        console.error('❌ [MachineService] Failed to add any videos to form data!');
+        console.error(
+          '❌ [MachineService] Failed to add any videos to form data!',
+        );
       } else {
         // console.log(`✅ [MachineService] Successfully added ${videosAddedCount} of ${videos.length} videos to form data`);
       }
@@ -1087,11 +1142,19 @@ export class MachineService {
       // Log form data structure (text fields only)
       // แสดงส่วนที่เป็น text fields (ไม่รวม binary data)
       // ใช้วิธีนับจากตัวแปรที่เก็บไว้แทนการอ่านจาก buffer เพราะ buffer อาจจะใหญ่เกินไป
-      const bufferStr = formBuffer.toString('utf8', 0, Math.min(10000, formBuffer.length));
+      const bufferStr = formBuffer.toString(
+        'utf8',
+        0,
+        Math.min(10000, formBuffer.length),
+      );
 
       // Extract text fields from form data
-      const transactionCodeMatch = bufferStr.match(/name="transactionCode"[^\r\n]*\r\n\r\n([^\r\n]+)/);
-      const transactionIdMatch = bufferStr.match(/name="transactionId"[^\r\n]*\r\n\r\n([^\r\n]+)/);
+      const transactionCodeMatch = bufferStr.match(
+        /name="transactionCode"[^\r\n]*\r\n\r\n([^\r\n]+)/,
+      );
+      const transactionIdMatch = bufferStr.match(
+        /name="transactionId"[^\r\n]*\r\n\r\n([^\r\n]+)/,
+      );
 
       // ใช้จำนวนที่นับไว้แล้วจาก formData array แทนการอ่านจาก buffer
       // เพราะ buffer อาจจะใหญ่เกินไปและ videos อาจจะไม่อยู่ในส่วนแรก
@@ -1105,21 +1168,31 @@ export class MachineService {
         // console.log('📤 [MachineService]   transactionId (raw):', JSON.stringify(transactionIdMatch[1]));
         // console.log('📤 [MachineService]   transactionId (hex):', Buffer.from(transactionIdMatch[1]).toString('hex'));
       } else {
-        console.warn('⚠️ [MachineService]   transactionId: NOT FOUND IN FORM DATA');
+        console.warn(
+          '⚠️ [MachineService]   transactionId: NOT FOUND IN FORM DATA',
+        );
       }
 
       if (videosInForm === 0 && videos.length > 0) {
-        console.error('❌ [MachineService] Videos were NOT added to form data!');
+        console.error(
+          '❌ [MachineService] Videos were NOT added to form data!',
+        );
         console.error('❌ [MachineService] Expected videos:', videos.length);
       }
 
       // Log first part of form data structure
-      const formDataPreview = bufferStr.substring(0, Math.min(2000, bufferStr.length));
+      const formDataPreview = bufferStr.substring(
+        0,
+        Math.min(2000, bufferStr.length),
+      );
 
       // Make request
       return new Promise((resolve, reject) => {
         try {
-          const url = new URL('/api/machines-public/upload-files', this.apiBaseUrl);
+          const url = new URL(
+            '/api/machines-public/upload-files',
+            this.apiBaseUrl,
+          );
 
           // Add query parameters
           if (machineId) {
@@ -1169,11 +1242,19 @@ export class MachineService {
                   } catch {
                     errorMessage = data || errorMessage;
                   }
-                  console.error('❌ [MachineService] Upload failed:', errorMessage);
+                  console.error(
+                    '❌ [MachineService] Upload failed:',
+                    errorMessage,
+                  );
                   reject(new Error(errorMessage));
                 }
               } catch (parseError) {
-                console.error('❌ [MachineService] Parse error:', parseError, 'Data:', data);
+                console.error(
+                  '❌ [MachineService] Parse error:',
+                  parseError,
+                  'Data:',
+                  data,
+                );
                 reject(new Error(`Failed to parse response: ${data}`));
               }
             });
@@ -1192,9 +1273,13 @@ export class MachineService {
 
           req.setTimeout(uploadTimeout, () => {
             // Longer timeout for file uploads
-            console.error(`❌ [MachineService] Upload timeout after ${uploadTimeout / 1000}s`);
+            console.error(
+              `❌ [MachineService] Upload timeout after ${uploadTimeout / 1000}s`,
+            );
             req.destroy();
-            reject(new Error(`Upload timeout after ${uploadTimeout / 1000} seconds`));
+            reject(
+              new Error(`Upload timeout after ${uploadTimeout / 1000} seconds`),
+            );
           });
 
           // Write form buffer in chunks เพื่อแสดง progress และป้องกัน memory issues
@@ -1208,13 +1293,18 @@ export class MachineService {
               return;
             }
 
-            const chunk = formBuffer.slice(bytesWritten, bytesWritten + chunkSize);
+            const chunk = formBuffer.slice(
+              bytesWritten,
+              bytesWritten + chunkSize,
+            );
             const canContinue = req.write(chunk);
 
             bytesWritten += chunk.length;
             currentChunk += 1;
 
-            const progress = ((bytesWritten / formBuffer.length) * 100).toFixed(1);
+            const progress = ((bytesWritten / formBuffer.length) * 100).toFixed(
+              1,
+            );
             if (currentChunk % 5 === 0 || bytesWritten === formBuffer.length) {
               // console.log(`📤 [MachineService] Upload progress: ${progress}% (${(bytesWritten / (1024 * 1024)).toFixed(2)} MB / ${(formBuffer.length / (1024 * 1024)).toFixed(2)} MB)`);
             }
@@ -1253,10 +1343,15 @@ export class MachineService {
     availableDevices?: string[],
     machineId?: string,
   ): Promise<{ success: boolean; message: string; notificationSent: boolean }> {
-    console.log('sendDeviceAlert', {deviceType,deviceName,availableDevices,machineId});
+    console.log('sendDeviceAlert', {
+      deviceType,
+      deviceName,
+      availableDevices,
+      machineId,
+    });
 
     try {
-      const response = await this.makeRequest<{
+      const makeRequest = this.makeRequest<{
         success: boolean;
         message: string;
         notificationSent: boolean;
@@ -1271,10 +1366,12 @@ export class MachineService {
         machineId ? { machineId } : undefined,
       );
 
-      await sseClient.updateMachineInfo({ isMaintenanceMode: true })
+      const [respMakeRequest] = await Promise.all([makeRequest]);
 
-      console.log(`✅ [MachineService] Device alert sent: ${deviceType} "${deviceName}" not found`);
-      return response;
+      console.log(
+        `✅ [MachineService] Device alert sent: ${deviceType} "${deviceName}" not found`,
+      );
+      return respMakeRequest;
     } catch (error) {
       console.error('❌ [MachineService] Send device alert failed:', error);
       // Don't throw - just log and return failure

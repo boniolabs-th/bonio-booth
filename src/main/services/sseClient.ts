@@ -106,6 +106,8 @@ export class SseClient {
       const url = new URL(`${this.apiBaseUrl}/api/machines/${this.machineId}`);
       const protocol = url.protocol === 'https:' ? https : http;
 
+      console.log('payload updateMachineInfo', payload);
+
       const postData = JSON.stringify(payload);
 
       const options: https.RequestOptions = {
