@@ -198,7 +198,7 @@ export interface FilterConfig {
 export const FILTERS: FilterConfig[] = [
   // LUT-based filters (for high-quality color grading via FFmpeg)
   { id: 'matte-brown-mono', name: 'Matte Brown', lutFile: 'Matte_Brown_Mono.cube', type: 'lut' },
-  { id: 'sepia-brown', name: 'Sepia', lutFile: 'Sepia_Brown.cube', type: 'lut' },
+  { id: 'sepia-brown', name: 'Sepia Brown', lutFile: 'Sepia_Brown.cube', type: 'lut' },
   { id: 'timelab-1', name: 'Classic', lutFile: 'Timelab 1.cube', type: 'lut' },
   { id: 'timelab-2', name: 'Cool', lutFile: 'Timelab 2.cube', type: 'lut' },
   { id: 'warm-light', name: 'Warm Light', lutFile: 'Warm Light.cube', type: 'lut' },
