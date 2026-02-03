@@ -172,7 +172,7 @@ export const applyLUTWithWorker = (
       imageData: clonedImageData,
       lut: {
         size: lut.size,
-        data: Array.from(lut.data), // Convert Float32Array to regular array
+        data: lut.data, // Pass Float32Array directly (structured clone)
         domainMin: lut.domainMin,
         domainMax: lut.domainMax,
       },

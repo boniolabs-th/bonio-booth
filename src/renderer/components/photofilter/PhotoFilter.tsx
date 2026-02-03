@@ -312,6 +312,7 @@ export default function PhotoFilter() {
   // Canon camera: สีถูกต้องอยู่แล้ว ข้าม processing เมื่อไม่มี filter
   const applyFilterToPhoto = async (
     photoUrl: string,
+    maxDimension: number = 2000,
   ): Promise<HTMLCanvasElement> => {
     const filter = FILTERS.find((f) => f.id === selectedFilter);
     const isCanon = state.cameraType === 'canon';
@@ -336,22 +337,21 @@ export default function PhotoFilter() {
         ctx.imageSmoothingQuality = 'high';
 
         // =========================================================================
-        // RESIZE: ลดขนาดภาพเพื่อลดระยะเวลาประมวลผล (โดยเฉพาะภาพจาก Canon)
-        // 4x6" 300dpi ต้องการแค่ 1200x1800 หรือ 1800x1200 (2.1MP)
-        // ตั้งเป้าหมายไว้ที่ 2000px ด้านยาว (เผื่อเล็กน้อยเพื่อคุณภาพและความคมชัด)
+        // RESIZE: ลดขนาดภาพเพื่อลดระยะเวลาประมวลผล
+        // Preview: ใช้ maxDimension = 1000 เพื่อความเร็ว
+        // Print: ใช้ maxDimension = 2000 (default) เพื่อคุณภาพ
         // =========================================================================
         let targetWidth = img.width;
         let targetHeight = img.height;
-        const MAX_DIMENSION = 2000;
 
-        if (Math.max(img.width, img.height) > MAX_DIMENSION) {
+        if (Math.max(img.width, img.height) > maxDimension) {
           const aspectRatio = img.width / img.height;
           if (img.width > img.height) {
-            targetWidth = MAX_DIMENSION;
-            targetHeight = Math.round(MAX_DIMENSION / aspectRatio);
+            targetWidth = maxDimension;
+            targetHeight = Math.round(maxDimension / aspectRatio);
           } else {
-            targetHeight = MAX_DIMENSION;
-            targetWidth = Math.round(MAX_DIMENSION * aspectRatio);
+            targetHeight = maxDimension;
+            targetWidth = Math.round(maxDimension * aspectRatio);
           }
           console.log(`🖼️ [PhotoFilter] Resizing image for processing from ${img.width}x${img.height} to ${targetWidth}x${targetHeight}`);
         }
@@ -566,7 +566,8 @@ export default function PhotoFilter() {
             try {
               console.log('🖼️ [PhotoFilter] Using Sharp encoder (JPEG for upload)...');
               const imageData = ctx.getImageData(0, 0, frameWidth, frameHeight);
-              const rawData = Array.from(imageData.data);
+              // PERFORMANCE FIX: Use Uint8Array directly
+              const rawData = new Uint8Array(imageData.data.buffer);
 
               const startTime = performance.now();
 
@@ -903,7 +904,9 @@ export default function PhotoFilter() {
     setIsGeneratingPreview(true);
     try {
       // Apply filter กับภาพแรกแล้วแสดงขนาดใหญ่
-      const filteredCanvas = await applyFilterToPhoto(state.selectedCaptures[0].photo);
+      // PREVIEW OPTIMIZATION: ใช้ขนาดแค่ 1000px สำหรับ preview บนจอ (จากเดิม 2000px)
+      // ช่วยลดเวลา render จาก 1-2 วินาที เหลือ ~0.3-0.5 วินาที
+      const filteredCanvas = await applyFilterToPhoto(state.selectedCaptures[0].photo, 1000);
       // ใช้ quality 0.85 สำหรับ preview (ไม่ต้องสูงมาก)
       const filteredDataUrl = filteredCanvas.toDataURL('image/jpeg', 0.85);
       setPreviewImage(filteredDataUrl);
