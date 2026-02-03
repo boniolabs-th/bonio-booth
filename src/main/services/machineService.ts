@@ -4,6 +4,7 @@ import { URL } from 'url';
 import fs from 'fs';
 import path from 'path';
 import { getEnvConfig, DEFAULT_MACHINE_ID, DEFAULT_PORT, DEFAULT_API_TIMEOUT } from '../config/env.config';
+import sseClient from './sseClient';
 
 // ==================== Type Definitions ====================
 
@@ -493,6 +494,8 @@ export class MachineService {
         isClosedAppReadyType: typeof isClosedAppReady,
         isClosedAppReadyValue: isClosedAppReady,
       });
+
+      await sseClient.updateMachineInfo({ status: 'online' })
       console.log('⚠️ [MachineService] ⚠️⚠️⚠️ IMPORTANT: handleShutdownReady() MUST be called after this! ⚠️⚠️⚠️');
       return { ...response, isShutdownReady, isClosedAppReady };
     } catch (error) {
@@ -1267,6 +1270,8 @@ export class MachineService {
         },
         machineId ? { machineId } : undefined,
       );
+
+      await sseClient.updateMachineInfo({ isMaintenanceMode: true })
 
       console.log(`✅ [MachineService] Device alert sent: ${deviceType} "${deviceName}" not found`);
       return response;

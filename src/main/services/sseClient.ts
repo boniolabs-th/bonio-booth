@@ -7,6 +7,7 @@ import https from 'https';
 import http from 'http';
 import { URL } from 'url';
 import { getEnvConfig, DEFAULT_MACHINE_ID } from '../config/env.config';
+import { MachineInfo } from './machineService';
 
 export enum MachineEventType {
   SHUTDOWN_SCHEDULED = 'shutdown-scheduled',
@@ -55,22 +56,26 @@ export class SseClient {
 
   constructor(options?: { apiBaseUrl?: string; machineId?: string }) {
     this.apiBaseUrl = options?.apiBaseUrl ? options.apiBaseUrl : '';
-    this.machineId = options?.machineId ? options.machineId : DEFAULT_MACHINE_ID;
+    this.machineId = options?.machineId
+      ? options.machineId
+      : DEFAULT_MACHINE_ID;
 
-    getEnvConfig().then((config) => {
-      if (!options?.apiBaseUrl) {
-        this.apiBaseUrl = config.API_BASE_URL;
-      }
-      if (!options?.machineId) {
-        this.machineId = config.MACHINE_ID;
-      }
-      console.log('🔧 [SseClient] Configuration loaded:', {
-        apiBaseUrl: this.apiBaseUrl,
-        machineId: this.machineId,
+    getEnvConfig()
+      .then((config) => {
+        if (!options?.apiBaseUrl) {
+          this.apiBaseUrl = config.API_BASE_URL;
+        }
+        if (!options?.machineId) {
+          this.machineId = config.MACHINE_ID;
+        }
+        console.log('🔧 [SseClient] Configuration loaded:', {
+          apiBaseUrl: this.apiBaseUrl,
+          machineId: this.machineId,
+        });
+      })
+      .catch((error) => {
+        console.error('❌ [SseClient] Failed to load env config:', error);
       });
-    }).catch((error) => {
-      console.error('❌ [SseClient] Failed to load env config:', error);
-    });
   }
 
   /**
@@ -96,14 +101,12 @@ export class SseClient {
     this.onStatus502Callback = callback;
   }
 
-  async updateStatus(status: string): Promise<void> {
+  async updateMachineInfo(payload: any): Promise<void> {
     try {
       const url = new URL(`${this.apiBaseUrl}/api/machines/${this.machineId}`);
       const protocol = url.protocol === 'https:' ? https : http;
 
-      const postData = JSON.stringify({
-        status,
-      });
+      const postData = JSON.stringify(payload);
 
       const options: https.RequestOptions = {
         hostname: url.hostname,
@@ -160,8 +163,9 @@ export class SseClient {
     }
 
     if (this.request) {
-      console.log('⚠️ [SseClient] Already connected, closing existing connection');
-      this.updateStatus('online');
+      console.log(
+        '⚠️ [SseClient] Already connected, closing existing connection',
+      );
       this.disconnect();
     }
 
@@ -171,8 +175,6 @@ export class SseClient {
     this.isConnecting = true;
 
     try {
-      this.updateStatus('online');
-
       const url = new URL(sseUrl);
       const protocol = url.protocol === 'https:' ? https : http;
 
@@ -206,12 +208,17 @@ export class SseClient {
         console.log('📡 [SseClient] Response status:', res.statusCode);
 
         if (res.statusCode !== 200) {
-          console.error('❌ [SseClient] Failed to connect, status:', res.statusCode);
+          console.error(
+            '❌ [SseClient] Failed to connect, status:',
+            res.statusCode,
+          );
           this.isConnectedFlag = false;
           this.hasEmittedConnected = false;
 
           if (res.statusCode === 502 && this.onStatus502Callback) {
-            console.log('⚠️ [SseClient] Status 502 detected, triggering maintenance mode');
+            console.log(
+              '⚠️ [SseClient] Status 502 detected, triggering maintenance mode',
+            );
             this.onStatus502Callback();
           }
 
@@ -222,7 +229,6 @@ export class SseClient {
         console.log('✅ [SseClient] Connected to SSE');
         this.isConnectedFlag = true;
         this.reconnectAttempts = 0;
-        this.updateStatus('online');
 
         // ⭐ เริ่ม heartbeat monitoring
         this.startHeartbeatMonitoring();
@@ -232,7 +238,9 @@ export class SseClient {
 
           // Emit connected event ครั้งแรก
           if (!this.hasEmittedConnected) {
-            console.log('📡 [SseClient] First data received, emitting connected event');
+            console.log(
+              '📡 [SseClient] First data received, emitting connected event',
+            );
             this.hasEmittedConnected = true;
             this.emitEvent(MachineEventType.SSE_CONNECTED, {
               timestamp: Date.now(),
@@ -295,7 +303,7 @@ export class SseClient {
       this.request.end();
     } catch (error) {
       console.error('❌ [SseClient] Failed to create connection:', error);
-      this.updateStatus('offline');
+      this.updateMachineInfo({ status: 'offline' });
       this.isConnecting = false;
       this.clearConnectionTimeout();
 
@@ -323,7 +331,9 @@ export class SseClient {
 
       // ถ้าไม่ได้รับ heartbeat เกิน 60 วินาที = disconnect
       if (timeSinceLastHeartbeat > 60000) {
-        console.warn('⚠️ [SseClient] No heartbeat for 60s, connection may be dead');
+        console.warn(
+          '⚠️ [SseClient] No heartbeat for 60s, connection may be dead',
+        );
 
         // Disconnect และ reconnect
         this.disconnect();
@@ -405,7 +415,9 @@ export class SseClient {
   private processBuffer(): void {
     // ⭐ จำกัดขนาด buffer
     if (this.buffer.length > this.maxBufferSize) {
-      console.error(`❌ [SseClient] Buffer exceeded ${this.maxBufferSize / 1024 / 1024}MB, clearing`);
+      console.error(
+        `❌ [SseClient] Buffer exceeded ${this.maxBufferSize / 1024 / 1024}MB, clearing`,
+      );
       console.error(`   Current size: ${this.buffer.length} bytes`);
       this.buffer = '';
       this.currentEvent = '';
@@ -413,7 +425,9 @@ export class SseClient {
       return;
     }
 
-    const lines = this.buffer.split('\n').map(line => line.replace(/\r$/, ''));
+    const lines = this.buffer
+      .split('\n')
+      .map((line) => line.replace(/\r$/, ''));
     this.buffer = lines.pop() || '';
 
     for (const line of lines) {
@@ -471,7 +485,11 @@ export class SseClient {
 
       this.emitEvent(eventType, data);
     } catch (error) {
-      console.error('❌ [SseClient] Failed to parse event data:', error, dataStr);
+      console.error(
+        '❌ [SseClient] Failed to parse event data:',
+        error,
+        dataStr,
+      );
       // Emit parse error event
       this.emitEvent('parse-error', {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -502,7 +520,7 @@ export class SseClient {
     // ⭐ Exponential backoff with max 60s
     const delay = Math.min(
       this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1),
-      60000
+      60000,
     );
 
     console.log(
@@ -538,7 +556,10 @@ export class SseClient {
         try {
           callback(eventType, data);
         } catch (error) {
-          console.error(`❌ [SseClient] Error in callback for ${eventType}:`, error);
+          console.error(
+            `❌ [SseClient] Error in callback for ${eventType}:`,
+            error,
+          );
         }
       });
     }
@@ -555,7 +576,9 @@ export class SseClient {
   async notifyShutdownReady(): Promise<{ success: boolean; message: string }> {
     return new Promise((resolve) => {
       try {
-        const url = new URL(`${this.apiBaseUrl}/api/machines/${this.machineId}/shutdown/ready`);
+        const url = new URL(
+          `${this.apiBaseUrl}/api/machines/${this.machineId}/shutdown/ready`,
+        );
         const protocol = url.protocol === 'https:' ? https : http;
 
         const postData = JSON.stringify({ machineId: this.machineId });
@@ -581,7 +604,10 @@ export class SseClient {
           res.on('end', () => {
             try {
               const result = JSON.parse(data);
-              console.log('📤 [SseClient] Shutdown ready notification sent:', result);
+              console.log(
+                '📤 [SseClient] Shutdown ready notification sent:',
+                result,
+              );
               resolve(result);
             } catch {
               resolve({ success: false, message: 'Failed to parse response' });
@@ -590,7 +616,10 @@ export class SseClient {
         });
 
         req.on('error', (error) => {
-          console.error('❌ [SseClient] Failed to notify shutdown ready:', error);
+          console.error(
+            '❌ [SseClient] Failed to notify shutdown ready:',
+            error,
+          );
           resolve({
             success: false,
             message: error.message,
@@ -609,14 +638,12 @@ export class SseClient {
     });
   }
 
-
-
   /**
    * ⭐ Cleanup method - เรียกเมื่อปิดแอป
    */
   async destroy(): Promise<void> {
     console.log('🗑️ [SseClient] Destroying instance...');
-    await this.updateStatus('offline');
+    await this.updateMachineInfo({ status: 'offline' });
     this.disconnect();
     this.eventCallbacks.clear();
     console.log('✅ [SseClient] Instance destroyed');
