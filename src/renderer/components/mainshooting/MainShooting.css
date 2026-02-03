@@ -263,6 +263,7 @@
   z-index: 25;
   text-align: center;
   padding: 40px;
+  min-height: 500px;
   box-sizing: border-box;
 }
 

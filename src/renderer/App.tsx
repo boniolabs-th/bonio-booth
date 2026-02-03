@@ -209,10 +209,17 @@ function MaintenanceListener() {
         navigate('/system-maintenance', {
           state: {
             maintenance: true,
+            deviceNotFound: true,
             deviceType: data.deviceType,
             deviceName: data.deviceName,
           },
         });
+      },
+    );
+    const unsubscribeDeviceFound = (window as any).electron.ipcRenderer.on(
+      'device-found',
+      () => {
+        navigate('/');
       },
     );
 
@@ -227,6 +234,7 @@ function MaintenanceListener() {
       unsubscribeSse502();
       unsubscribeCameraCheck();
       unsubscribeDeviceNotFound();
+      unsubscribeDeviceFound();
     };
   }, [navigate]);
 

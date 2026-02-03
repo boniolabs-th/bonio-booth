@@ -11,6 +11,7 @@ export default function SystemMaintenance() {
   const navigate = useNavigate();
   const location = useLocation();
   const isMaintenanceMode = location.state?.maintenance;
+  const isDeviceNotFound = location.state?.deviceNotFound;
   const [lineUrl, setLineUrl] = useState<string | null>(null);
 
   const handleBack = useCallback(() => {
@@ -40,7 +41,13 @@ export default function SystemMaintenance() {
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const res = await (window as any).electron.payment.forceInit();
-          if (res.success && !res.data.machine.isMaintenanceMode) {
+          console.log('SystemMaintenance res:', res);
+
+          if (
+            res.success &&
+            !res.data.machine.isMaintenanceMode &&
+            !isDeviceNotFound
+          ) {
             navigate('/');
           }
         } catch (error) {
@@ -51,7 +58,7 @@ export default function SystemMaintenance() {
       return () => clearInterval(interval);
     }
     return undefined;
-  }, [isMaintenanceMode, navigate]);
+  }, [isDeviceNotFound, isMaintenanceMode, navigate]);
 
   return (
     <div className="get-maintenance-container">
