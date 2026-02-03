@@ -161,6 +161,7 @@ export class SseClient {
 
     if (this.request) {
       console.log('⚠️ [SseClient] Already connected, closing existing connection');
+      this.updateStatus('online');
       this.disconnect();
     }
 
@@ -221,7 +222,7 @@ export class SseClient {
         console.log('✅ [SseClient] Connected to SSE');
         this.isConnectedFlag = true;
         this.reconnectAttempts = 0;
-
+        this.updateStatus('online');
 
         // ⭐ เริ่ม heartbeat monitoring
         this.startHeartbeatMonitoring();
@@ -294,6 +295,7 @@ export class SseClient {
       this.request.end();
     } catch (error) {
       console.error('❌ [SseClient] Failed to create connection:', error);
+      this.updateStatus('offline');
       this.isConnecting = false;
       this.clearConnectionTimeout();
 
