@@ -335,13 +335,34 @@ export default function PhotoFilter() {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        canvas.width = img.width;
-        canvas.height = img.height;
+        // =========================================================================
+        // RESIZE: ลดขนาดภาพเพื่อลดระยะเวลาประมวลผล (โดยเฉพาะภาพจาก Canon)
+        // 4x6" 300dpi ต้องการแค่ 1200x1800 หรือ 1800x1200 (2.1MP)
+        // ตั้งเป้าหมายไว้ที่ 2000px ด้านยาว (เผื่อเล็กน้อยเพื่อคุณภาพและความคมชัด)
+        // =========================================================================
+        let targetWidth = img.width;
+        let targetHeight = img.height;
+        const MAX_DIMENSION = 2000;
+
+        if (Math.max(img.width, img.height) > MAX_DIMENSION) {
+          const aspectRatio = img.width / img.height;
+          if (img.width > img.height) {
+            targetWidth = MAX_DIMENSION;
+            targetHeight = Math.round(MAX_DIMENSION / aspectRatio);
+          } else {
+            targetHeight = MAX_DIMENSION;
+            targetWidth = Math.round(MAX_DIMENSION * aspectRatio);
+          }
+          console.log(`🖼️ [PhotoFilter] Resizing image for processing from ${img.width}x${img.height} to ${targetWidth}x${targetHeight}`);
+        }
+
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
 
         // Canon camera: ข้าม processing ถ้าไม่มี filter เพราะสีถูกต้องอยู่แล้ว
         if (isCanon && hasNoFilter) {
-          console.log('📷 [PhotoFilter] Canon camera with no filter - using original image');
-          ctx.drawImage(img, 0, 0);
+          console.log('📷 [PhotoFilter] Canon camera with no filter - using resized original image'); // Log updated
+          ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
           resolve(canvas);
           return;
         }
@@ -350,8 +371,8 @@ export default function PhotoFilter() {
         if (filter?.type === 'lut' && filter.lutFile) {
           // Apply LUT filter using Web Worker (non-blocking)
           try {
-            // Draw image to canvas first
-            ctx.drawImage(img, 0, 0);
+            // Draw image to canvas first (with resize)
+            ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
             // Load and apply LUT in background thread
             const lutPath = await getLUTFilePath(filter.lutFile);
@@ -363,7 +384,7 @@ export default function PhotoFilter() {
           } catch (error) {
             console.error('Failed to apply LUT:', error);
             // Fallback to original (no sharpening)
-            ctx.drawImage(img, 0, 0);
+            ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
             resolve(canvas);
           }
         } else {
@@ -371,7 +392,7 @@ export default function PhotoFilter() {
           if (filter?.filter) {
             ctx.filter = filter.filter;
           }
-          ctx.drawImage(img, 0, 0);
+          ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
           // ไม่ใช้ sharpening เพื่อรักษาคุณภาพภาพต้นฉบับ
           resolve(canvas);
         }
