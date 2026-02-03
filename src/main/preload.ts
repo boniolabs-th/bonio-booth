@@ -258,14 +258,15 @@ const electronHandler = {
      * @param quality - JPEG quality 1-100 (default: 92)
      */
     encode: (
-      rawData: number[],
+      rawData: Uint8Array | number[],
       width: number,
       height: number,
       format: 'png' | 'jpeg',
       quality?: number
     ) => {
+      const buffer = rawData instanceof Uint8Array ? rawData : Uint8Array.from(rawData);
       return ipcRenderer.invoke('encode-image-sharp', {
-        rawData,
+        rawData: buffer,
         width,
         height,
         format,

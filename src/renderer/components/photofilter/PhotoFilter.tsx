@@ -667,7 +667,10 @@ export default function PhotoFilter() {
                   try {
                     console.log('🖼️ [PhotoFilter] Using Sharp for printImage...');
                     const imageData = dCtx.getImageData(0, 0, doubleCanvas.width, doubleCanvas.height);
-                    const rawData = Array.from(imageData.data);
+
+                    // PERFORMANCE FIX: Use Uint8Array directly instead of Array.from()
+                    // Array.from() converts typed array to standard array which is extremely slow for large images
+                    const rawData = new Uint8Array(imageData.data.buffer);
 
                     const result = await window.electron.imageEncode.encode(
                       rawData,

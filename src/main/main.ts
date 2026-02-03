@@ -1543,7 +1543,7 @@ ipcMain.on("print-photo", async (event, printConfig) => {
 ipcMain.handle('encode-image-sharp', async (
   _event,
   options: {
-    rawData: number[];  // RGBA pixel data
+    rawData: Uint8Array | number[];  // RGBA pixel data
     width: number;
     height: number;
     format: 'png' | 'jpeg';
@@ -1554,7 +1554,7 @@ ipcMain.handle('encode-image-sharp', async (
     const startTime = Date.now();
     const { rawData, width, height, format, quality = 92 } = options;
 
-    // แปลง array เป็น Buffer
+    // แปลง array/Uint8Array เป็น Buffer
     const inputBuffer = Buffer.from(rawData);
 
     console.log(`🖼️ [Sharp Encode] Starting ${format.toUpperCase()} encode:`, {
