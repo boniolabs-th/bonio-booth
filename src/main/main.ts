@@ -120,7 +120,6 @@ class AppUpdater {
 let machineId: string = '';
 let machineStatus: StatusResponse | null = null;
 let isHandlingShutdownReady = false;
-let isFirstInit = true;
 
 /**
  * Helper function สำหรับเช็คและจัดการ isShutdownReady หลังจากเรียก init()
@@ -284,7 +283,7 @@ async function initializeApp() {
 
     // ตรวจสอบ devices ที่ตั้งค่าไว้ (camera/printer) หลังจาก init สำเร็จ
     // ทำแบบ async เพื่อไม่ให้บล็อกการโหลด app
-    if (mainWindow && !mainWindow.isDestroyed() && isFirstInit) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       const runCheck = async () => {
         try {
           console.log('🚀 [Main] Running device check after init');
@@ -931,10 +930,6 @@ const createWindow = async () => {
       await initializeApp();
     } catch (error) {
       console.error('Failed to initialize app:', error);
-    } finally {
-      if(isFirstInit) {
-        isFirstInit = false
-      }
     }
   });
 
