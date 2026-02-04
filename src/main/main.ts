@@ -10,7 +10,7 @@
  */
 
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain, session, powerSaveBlocker } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, session, powerSaveBlocker, dialog } from 'electron';
 import { promises as fs } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -113,7 +113,54 @@ class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
     autoUpdater.logger = log;
-    autoUpdater.checkForUpdatesAndNotify();
+
+    // Disable auto downloading
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = false;
+
+    // Events
+    autoUpdater.on('error', (error) => {
+      dialog.showErrorBox('Update Error', error == null ? "unknown" : (error.stack || error).toString());
+    });
+
+    autoUpdater.on('update-available', (info) => {
+      dialog.showMessageBox({
+        type: 'info',
+        title: 'Found Updates',
+        message: 'New version available: ' + info.version + '.\nDo you want to download it now?',
+        buttons: ['Yes', 'No']
+      }).then((result) => {
+        if (result.response === 0) {
+          autoUpdater.downloadUpdate();
+        }
+      });
+    });
+
+    autoUpdater.on('update-not-available', (info) => {
+       dialog.showMessageBox({
+        title: 'No Updates',
+        message: 'Current version is up-to-date.',
+        buttons: ['OK']
+       });
+    });
+
+    autoUpdater.on('download-progress', (progressObj) => {
+       // Optional: Show progress?
+       // For now, let's just log it. A modal progress bar would be nice but simple dialog is requested.
+       log.info(`Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}%`);
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+      dialog.showMessageBox({
+        title: 'Install Updates',
+        message: 'Updates downloaded, application will be quit for update...',
+        buttons: ['Update Now', 'Later']
+      }).then((result) => {
+        if (result.response === 0) {
+          autoUpdater.quitAndInstall();
+        }
+      });
+    });
   }
 }
 
@@ -711,14 +758,25 @@ async function generateImageWithPadding(
       height: originalHeight,
     });
 
-    // โหลด paper position config จากไฟล์
+    // โหลด paper position config จากไฟล์ (สำหรับ type transform เท่านั้น)
     const paperPositionConfig = await getPaperPositionConfig();
     const typeTransform = paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
 
-    // ดึง scale จาก config ตาม orientation
-    const configScale = orientation === 'landscape'
-      ? (paperPositionConfig.landscapeScale ?? scale ?? 100)
-      : (paperPositionConfig.portraitScale ?? scale ?? 100);
+    // ใช้ค่า scale ที่ส่งมาจาก printConfig โดยตรง (priority สูงสุด)
+    // ถ้าไม่มีค่าที่ส่งมา ค่อย fallback ไปใช้ค่าจาก config
+    const configScale = scale !== 100
+      ? scale  // ใช้ค่าที่ส่งมาจาก printConfig
+      : (orientation === 'landscape'
+        ? (paperPositionConfig.landscapeScale ?? 100)
+        : (paperPositionConfig.portraitScale ?? 100));
+
+    console.log('🖼️ [generateImageWithPadding] Scale source:', {
+      parameterScale: scale,
+      configLandscapeScale: paperPositionConfig.landscapeScale,
+      configPortraitScale: paperPositionConfig.portraitScale,
+      finalScale: configScale,
+      usingParameterScale: scale !== 100,
+    });
 
     // ตรวจสอบว่าต้องหมุนภาพหรือไม่
     const willRotate = orientation !== typeTransform;
@@ -1093,6 +1151,14 @@ const createWindow = async () => {
     });
 
     template.push({ type: 'separator' });
+
+    // เพิ่มเมนูตรวจสอบอัปเดต
+    template.push({
+      label: 'Check for Updates...',
+      click: () => {
+        autoUpdater.checkForUpdates();
+      },
+    });
 
     // เพิ่ม version ในเมนู
     const appVersion = app.getVersion();
