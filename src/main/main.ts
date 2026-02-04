@@ -758,19 +758,20 @@ async function generateImageWithPadding(
       height: originalHeight,
     });
 
-    // โหลด paper position config จากไฟล์ (สำหรับ type transform เท่านั้น)
+    // โหลด paper position config จากไฟล์
     const paperPositionConfig = await getPaperPositionConfig();
     const typeTransform = paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
 
-    // ใช้ค่า scale ที่ส่งมาจาก printConfig โดยตรง (priority สูงสุด)
-    // ถ้าค่า scale parameter ไม่ใช่ default (100) แสดงว่ามีการส่งค่ามาจริง → ใช้ค่านั้น
-    // ถ้าเป็น 100 (default) ให้ใช้ค่าจาก config file
-    const configScale = scale;  // ใช้ค่าที่ส่งมาโดยตรงเสมอ (ถ้าไม่ส่งจะเป็น 100 จาก default parameter)
+    // ดึง scale จาก config ตาม orientation (ถ้าไม่มีใน config ให้ใช้ค่าจาก parameter หรือ default 100)
+    const configScale = orientation === 'landscape'
+      ? (paperPositionConfig.landscapeScale ?? scale ?? 100)
+      : (paperPositionConfig.portraitScale ?? scale ?? 100);
 
     console.log('🖼️ [generateImageWithPadding] Scale source:', {
       parameterScale: scale,
       configLandscapeScale: paperPositionConfig.landscapeScale,
       configPortraitScale: paperPositionConfig.portraitScale,
+      orientation,
       finalScale: configScale,
     });
 
@@ -1442,6 +1443,11 @@ ipcMain.on("print-photo", async (event, printConfig) => {
       }
     }
 
+    // ดึงค่า horizontal, vertical และ scale จาก printConfig หรือใช้ค่า default
+    const horizontal = printConfig.horizontal ?? 0;
+    const vertical = printConfig.vertical ?? 0;
+    const scale = printConfig.scale ?? 100; // Default 100% (ไม่ zoom)
+
     console.log('🖨️ [Print] Print config received:', {
       frameId: printConfig.frameId,
       frameName: printConfig.frameName,
@@ -1449,12 +1455,13 @@ ipcMain.on("print-photo", async (event, printConfig) => {
       orientation,
       receivedOrientation: printConfig.orientation,
       hasOrientation: !!printConfig.orientation,
+      horizontal,
+      vertical,
+      scale,
+      rawHorizontal: printConfig.horizontal,
+      rawVertical: printConfig.vertical,
+      rawScale: printConfig.scale,
     });
-
-    // ดึงค่า horizontal, vertical และ scale จาก printConfig หรือใช้ค่า default
-    const horizontal = printConfig.horizontal ?? 0;
-    const vertical = printConfig.vertical ?? 0;
-    const scale = printConfig.scale ?? 100; // Default 100% (ไม่ zoom)
 
     const paddedImageBuffer = await generateImageWithPadding(
       printConfig.imageDataUrl,
