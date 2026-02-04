@@ -763,9 +763,17 @@ async function generateImageWithPadding(
     const typeTransform = paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
 
     // ดึง scale จาก config ตาม orientation (ถ้าไม่มีใน config ให้ใช้ค่าจาก parameter หรือ default 100)
-    const configScale = orientation === 'landscape'
-      ? (paperPositionConfig.landscapeScale ?? scale ?? 100)
-      : (paperPositionConfig.portraitScale ?? scale ?? 100);
+    // ลำดับความสำคัญ: ถ้า scale ที่ส่งมาไม่ใช่ 100 (มีการปรับ) ให้ใช้ค่านั้นเลย  by all
+    // ถ้าเป็น 100 หรือไม่ได้ส่งมา ค่อยไปดึงจากไฟล์ Config
+    // ลำดับความสำคัญ: ถ้า scale ที่ส่งมาไม่ใช่ 100 (มีการปรับ) ให้ใช้ค่านั้นเลย 
+    // ถ้าเป็น 100 หรือไม่ได้ส่งมา ค่อยไปดึงจากไฟล์  edit by all 
+    const finalScale = (scale !== 100 && scale !== undefined) 
+      ? scale 
+      : (orientation === 'landscape' 
+          ? (paperPositionConfig.landscapeScale ?? 100) 
+          : (paperPositionConfig.portraitScale ?? 100));
+
+    const scaleValue = finalScale / 100; // ใช้ finalScale แทน configScale
 
     console.log('🖼️ [generateImageWithPadding] Scale source:', {
       parameterScale: scale,
