@@ -564,6 +564,26 @@ export default function MainShooting() {
         throw new Error('ไม่สามารถเริ่ม Live View ได้');
       }
 
+      console.log('📷 [Canon] Live View started, waiting for first frame...');
+
+      // รอให้ได้ frame แรกก่อนถือว่า camera พร้อม
+      // เพื่อป้องกันปัญหา video รูปแรกขาดช่วงเพราะ Live View ยังไม่พร้อม
+      const FIRST_FRAME_TIMEOUT = 3000; // รอสูงสุด 3 วินาที
+      const POLL_INTERVAL = 100; // เช็คทุก 100ms
+      let waitTime = 0;
+
+      while (!canonCamera.liveViewFrame && waitTime < FIRST_FRAME_TIMEOUT) {
+        // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
+        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+        waitTime += POLL_INTERVAL;
+      }
+
+      if (canonCamera.liveViewFrame) {
+        console.log(`✅ [Canon] First frame received after ${waitTime}ms - camera ready!`);
+      } else {
+        console.warn(`⚠️ [Canon] First frame timeout after ${waitTime}ms - proceeding anyway`);
+      }
+
       console.log('✅ [Canon] Camera initialized successfully with Live View');
 
       // Set default dimensions for Canon (Live View is usually 1920x1280 or similar)
