@@ -750,8 +750,8 @@ async function generateImageWithPadding(
 
     // ดึงข้อมูลภาพต้นฉบับ
     const metadata = await sharp(inputBuffer).metadata();
-    const originalWidth = metadata.width || 1200;
-    const originalHeight = metadata.height || 1800;
+    const originalWidth = metadata.width || 2400;
+    const originalHeight = metadata.height || 3600;
 
     console.log('🖼️ [generateImageWithPadding] Using Sharp - Original dimensions:', {
       width: originalWidth,
