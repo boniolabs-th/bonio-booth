@@ -26,7 +26,7 @@ const electronHandler = {
     },
   },
   print: {
-    printPhoto: (printConfig: { imageDataUrl: string; frameId: string; frameName: string; copies?: number; orientation?: 'portrait' | 'landscape'; imageSize?: string; horizontal?: number; vertical?: number }) => {
+    printPhoto: (printConfig: { imageDataUrl: string; frameId: string; frameName: string; copies?: number; orientation?: 'portrait' | 'landscape'; imageSize?: string; horizontal?: number; vertical?: number; scale?: number }) => {
       ipcRenderer.send('print-photo', printConfig);
     },
     onPrintResponse: (

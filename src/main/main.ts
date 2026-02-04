@@ -763,19 +763,15 @@ async function generateImageWithPadding(
     const typeTransform = paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
 
     // ใช้ค่า scale ที่ส่งมาจาก printConfig โดยตรง (priority สูงสุด)
-    // ถ้าไม่มีค่าที่ส่งมา ค่อย fallback ไปใช้ค่าจาก config
-    const configScale = scale !== 100
-      ? scale  // ใช้ค่าที่ส่งมาจาก printConfig
-      : (orientation === 'landscape'
-        ? (paperPositionConfig.landscapeScale ?? 100)
-        : (paperPositionConfig.portraitScale ?? 100));
+    // ถ้าค่า scale parameter ไม่ใช่ default (100) แสดงว่ามีการส่งค่ามาจริง → ใช้ค่านั้น
+    // ถ้าเป็น 100 (default) ให้ใช้ค่าจาก config file
+    const configScale = scale;  // ใช้ค่าที่ส่งมาโดยตรงเสมอ (ถ้าไม่ส่งจะเป็น 100 จาก default parameter)
 
     console.log('🖼️ [generateImageWithPadding] Scale source:', {
       parameterScale: scale,
       configLandscapeScale: paperPositionConfig.landscapeScale,
       configPortraitScale: paperPositionConfig.portraitScale,
       finalScale: configScale,
-      usingParameterScale: scale !== 100,
     });
 
     // ตรวจสอบว่าต้องหมุนภาพหรือไม่

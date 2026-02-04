@@ -511,10 +511,14 @@ export default function PrintTest(): React.JSX.Element {
       }
 
       // เรียก print function
+      const currentScale = orientation === 'landscape' ? landscapeScale : portraitScale;
       console.log('🖨️ [PrintTest] Calling print function...', {
         orientation,
         isPortraitCut,
         imageSize,
+        scale: currentScale,
+        horizontal: currentHorizontal,
+        vertical: currentVertical,
       });
       // @ts-ignore
       if (window.electron?.print?.printPhoto) {
@@ -552,6 +556,7 @@ export default function PrintTest(): React.JSX.Element {
             imageSize, // ส่ง imageSize เพื่อให้ระบบรู้ว่าเป็น 2x6 และจะตัดได้
             horizontal: currentHorizontal, // ส่งค่า horizontal ตาม orientation
             vertical: currentVertical, // ส่งค่า vertical ตาม orientation
+            scale: currentScale, // ส่งค่า scale ตาม orientation ที่เลือก
           });
 
           // Timeout after 60 seconds
