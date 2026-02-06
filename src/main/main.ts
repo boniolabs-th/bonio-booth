@@ -806,8 +806,9 @@ async function generateImageWithPadding(
       // รวม offset จาก user กับ centering padding
       const paddingLeft = Math.round(Math.max(0, extraPaddingH + effectiveHorizontal));
       const paddingRight = Math.round(Math.max(0, extraPaddingH - effectiveHorizontal));
-      const paddingTop = Math.round(Math.max(0, extraPaddingV - effectiveVertical));
-      const paddingBottom = Math.round(Math.max(0, extraPaddingV + effectiveVertical));
+      // สลับ vertical เพื่อให้ + = ลง, - = ขึ้น
+      const paddingTop = Math.round(Math.max(0, extraPaddingV + effectiveVertical));
+      const paddingBottom = Math.round(Math.max(0, extraPaddingV - effectiveVertical));
 
       // 3. เพิ่ม padding รอบภาพด้วยพื้นหลังขาว
       image = image.extend({
@@ -833,8 +834,9 @@ async function generateImageWithPadding(
       });
 
       // 2. คำนวณจุดเริ่มต้น crop (crop ตรงกลาง + offset)
+      // สลับ vertical เพื่อให้ + = ลง, - = ขึ้น
       const cropStartX = Math.round(((scaledContentWidth - originalWidth) / 2) - effectiveHorizontal);
-      const cropStartY = Math.round(((scaledContentHeight - originalHeight) / 2) + effectiveVertical);
+      const cropStartY = Math.round(((scaledContentHeight - originalHeight) / 2) - effectiveVertical);
 
       // Clamp ให้ไม่เกินขอบ
       const finalCropX = Math.max(0, Math.min(scaledContentWidth - originalWidth, cropStartX));
@@ -858,6 +860,7 @@ async function generateImageWithPadding(
     } else {
       // ======= NO SCALE (scale = 100%) =======
       // เพิ่ม padding เฉพาะถ้ามี offset
+      // สลับ vertical เพื่อให้ + = ลง, - = ขึ้น
       const paddingLeft = Math.round(Math.max(0, effectiveHorizontal));
       const paddingRight = Math.round(Math.max(0, -effectiveHorizontal));
       const paddingTop = Math.round(Math.max(0, effectiveVertical));

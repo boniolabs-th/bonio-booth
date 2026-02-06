@@ -27,14 +27,26 @@ export default function RequestImage(): React.JSX.Element {
   const [imageError, setImageError] = useState<string>('');
   const [imageLoaded, setImageLoaded] = useState<boolean>(false);
 
-  // Position Paper Modal States
+  // Position Paper Modal States (แยก landscape/portrait เหมือน PrintTest)
   const [isPositionModalOpen, setIsPositionModalOpen] = useState(false);
-  const [scale, setScale] = useState<number>(100);
-  const [horizontal, setHorizontal] = useState<number>(0);
-  const [vertical, setVertical] = useState<number>(0);
-  const [originalScale, setOriginalScale] = useState<number>(100);
-  const [originalHorizontal, setOriginalHorizontal] = useState<number>(0);
-  const [originalVertical, setOriginalVertical] = useState<number>(0);
+  const [landscapeScale, setLandscapeScale] = useState<number>(100);
+  const [portraitScale, setPortraitScale] = useState<number>(100);
+  const [landscapeHorizontal, setLandscapeHorizontal] = useState<number>(0);
+  const [landscapeVertical, setLandscapeVertical] = useState<number>(0);
+  const [portraitHorizontal, setPortraitHorizontal] = useState<number>(0);
+  const [portraitVertical, setPortraitVertical] = useState<number>(0);
+  const [originalLandscapeScale, setOriginalLandscapeScale] =
+    useState<number>(100);
+  const [originalPortraitScale, setOriginalPortraitScale] =
+    useState<number>(100);
+  const [originalLandscapeHorizontal, setOriginalLandscapeHorizontal] =
+    useState<number>(0);
+  const [originalLandscapeVertical, setOriginalLandscapeVertical] =
+    useState<number>(0);
+  const [originalPortraitHorizontal, setOriginalPortraitHorizontal] =
+    useState<number>(0);
+  const [originalPortraitVertical, setOriginalPortraitVertical] =
+    useState<number>(0);
   const [envConfig, setEnvConfig] = useState<EnvConfig | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isPaperPositionConfigModalOpen, setIsPaperPositionConfigModalOpen] =
@@ -42,7 +54,15 @@ export default function RequestImage(): React.JSX.Element {
 
   const [alertText, setAlertText] = useState('');
 
-  // Load environment config and paper position
+  // คำนวณค่าปัจจุบันตาม orientation (portrait และ portrait-cut ใช้ค่าเดียวกัน)
+  const currentScale =
+    orientation === 'landscape' ? landscapeScale : portraitScale;
+  const currentHorizontal =
+    orientation === 'landscape' ? landscapeHorizontal : portraitHorizontal;
+  const currentVertical =
+    orientation === 'landscape' ? landscapeVertical : portraitVertical;
+
+  // Load environment config and paper position (เหมือน PrintTest)
   useEffect(() => {
     const loadEnvConfigAndPaperPosition = async () => {
       try {
@@ -60,7 +80,98 @@ export default function RequestImage(): React.JSX.Element {
 
         setEnvConfig(config);
 
-        // ดึงค่า paperPosition จาก main process ผ่าน IPC
+        // 1. โหลดค่าจาก print test position storage ก่อน (priority สูงสุด)
+        // @ts-ignore
+        const positionResult =
+          await window.electron?.payment?.getPrintTestPosition();
+
+        if (positionResult?.success && positionResult.position) {
+          const pos = positionResult.position;
+          console.log(
+            '🔍 [RequestImage] Print test position from storage:',
+            pos,
+          );
+
+          if (
+            pos.landscapeHorizontal !== undefined &&
+            pos.landscapeHorizontal !== null
+          ) {
+            setLandscapeHorizontal(pos.landscapeHorizontal);
+            setOriginalLandscapeHorizontal(pos.landscapeHorizontal);
+          }
+          if (
+            pos.landscapeVertical !== undefined &&
+            pos.landscapeVertical !== null
+          ) {
+            setLandscapeVertical(pos.landscapeVertical);
+            setOriginalLandscapeVertical(pos.landscapeVertical);
+          }
+          if (
+            pos.portraitHorizontal !== undefined &&
+            pos.portraitHorizontal !== null
+          ) {
+            setPortraitHorizontal(pos.portraitHorizontal);
+            setOriginalPortraitHorizontal(pos.portraitHorizontal);
+          }
+          if (
+            pos.portraitVertical !== undefined &&
+            pos.portraitVertical !== null
+          ) {
+            setPortraitVertical(pos.portraitVertical);
+            setOriginalPortraitVertical(pos.portraitVertical);
+          }
+
+          console.log(
+            '✅ [RequestImage] Print test position loaded from storage',
+          );
+        }
+
+        // 2. โหลดค่าจาก Paper Position Config (สำหรับ landscapeScale และ portraitScale)
+        // @ts-ignore
+        const paperPositionConfigResult =
+          await window.electron?.payment?.getPaperPositionConfig();
+
+        if (
+          paperPositionConfigResult?.success &&
+          paperPositionConfigResult.config
+        ) {
+          const {
+            landscapeScale: configLandscapeScale,
+            portraitScale: configPortraitScale,
+          } = paperPositionConfigResult.config;
+          console.log(
+            '🔍 [RequestImage] Paper position config from IPC:',
+            paperPositionConfigResult.config,
+          );
+
+          const finalLandscapeScale =
+            configLandscapeScale !== undefined && configLandscapeScale !== null
+              ? configLandscapeScale
+              : 100;
+          const finalPortraitScale =
+            configPortraitScale !== undefined && configPortraitScale !== null
+              ? configPortraitScale
+              : 100;
+
+          setLandscapeScale(finalLandscapeScale);
+          setPortraitScale(finalPortraitScale);
+          setOriginalLandscapeScale(finalLandscapeScale);
+          setOriginalPortraitScale(finalPortraitScale);
+
+          console.log(
+            '✅ [RequestImage] Paper position config loaded from API:',
+            {
+              landscapeScale: finalLandscapeScale,
+              portraitScale: finalPortraitScale,
+            },
+          );
+        } else {
+          console.log(
+            '⚠️ [RequestImage] No paperPosition config from IPC, using defaults',
+          );
+        }
+
+        // 3. โหลดค่า horizontal และ vertical จาก API (fallback ถ้าไม่มีใน storage)
         // @ts-ignore
         const paperPositionResult =
           await window.electron?.payment?.getPaperPosition();
@@ -69,25 +180,39 @@ export default function RequestImage(): React.JSX.Element {
           const paperPos = paperPositionResult.paperPosition;
           console.log('🔍 [RequestImage] paperPos from IPC:', paperPos);
 
-          const finalScale =
-            paperPos.scale !== undefined && paperPos.scale !== null
-              ? paperPos.scale
-              : 100;
-          const finalHorizontal =
-            paperPos.horizontal !== undefined && paperPos.horizontal !== null
-              ? paperPos.horizontal
-              : 0;
-          const finalVertical =
-            paperPos.vertical !== undefined && paperPos.vertical !== null
-              ? paperPos.vertical
-              : 0;
+          const hasStorageValue =
+            positionResult?.success && positionResult.position;
+          if (!hasStorageValue) {
+            const finalHorizontal =
+              paperPos.horizontal !== undefined && paperPos.horizontal !== null
+                ? paperPos.horizontal
+                : 0;
+            const finalVertical =
+              paperPos.vertical !== undefined && paperPos.vertical !== null
+                ? paperPos.vertical
+                : 0;
 
-          setScale(finalScale);
-          setHorizontal(finalHorizontal);
-          setVertical(finalVertical);
-          setOriginalScale(finalScale);
-          setOriginalHorizontal(finalHorizontal);
-          setOriginalVertical(finalVertical);
+            setLandscapeHorizontal(finalHorizontal);
+            setLandscapeVertical(finalVertical);
+            setPortraitHorizontal(finalHorizontal);
+            setPortraitVertical(finalVertical);
+            setOriginalLandscapeHorizontal(finalHorizontal);
+            setOriginalLandscapeVertical(finalVertical);
+            setOriginalPortraitHorizontal(finalHorizontal);
+            setOriginalPortraitVertical(finalVertical);
+
+            console.log(
+              '✅ [RequestImage] Paper position loaded from API (fallback):',
+              {
+                horizontal: finalHorizontal,
+                vertical: finalVertical,
+              },
+            );
+          }
+        } else {
+          console.log(
+            '⚠️ [RequestImage] No paperPosition from IPC, using defaults',
+          );
         }
       } catch (error) {
         console.error(
@@ -126,17 +251,24 @@ export default function RequestImage(): React.JSX.Element {
     setImageError('ไม่สามารถโหลดรูปภาพได้ กรุณาตรวจสอบ URL');
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleOpenPositionModal = () => {
-    setOriginalScale(scale);
-    setOriginalHorizontal(horizontal);
-    setOriginalVertical(vertical);
+    setOriginalLandscapeScale(landscapeScale);
+    setOriginalPortraitScale(portraitScale);
+    setOriginalLandscapeHorizontal(landscapeHorizontal);
+    setOriginalLandscapeVertical(landscapeVertical);
+    setOriginalPortraitHorizontal(portraitHorizontal);
+    setOriginalPortraitVertical(portraitVertical);
     setIsPositionModalOpen(true);
   };
 
   const handleClosePositionModal = () => {
-    setScale(originalScale);
-    setHorizontal(originalHorizontal);
-    setVertical(originalVertical);
+    setLandscapeScale(originalLandscapeScale);
+    setPortraitScale(originalPortraitScale);
+    setLandscapeHorizontal(originalLandscapeHorizontal);
+    setLandscapeVertical(originalLandscapeVertical);
+    setPortraitHorizontal(originalPortraitHorizontal);
+    setPortraitVertical(originalPortraitVertical);
     setIsPositionModalOpen(false);
   };
 
@@ -159,9 +291,9 @@ export default function RequestImage(): React.JSX.Element {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            scale,
-            horizontal,
-            vertical,
+            scale: currentScale,
+            horizontal: currentHorizontal,
+            vertical: currentVertical,
           }),
         },
       );
@@ -175,9 +307,12 @@ export default function RequestImage(): React.JSX.Element {
       const data = await response.json();
       console.log('✅ [RequestImage] Paper position updated:', data);
 
-      setOriginalScale(scale);
-      setOriginalHorizontal(horizontal);
-      setOriginalVertical(vertical);
+      setOriginalLandscapeScale(landscapeScale);
+      setOriginalPortraitScale(portraitScale);
+      setOriginalLandscapeHorizontal(landscapeHorizontal);
+      setOriginalLandscapeVertical(landscapeVertical);
+      setOriginalPortraitHorizontal(portraitHorizontal);
+      setOriginalPortraitVertical(portraitVertical);
       setIsPositionModalOpen(false);
     } catch (error) {
       console.error('❌ [RequestImage] Error updating paper position:', error);
@@ -189,9 +324,12 @@ export default function RequestImage(): React.JSX.Element {
 
   const hasChanges = () => {
     return (
-      scale !== originalScale ||
-      horizontal !== originalHorizontal ||
-      vertical !== originalVertical
+      landscapeScale !== originalLandscapeScale ||
+      portraitScale !== originalPortraitScale ||
+      landscapeHorizontal !== originalLandscapeHorizontal ||
+      landscapeVertical !== originalLandscapeVertical ||
+      portraitHorizontal !== originalPortraitHorizontal ||
+      portraitVertical !== originalPortraitVertical
     );
   };
 
@@ -305,6 +443,9 @@ export default function RequestImage(): React.JSX.Element {
         orientation,
         isPortraitCut,
         imageSize,
+        scale: currentScale,
+        horizontal: currentHorizontal,
+        vertical: currentVertical,
       });
       // @ts-ignore
       if (window.electron?.print?.printPhoto) {
@@ -343,8 +484,9 @@ export default function RequestImage(): React.JSX.Element {
             copies,
             orientation: isPortraitCut ? 'portrait' : orientation, // ส่ง portrait สำหรับ portrait-cut
             imageSize, // ส่ง imageSize เพื่อให้ระบบรู้ว่าเป็น 2x6 และจะตัดได้
-            horizontal, // ค่า horizontal จาก paper position
-            vertical, // ค่า vertical จาก paper position
+            horizontal: currentHorizontal, // ส่งค่า horizontal ตาม orientation
+            vertical: currentVertical, // ส่งค่า vertical ตาม orientation
+            scale: currentScale, // ส่งค่า scale ตาม orientation ที่เลือก
           });
 
           // Timeout after 60 seconds
@@ -598,11 +740,18 @@ export default function RequestImage(): React.JSX.Element {
                     type="range"
                     min="50"
                     max="150"
-                    value={scale}
-                    onChange={(e) => setScale(Number(e.target.value))}
+                    value={currentScale}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      if (orientation === 'landscape') {
+                        setLandscapeScale(val);
+                      } else {
+                        setPortraitScale(val);
+                      }
+                    }}
                     className="slider slider-horizontal"
                   />
-                  <span className="slider-value">{scale}</span>
+                  <span className="slider-value">{currentScale}</span>
                 </div>
               </div>
 
@@ -616,11 +765,18 @@ export default function RequestImage(): React.JSX.Element {
                     type="range"
                     min="-50"
                     max="50"
-                    value={horizontal}
-                    onChange={(e) => setHorizontal(Number(e.target.value))}
+                    value={currentHorizontal}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      if (orientation === 'landscape') {
+                        setLandscapeHorizontal(val);
+                      } else {
+                        setPortraitHorizontal(val);
+                      }
+                    }}
                     className="slider slider-horizontal"
                   />
-                  <span className="slider-value">{horizontal}</span>
+                  <span className="slider-value">{currentHorizontal}</span>
                 </div>
               </div>
 
@@ -634,11 +790,18 @@ export default function RequestImage(): React.JSX.Element {
                     type="range"
                     min="-50"
                     max="50"
-                    value={vertical}
-                    onChange={(e) => setVertical(Number(e.target.value))}
+                    value={currentVertical}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      if (orientation === 'landscape') {
+                        setLandscapeVertical(val);
+                      } else {
+                        setPortraitVertical(val);
+                      }
+                    }}
                     className="slider slider-vertical"
                   />
-                  <span className="slider-value">{vertical}</span>
+                  <span className="slider-value">{currentVertical}</span>
                 </div>
               </div>
             </div>
