@@ -737,12 +737,12 @@ async function getImageDimensions(base64: string): Promise<{ width: number; heig
  */
 async function generateImageWithPadding(
   base64: string,
-  paddingPercent = 0,
   orientation: 'portrait' | 'landscape' = 'portrait',
   horizontal: number = 0,
   vertical: number = 0,
   scale: number = 100
 ): Promise<Buffer> {
+
   try {
     // แปลง base64 เป็น buffer
     const base64Data = base64.replace(/^data:image\/\w+;base64,/, '');
@@ -753,11 +753,6 @@ async function generateImageWithPadding(
     const originalWidth = metadata.width || 2400;
     const originalHeight = metadata.height || 3600;
 
-    console.log('🖼️ [generateImageWithPadding] Using Sharp - Original dimensions:', {
-      width: originalWidth,
-      height: originalHeight,
-    });
-
     // โหลด paper position config จากไฟล์
     const paperPositionConfig = await getPaperPositionConfig();
     const typeTransform = paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
@@ -767,91 +762,54 @@ async function generateImageWithPadding(
       ? (paperPositionConfig.landscapeScale ?? scale ?? 100)
       : (paperPositionConfig.portraitScale ?? scale ?? 100);
 
-    console.log('🖼️ [generateImageWithPadding] Scale source:', {
-      parameterScale: scale,
-      configLandscapeScale: paperPositionConfig.landscapeScale,
-      configPortraitScale: paperPositionConfig.portraitScale,
-      orientation,
-      finalScale: configScale,
-    });
-
     // ตรวจสอบว่าต้องหมุนภาพหรือไม่
     const willRotate = orientation !== typeTransform;
 
-    // แปลง scale จากเปอร์เซ็นต์เป็นตัวเลข
+    // แปลง scale จากเปอร์เซ็นต์เป็นตัวเลข (100% = 1.0)
     const scaleValue = configScale / 100;
-
-    console.log('🖼️ [generateImageWithPadding] Sharp processing:', {
-      originalOrientation: orientation,
-      typeTransform,
-      willRotate,
-      configScale,
-      scaleValue,
-    });
 
     // ถ้ามีการ rotate 90° ต้องสลับ horizontal กับ vertical
     const effectiveHorizontal = willRotate ? vertical : horizontal;
     const effectiveVertical = willRotate ? horizontal : -vertical;
 
-    console.log('🖼️ [generateImageWithPadding] Position adjustment:', {
-      willRotate,
-      originalHorizontal: horizontal,
-      originalVertical: vertical,
-      effectiveHorizontal,
-      effectiveVertical,
-    });
+    // ======= NEW APPROACH: Scale content within fixed output size =======
+    // Output size คงที่เท่ากับขนาดเดิมเสมอ เพื่อให้ printer ไม่ต้อง fit to page
+    // Scale จะทำงานโดยการ zoom in/out content ภายใน output size คงที่
 
-    // ======= ตาม guide.md: DO NOT resize the image =======
-    // ใช้ขนาดเดิมของภาพ ไม่ resize ไปยัง native resolution
-    // เพราะการ resize จะทำให้ frame edges เบลอ
-    // Printer จะจัดการ scaling เอง
-    //
-    // รองรับเฉพาะ user scale จาก paper position config เท่านั้น
-    const totalScaleValue = scaleValue;
+    // คำนวณขนาด content หลัง scale
+    const scaledContentWidth = Math.round(originalWidth * scaleValue);
+    const scaledContentHeight = Math.round(originalHeight * scaleValue);
 
-    // คำนวณขนาดสุดท้ายหลัง scale (ถ้า user ปรับ scale)
-    const scaledWidth = Math.round(originalWidth * totalScaleValue);
-    const scaledHeight = Math.round(originalHeight * totalScaleValue);
-
-    console.log('🖼️ [generateImageWithPadding] Scale calculation (no resize per guide.md):', {
-      originalSize: `${originalWidth}x${originalHeight}`,
-      userScale: `${(scaleValue * 100).toFixed(0)}%`,
-      scaledSize: `${scaledWidth}x${scaledHeight}`,
-      note: 'DO NOT resize - frame edges must remain pixel-perfect',
+    console.log('🖼️ [generateImageWithPadding] Scale calculation:', {
+      configScale: `${configScale}%`,
+      scaleValue,
+      original: `${originalWidth}x${originalHeight}`,
+      scaledContent: `${scaledContentWidth}x${scaledContentHeight}`,
+      output: `${originalWidth}x${originalHeight} (fixed)`,
     });
 
     // เริ่มต้น Sharp pipeline
     let image = sharp(inputBuffer);
 
-    // 1. Scale ภาพด้วย Lanczos3 (เฉพาะถ้า user ปรับ scale)
-    if (totalScaleValue !== 1) {
-      image = image.resize(scaledWidth, scaledHeight, {
+    if (scaleValue < 1) {
+      // ======= ZOOM OUT (scale < 100%) =======
+      // 1. ย่อ content ลง
+      image = image.resize(scaledContentWidth, scaledContentHeight, {
         fit: 'fill',
         kernel: sharp.kernel.lanczos3,
       });
-    }
 
-    // 2. Rotate ถ้าจำเป็น (90 องศา clockwise)
-    if (willRotate) {
-      image = image.rotate(90);
-    }
+      // 2. คำนวณ padding เพื่อให้ content อยู่ตรงกลาง + offset
+      const extraPaddingH = Math.round((originalWidth - scaledContentWidth) / 2);
+      const extraPaddingV = Math.round((originalHeight - scaledContentHeight) / 2);
 
-    // ขนาดหลัง rotate
-    const finalWidth = willRotate ? scaledHeight : scaledWidth;
-    const finalHeight = willRotate ? scaledWidth : scaledHeight;
+      // รวม offset จาก user กับ centering padding
+      const paddingLeft = Math.round(Math.max(0, extraPaddingH + effectiveHorizontal));
+      const paddingRight = Math.round(Math.max(0, extraPaddingH - effectiveHorizontal));
+      const paddingTop = Math.round(Math.max(0, extraPaddingV - effectiveVertical));
+      const paddingBottom = Math.round(Math.max(0, extraPaddingV + effectiveVertical));
 
-    // 3. คำนวณ padding สำหรับ offset (horizontal/vertical)
-    // เพิ่ม margin รอบภาพเพื่อให้สามารถเลื่อนตำแหน่งได้
-    // effectiveHorizontal: บวก=ขวา (เพิ่ม padding ซ้าย), ลบ=ซ้าย (เพิ่ม padding ขวา)
-    // effectiveVertical: บวก=ขึ้น (เพิ่ม padding ล่าง), ลบ=ลง (เพิ่ม padding บน)
-    // ใช้ Math.round เพราะ Sharp ต้องการค่า integer
-    const paddingLeft = Math.round(Math.max(0, effectiveHorizontal));
-    const paddingRight = Math.round(Math.max(0, -effectiveHorizontal));
-    const paddingTop = Math.round(Math.max(0, -effectiveVertical));
-    const paddingBottom = Math.round(Math.max(0, effectiveVertical));
-
-    // เพิ่ม padding รอบภาพด้วยพื้นหลังขาว
-    if (paddingLeft > 0 || paddingRight > 0 || paddingTop > 0 || paddingBottom > 0) {
+      // 3. เพิ่ม padding รอบภาพด้วยพื้นหลังขาว
       image = image.extend({
         top: paddingTop,
         bottom: paddingBottom,
@@ -860,36 +818,84 @@ async function generateImageWithPadding(
         background: { r: 255, g: 255, b: 255, alpha: 1 },
       });
 
-      console.log('🖼️ [generateImageWithPadding] Applied padding:', {
-        top: paddingTop,
-        bottom: paddingBottom,
-        left: paddingLeft,
-        right: paddingRight,
+      console.log('🖼️ [generateImageWithPadding] Zoom out - padding:', {
+        extraPadding: `H=${extraPaddingH}, V=${extraPaddingV}`,
+        offset: `H=${effectiveHorizontal}, V=${effectiveVertical}`,
+        finalPadding: `L=${paddingLeft}, R=${paddingRight}, T=${paddingTop}, B=${paddingBottom}`,
       });
+
+    } else if (scaleValue > 1) {
+      // ======= ZOOM IN (scale > 100%) =======
+      // 1. ขยาย content ขึ้น
+      image = image.resize(scaledContentWidth, scaledContentHeight, {
+        fit: 'fill',
+        kernel: sharp.kernel.lanczos3,
+      });
+
+      // 2. คำนวณจุดเริ่มต้น crop (crop ตรงกลาง + offset)
+      const cropStartX = Math.round(((scaledContentWidth - originalWidth) / 2) - effectiveHorizontal);
+      const cropStartY = Math.round(((scaledContentHeight - originalHeight) / 2) + effectiveVertical);
+
+      // Clamp ให้ไม่เกินขอบ
+      const finalCropX = Math.max(0, Math.min(scaledContentWidth - originalWidth, cropStartX));
+      const finalCropY = Math.max(0, Math.min(scaledContentHeight - originalHeight, cropStartY));
+
+      // 3. Crop กลับมาเป็นขนาดเดิม
+      image = image.extract({
+        left: finalCropX,
+        top: finalCropY,
+        width: originalWidth,
+        height: originalHeight,
+      });
+
+      console.log('🖼️ [generateImageWithPadding] Zoom in - crop:', {
+        scaledSize: `${scaledContentWidth}x${scaledContentHeight}`,
+        cropStart: `X=${cropStartX}, Y=${cropStartY}`,
+        finalCrop: `X=${finalCropX}, Y=${finalCropY}`,
+        outputSize: `${originalWidth}x${originalHeight}`,
+      });
+
+    } else {
+      // ======= NO SCALE (scale = 100%) =======
+      // เพิ่ม padding เฉพาะถ้ามี offset
+      const paddingLeft = Math.round(Math.max(0, effectiveHorizontal));
+      const paddingRight = Math.round(Math.max(0, -effectiveHorizontal));
+      const paddingTop = Math.round(Math.max(0, -effectiveVertical));
+      const paddingBottom = Math.round(Math.max(0, effectiveVertical));
+
+      if (paddingLeft > 0 || paddingRight > 0 || paddingTop > 0 || paddingBottom > 0) {
+        image = image.extend({
+          top: paddingTop,
+          bottom: paddingBottom,
+          left: paddingLeft,
+          right: paddingRight,
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        });
+      }
     }
 
-    // 4. Output เป็น PNG เพื่อรักษาสีต้นฉบับและ frame sharpness (ตาม guide.md)
+    // Rotate ถ้าจำเป็น (90 องศา clockwise) - ทำหลัง scale/crop
+    if (willRotate) {
+      image = image.rotate(90);
+    }
+
+    // Output เป็น PNG เพื่อรักษาสีต้นฉบับและ frame sharpness
     const outputBuffer = await image
       .png({
-        compressionLevel: 6, // Balance ระหว่างขนาดไฟล์และความเร็ว
+        compressionLevel: 6,
         adaptiveFiltering: true,
       })
       .toBuffer();
 
     const outputMetadata = await sharp(outputBuffer).metadata();
-    console.log('🖼️ [generateImageWithPadding] Sharp output (no resize per guide.md):', {
-      inputSize: `${originalWidth}x${originalHeight}`,
-      outputSize: `${outputMetadata.width}x${outputMetadata.height}`,
-      bufferSize: `${(outputBuffer.length / 1024 / 1024).toFixed(2)} MB`,
-      userScale: `${(scaleValue * 100).toFixed(0)}%`,
-    });
-
+    console.log('🖼️ [generateImageWithPadding] Final output:', outputMetadata);
     return outputBuffer;
 
   } catch (err) {
     console.error('❌ [generateImageWithPadding] Sharp error:', err);
     throw err instanceof Error ? err : new Error(String(err));
   }
+
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -1465,7 +1471,6 @@ ipcMain.on("print-photo", async (event, printConfig) => {
 
     const paddedImageBuffer = await generateImageWithPadding(
       printConfig.imageDataUrl,
-      5,
       orientation,
       horizontal,
       vertical,
