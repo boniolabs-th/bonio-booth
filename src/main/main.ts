@@ -803,9 +803,9 @@ async function generateImageWithPadding(
       const extraPaddingH = Math.round((originalWidth - scaledContentWidth) / 2);
       const extraPaddingV = Math.round((originalHeight - scaledContentHeight) / 2);
 
-      // รวม offset จาก user กับ centering padding
-      const paddingLeft = Math.round(Math.max(0, extraPaddingH + effectiveHorizontal));
-      const paddingRight = Math.round(Math.max(0, extraPaddingH - effectiveHorizontal));
+      // รวม offset จาก user กับ centering padding (สลับ horizontal เพื่อให้ + = ขวา, - = ซ้าย)
+      const paddingLeft = Math.round(Math.max(0, extraPaddingH - effectiveHorizontal));
+      const paddingRight = Math.round(Math.max(0, extraPaddingH + effectiveHorizontal));
       const paddingTop = Math.round(Math.max(0, extraPaddingV - effectiveVertical));
       const paddingBottom = Math.round(Math.max(0, extraPaddingV + effectiveVertical));
 
@@ -832,8 +832,8 @@ async function generateImageWithPadding(
         kernel: sharp.kernel.lanczos3,
       });
 
-      // 2. คำนวณจุดเริ่มต้น crop (crop ตรงกลาง + offset)
-      const cropStartX = Math.round(((scaledContentWidth - originalWidth) / 2) - effectiveHorizontal);
+      // 2. คำนวณจุดเริ่มต้น crop (crop ตรงกลาง + offset, สลับ horizontal เพื่อให้ + = ขวา)
+      const cropStartX = Math.round(((scaledContentWidth - originalWidth) / 2) + effectiveHorizontal);
       const cropStartY = Math.round(((scaledContentHeight - originalHeight) / 2) + effectiveVertical);
 
       // Clamp ให้ไม่เกินขอบ
@@ -857,9 +857,9 @@ async function generateImageWithPadding(
 
     } else {
       // ======= NO SCALE (scale = 100%) =======
-      // เพิ่ม padding เฉพาะถ้ามี offset
-      const paddingLeft = Math.round(Math.max(0, effectiveHorizontal));
-      const paddingRight = Math.round(Math.max(0, -effectiveHorizontal));
+      // เพิ่ม padding เฉพาะถ้ามี offset (สลับ horizontal เพื่อให้ + = ขวา, - = ซ้าย)
+      const paddingLeft = Math.round(Math.max(0, -effectiveHorizontal));
+      const paddingRight = Math.round(Math.max(0, effectiveHorizontal));
       const paddingTop = Math.round(Math.max(0, -effectiveVertical));
       const paddingBottom = Math.round(Math.max(0, effectiveVertical));
 
