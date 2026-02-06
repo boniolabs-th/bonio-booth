@@ -49,33 +49,47 @@ function CropOverlay({
   containerWidth: number;
   containerHeight: number;
 }) {
-  // คำนวณว่า video ถูก scale เท่าไหร่ใน container (object-fit: cover)
+  // คำนวณ Ratio
+  const slotRatio = slotWidth / slotHeight;
   const videoRatio = videoWidth / videoHeight;
-  const containerRatio = containerWidth / containerHeight;
 
-  let displayedVideoWidth: number;
-  let displayedVideoHeight: number;
+  // คำนวณขนาดของ Crop Area บน Video ต้นฉบับ (Source)
+  // โดยใช้ logic "Object Fit: Cover" - หาพื้นที่ใหญ่ที่สุดใน Video ที่มี Ratio เดียวกับ Slot
+  let cropSourceWidth: number;
+  let cropSourceHeight: number;
 
-  if (videoRatio > containerRatio) {
-    // Video กว้างกว่า container - height เต็ม, width ถูกครอป
-    displayedVideoHeight = containerHeight;
-    displayedVideoWidth = containerHeight * videoRatio;
+  if (videoRatio > slotRatio) {
+    // Video กว้างกว่า Slot -> ยึด Height เป็นหลัก แล้วตัดขอบซ้ายขวาออก
+    cropSourceHeight = videoHeight;
+    cropSourceWidth = videoHeight * slotRatio;
   } else {
-    // Video สูงกว่า container - width เต็ม, height ถูกครอป
-    displayedVideoWidth = containerWidth;
-    displayedVideoHeight = containerWidth / videoRatio;
+    // Video สูงกว่า Slot -> ยึด Width เป็นหลัก แล้วตัดขอบบนล่างออก
+    cropSourceWidth = videoWidth;
+    cropSourceHeight = videoWidth / slotRatio;
   }
 
-  // คำนวณ scale factor ระหว่าง video จริงกับที่แสดง
+  // คำนวณ Scale ของ Video ที่แสดงผลบนหน้าจอเมื่อเทียบกับ Video ต้นฉบับ
+  // (คำนวณเหมือนเดิมเพื่อหาขนาด Video ที่วาดจริงบน Container)
+  const containerRatio = containerWidth / containerHeight;
+  let displayedVideoWidth: number;
+
+  if (videoRatio > containerRatio) {
+    // Video กว้างกว่า container - height เต็ม
+    displayedVideoWidth = containerHeight * videoRatio;
+  } else {
+    // Video สูงกว่า container - width เต็ม
+    displayedVideoWidth = containerWidth;
+  }
+
   const scale = displayedVideoWidth / videoWidth;
 
-  // ขนาด slot ที่แสดงจริงบน container (ตาม pixel จริง)
-  const displayedSlotWidth = slotWidth * scale;
-  const displayedSlotHeight = slotHeight * scale;
+  // แปลงขนาด Crop จาก Source -> Displayed (บนหน้าจอ)
+  const displayedCropWidth = cropSourceWidth * scale;
+  const displayedCropHeight = cropSourceHeight * scale;
 
   // คำนวณเป็น percentage ของ container
-  const cropWidthPercent = (displayedSlotWidth / containerWidth) * 100;
-  const cropHeightPercent = (displayedSlotHeight / containerHeight) * 100;
+  const cropWidthPercent = (displayedCropWidth / containerWidth) * 100;
+  const cropHeightPercent = (displayedCropHeight / containerHeight) * 100;
 
   // จำกัดไม่ให้เกิน 100%
   const cropWidth = Math.min(cropWidthPercent, 100);
@@ -169,7 +183,9 @@ export default function MainShooting() {
 
   // Camera type and config state
   const [cameraType, setCameraType] = useState<CameraType>('webcam');
-  const [cameraConfig, setCameraConfigState] = useState<CameraConfig | null>(null);
+  const [cameraConfig, setCameraConfigState] = useState<CameraConfig | null>(
+    null,
+  );
   const cameraTypeRef = useRef<CameraType>('webcam'); // Ref to track current camera type for capture loop
 
   const [, setCameraCountdown] = useState(3);
@@ -237,7 +253,8 @@ export default function MainShooting() {
       // ใช้ deviceId จาก config ที่ส่งมา หรือจาก state (fallback)
       // ใช้ parameter config ก่อน เพราะมันเป็นค่าที่โหลดมาใหม่และแน่ใจว่า update แล้ว
       const configToUse = config || cameraConfig;
-      const targetDeviceId = configToUse?.type === 'webcam' ? configToUse.deviceId : null;
+      const targetDeviceId =
+        configToUse?.type === 'webcam' ? configToUse.deviceId : null;
 
       console.log('📹 [Webcam] Using camera config:', {
         hasConfig: !!configToUse,
@@ -267,15 +284,23 @@ export default function MainShooting() {
         }
 
         // ถ้ามี config แต่ไม่พบกล้องที่ตั้งค่าไว้ ให้ใช้กล้องตัวสุดท้าย
-        if (finalDeviceId && !videoDevices.find(d => d.deviceId === finalDeviceId)) {
-          console.warn('⚠️ [Webcam] Configured camera not found, using last camera');
+        if (
+          finalDeviceId &&
+          !videoDevices.find((d) => d.deviceId === finalDeviceId)
+        ) {
+          console.warn(
+            '⚠️ [Webcam] Configured camera not found, using last camera',
+          );
           finalDeviceId = videoDevices[videoDevices.length - 1].deviceId;
         }
 
         // ถ้าไม่มี config ให้ใช้กล้องตัวสุดท้าย (มักเป็น external camera)
         if (!finalDeviceId) {
           finalDeviceId = videoDevices[videoDevices.length - 1].deviceId;
-          console.log('📹 [Webcam] No config, using last camera (external):', finalDeviceId);
+          console.log(
+            '📹 [Webcam] No config, using last camera (external):',
+            finalDeviceId,
+          );
         }
       } catch (enumError) {
         console.warn('⚠️ [Webcam] Failed to enumerate devices:', enumError);
@@ -284,15 +309,17 @@ export default function MainShooting() {
 
       // Request camera access with specific device
       const constraints: MediaStreamConstraints = {
-        video: finalDeviceId ? {
-          deviceId: { exact: finalDeviceId },
-          width: { ideal: 2560 }, //edit by all 2k
-          height: { ideal: 1440 },
-          frameRate: { ideal: 30 },  // เพิ่มการตั้งค่าเพื่อความคมชัด by all
-        } : {
-          width: { ideal: 2560 },
-          height: { ideal: 1440 }, //เพิ่มความคมชัด by all 2k
-        },
+        video: finalDeviceId
+          ? {
+              deviceId: { exact: finalDeviceId },
+              width: { ideal: 2560 }, //edit by all 2k
+              height: { ideal: 1440 },
+              frameRate: { ideal: 30 }, // เพิ่มการตั้งค่าเพื่อความคมชัด by all
+            }
+          : {
+              width: { ideal: 2560 },
+              height: { ideal: 1440 }, //เพิ่มความคมชัด by all 2k
+            },
         audio: false,
       };
 
@@ -430,20 +457,24 @@ export default function MainShooting() {
       // Try to use MP4 (H.264) first if available (Chrome 107+ supports it)
       const mimeTypes = [
         'video/mp4;codecs=avc1', // H.264 in MP4 container (Best for colors/compatibility)
-        'video/mp4',             // Generic MP4
+        'video/mp4', // Generic MP4
         'video/webm;codecs=vp9', // Chrome default high quality
         'video/webm;codecs=vp8', // Chrome default compatibility
-        'video/webm'             // Generic WebM
+        'video/webm', // Generic WebM
       ];
 
-      const supportedType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
+      const supportedType = mimeTypes.find((type) =>
+        MediaRecorder.isTypeSupported(type),
+      );
 
       const options = {
         mimeType: supportedType || 'video/webm',
         videoBitsPerSecond: 15000000, // 15 Mbps for high quality video
       };
 
-      console.log(`🎥 [MainShooting] MediaRecorder using mimeType: ${options.mimeType}`);
+      console.log(
+        `🎥 [MainShooting] MediaRecorder using mimeType: ${options.mimeType}`,
+      );
 
       // Save mimeType to ref to use when creating Blob later
       (mediaRecorderRef as any).mimeType = options.mimeType;
@@ -499,7 +530,10 @@ export default function MainShooting() {
 
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    const context = canvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
+    const context = canvas.getContext('2d', {
+      willReadFrequently: true,
+      colorSpace: 'srgb',
+    });
 
     if (context) {
       canvas.width = video.videoWidth;
@@ -530,7 +564,9 @@ export default function MainShooting() {
   // CANON CAMERA Functions
   // ===========================================================================
 
-  const startCanonCamera = async (config?: CameraConfig | null): Promise<void> => {
+  const startCanonCamera = async (
+    config?: CameraConfig | null,
+  ): Promise<void> => {
     try {
       setIsCameraLoading(true);
       setCameraError('');
@@ -547,7 +583,9 @@ export default function MainShooting() {
       let cameraIndex = 0; // default to first camera
       if (config && config.type === 'canon') {
         cameraIndex = config.cameraIndex ?? 0;
-        console.log(`📷 [Canon] Using saved camera index: ${cameraIndex} (${config.cameraName})`);
+        console.log(
+          `📷 [Canon] Using saved camera index: ${cameraIndex} (${config.cameraName})`,
+        );
       }
 
       // Connect to camera with saved index
@@ -574,14 +612,18 @@ export default function MainShooting() {
 
       while (!canonCamera.liveViewFrame && waitTime < FIRST_FRAME_TIMEOUT) {
         // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
-        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
         waitTime += POLL_INTERVAL;
       }
 
       if (canonCamera.liveViewFrame) {
-        console.log(`✅ [Canon] First frame received after ${waitTime}ms - camera ready!`);
+        console.log(
+          `✅ [Canon] First frame received after ${waitTime}ms - camera ready!`,
+        );
       } else {
-        console.warn(`⚠️ [Canon] First frame timeout after ${waitTime}ms - proceeding anyway`);
+        console.warn(
+          `⚠️ [Canon] First frame timeout after ${waitTime}ms - proceeding anyway`,
+        );
       }
 
       console.log('✅ [Canon] Camera initialized successfully with Live View');
@@ -589,7 +631,6 @@ export default function MainShooting() {
       // Set default dimensions for Canon (Live View is usually 1920x1280 or similar)
       setVideoDimensions({ width: 1920, height: 1280 });
       setIsCameraLoading(false);
-
     } catch (error) {
       setIsCameraLoading(false);
 
@@ -614,92 +655,99 @@ export default function MainShooting() {
    * Create a video blob URL from an array of JPEG base64 frames
    * Uses canvas + MediaRecorder to generate WebM video
    */
-  const createVideoFromFrames = useCallback(async (frames: string[], fps: number = 30): Promise<string> => {
-    if (frames.length === 0) {
-      console.warn('📷 [Canon] No frames to create video from');
-      return '';
-    }
-
-    console.log(`📷 [Canon] Creating video from ${frames.length} frames at ${fps}fps`);
-
-    return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
-      if (!ctx) {
-        reject(new Error('Cannot create canvas context'));
-        return;
+  const createVideoFromFrames = useCallback(
+    async (frames: string[], fps: number = 30): Promise<string> => {
+      if (frames.length === 0) {
+        console.warn('📷 [Canon] No frames to create video from');
+        return '';
       }
 
-      // Load first frame to get dimensions
-      const firstImg = new Image();
-      firstImg.onload = () => {
-        canvas.width = firstImg.naturalWidth;
-        canvas.height = firstImg.naturalHeight;
+      console.log(
+        `📷 [Canon] Creating video from ${frames.length} frames at ${fps}fps`,
+      );
 
-        // Setup MediaRecorder
-        const stream = canvas.captureStream(fps);
-        const mediaRecorder = new MediaRecorder(stream, {
-          mimeType: 'video/webm;codecs=vp9',
-          videoBitsPerSecond: 15000000, // 15 Mbps for high quality video
-        });
+      return new Promise((resolve, reject) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+        if (!ctx) {
+          reject(new Error('Cannot create canvas context'));
+          return;
+        }
 
-        const chunks: Blob[] = [];
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) {
-            chunks.push(e.data);
-          }
-        };
+        // Load first frame to get dimensions
+        const firstImg = new Image();
+        firstImg.onload = () => {
+          canvas.width = firstImg.naturalWidth;
+          canvas.height = firstImg.naturalHeight;
 
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(chunks, { type: 'video/webm' });
-          const url = URL.createObjectURL(blob);
-          console.log(`✅ [Canon] Video created: ${url} (${(blob.size / 1024).toFixed(1)} KB)`);
-          resolve(url);
-        };
+          // Setup MediaRecorder
+          const stream = canvas.captureStream(fps);
+          const mediaRecorder = new MediaRecorder(stream, {
+            mimeType: 'video/webm;codecs=vp9',
+            videoBitsPerSecond: 15000000, // 15 Mbps for high quality video
+          });
 
-        mediaRecorder.onerror = (e) => {
-          console.error('❌ [Canon] MediaRecorder error:', e);
-          reject(e);
-        };
-
-        mediaRecorder.start();
-
-        // Draw frames sequentially
-        let frameIndex = 0;
-        const frameInterval = 1000 / fps;
-
-        const drawNextFrame = () => {
-          if (frameIndex >= frames.length) {
-            // All frames drawn, stop recording
-            setTimeout(() => {
-              mediaRecorder.stop();
-            }, frameInterval); // Wait one more frame interval before stopping
-            return;
-          }
-
-          const img = new Image();
-          img.onload = () => {
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            frameIndex++;
-            setTimeout(drawNextFrame, frameInterval);
+          const chunks: Blob[] = [];
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+              chunks.push(e.data);
+            }
           };
-          img.onerror = () => {
-            console.warn(`⚠️ [Canon] Failed to load frame ${frameIndex}`);
-            frameIndex++;
-            setTimeout(drawNextFrame, frameInterval);
+
+          mediaRecorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            console.log(
+              `✅ [Canon] Video created: ${url} (${(blob.size / 1024).toFixed(1)} KB)`,
+            );
+            resolve(url);
           };
-          img.src = frames[frameIndex];
+
+          mediaRecorder.onerror = (e) => {
+            console.error('❌ [Canon] MediaRecorder error:', e);
+            reject(e);
+          };
+
+          mediaRecorder.start();
+
+          // Draw frames sequentially
+          let frameIndex = 0;
+          const frameInterval = 1000 / fps;
+
+          const drawNextFrame = () => {
+            if (frameIndex >= frames.length) {
+              // All frames drawn, stop recording
+              setTimeout(() => {
+                mediaRecorder.stop();
+              }, frameInterval); // Wait one more frame interval before stopping
+              return;
+            }
+
+            const img = new Image();
+            img.onload = () => {
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              frameIndex++;
+              setTimeout(drawNextFrame, frameInterval);
+            };
+            img.onerror = () => {
+              console.warn(`⚠️ [Canon] Failed to load frame ${frameIndex}`);
+              frameIndex++;
+              setTimeout(drawNextFrame, frameInterval);
+            };
+            img.src = frames[frameIndex];
+          };
+
+          drawNextFrame();
         };
 
-        drawNextFrame();
-      };
-
-      firstImg.onerror = () => {
-        reject(new Error('Failed to load first frame'));
-      };
-      firstImg.src = frames[0];
-    });
-  }, []);
+        firstImg.onerror = () => {
+          reject(new Error('Failed to load first frame'));
+        };
+        firstImg.src = frames[0];
+      });
+    },
+    [],
+  );
 
   const stopCanonFrameRecording = useCallback(async (): Promise<string> => {
     console.log('📷 [Canon] Stopping frame recording...');
@@ -735,7 +783,9 @@ export default function MainShooting() {
         // Return image directly without flipping
         // Live Preview is mirrored via CSS for selfie-like experience
         // But captured photo should be the actual camera view (readable text/numbers)
-        console.log('✅ [Canon] Photo returned without flip (actual camera view)');
+        console.log(
+          '✅ [Canon] Photo returned without flip (actual camera view)',
+        );
 
         // Resize photo from 6000x4000 to 3600x2400 to reduce file size
         try {
@@ -744,7 +794,10 @@ export default function MainShooting() {
           console.log('✅ [Canon] Photo resized successfully!');
           return resizedPhoto;
         } catch (resizeError) {
-          console.error('⚠️ [Canon] Resize failed, returning original:', resizeError);
+          console.error(
+            '⚠️ [Canon] Resize failed, returning original:',
+            resizeError,
+          );
           return result.imageData;
         }
       }
@@ -816,7 +869,9 @@ export default function MainShooting() {
       // เช่น countdown 3 วิ: [3=เริ่มถ่ายทันที], 2, 1, 0=stop (ได้ video 3 วิเต็ม)
       if (currentCount <= VIDEO_RECORDING_DURATION) {
         recordingStarted = true;
-        console.log(`🎬 Starting video recording immediately at countdown ${currentCount}`);
+        console.log(
+          `🎬 Starting video recording immediately at countdown ${currentCount}`,
+        );
         onStartRecording?.();
       }
 
@@ -829,7 +884,9 @@ export default function MainShooting() {
         // เช่น countdown 7 วิ: 7, 6, 5, 4, [3=เริ่มถ่าย], 2, 1, 0=stop (ได้ video 3 วิเต็ม)
         if (!recordingStarted && currentCount === VIDEO_RECORDING_DURATION) {
           recordingStarted = true;
-          console.log(`🎬 Starting video recording at countdown ${currentCount}`);
+          console.log(
+            `🎬 Starting video recording at countdown ${currentCount}`,
+          );
           onStartRecording?.();
         }
 
@@ -934,7 +991,8 @@ export default function MainShooting() {
 
         try {
           // @ts-ignore
-          const configResult = await window.electron?.payment?.getCameraConfig();
+          const configResult =
+            await window.electron?.payment?.getCameraConfig();
           console.log('📷 [MainShooting] Camera config result:', configResult);
 
           if (configResult?.success && configResult.config) {
@@ -943,14 +1001,19 @@ export default function MainShooting() {
             console.log(`📷 [MainShooting] Using ${loadedCameraType} camera`);
           }
         } catch (configError) {
-          console.warn('⚠️ [MainShooting] Failed to get camera config, using webcam:', configError);
+          console.warn(
+            '⚠️ [MainShooting] Failed to get camera config, using webcam:',
+            configError,
+          );
         }
 
         // Update both state and ref
         setCameraType(loadedCameraType);
         cameraTypeRef.current = loadedCameraType; // Important: set ref for capture loop
         setCameraConfigState(loadedConfig);
-        console.log(`📷 [MainShooting] cameraTypeRef set to: ${cameraTypeRef.current}`);
+        console.log(
+          `📷 [MainShooting] cameraTypeRef set to: ${cameraTypeRef.current}`,
+        );
 
         // ========================================
         // Step 2: Start the appropriate camera
@@ -1008,7 +1071,7 @@ export default function MainShooting() {
               () => {
                 // Callback to start recording when countdown reaches 3
                 startRecording();
-              }
+              },
             );
 
             // Stop recording and get frames data (for Canon) or video URL (for webcam)
@@ -1019,7 +1082,10 @@ export default function MainShooting() {
             // eslint-disable-next-line no-await-in-loop
             const photoData = await takePhoto();
 
-            console.log(`📷 [Capture ${i + 1}] photoData received:`, photoData ? `${photoData.substring(0, 50)}...` : 'EMPTY');
+            console.log(
+              `📷 [Capture ${i + 1}] photoData received:`,
+              photoData ? `${photoData.substring(0, 50)}...` : 'EMPTY',
+            );
 
             // Process video for Canon
             let videoUrl = '';
@@ -1033,32 +1099,41 @@ export default function MainShooting() {
                   boomerangFrames = data.frames;
                   // Handle video creation in background (don't await)
                   // This prevents blocking the UI and next capture countdown
-                  console.log(`📷 [Canon] Creating video in background from ${data.frames.length} frames...`);
+                  console.log(
+                    `📷 [Canon] Creating video in background from ${data.frames.length} frames...`,
+                  );
 
                   // Capture index for updating state later
                   const currentCaptureIndex = i;
 
-                  createVideoFromFrames(data.frames, 30).then(url => {
-                    console.log(`✅ [Canon] Background video ready for capture ${currentCaptureIndex + 1}: ${url}`);
-                    // Update state with the generated video URL
-                    setCaptures(prevCaptures => {
-                      const updated = [...prevCaptures];
-                      if (updated[currentCaptureIndex]) {
-                        updated[currentCaptureIndex] = {
-                          ...updated[currentCaptureIndex],
-                          video: url
-                        };
-                      }
-                      return updated;
-                    });
+                  createVideoFromFrames(data.frames, 30)
+                    .then((url) => {
+                      console.log(
+                        `✅ [Canon] Background video ready for capture ${currentCaptureIndex + 1}: ${url}`,
+                      );
+                      // Update state with the generated video URL
+                      setCaptures((prevCaptures) => {
+                        const updated = [...prevCaptures];
+                        if (updated[currentCaptureIndex]) {
+                          updated[currentCaptureIndex] = {
+                            ...updated[currentCaptureIndex],
+                            video: url,
+                          };
+                        }
+                        return updated;
+                      });
 
-                    // Also update the local array reference if needed (though next iterations just append)
-                    if (newCaptures[currentCaptureIndex]) {
-                      newCaptures[currentCaptureIndex].video = url;
-                    }
-                  }).catch(err => {
-                    console.error('❌ [Canon] Background video processing failed:', err);
-                  });
+                      // Also update the local array reference if needed (though next iterations just append)
+                      if (newCaptures[currentCaptureIndex]) {
+                        newCaptures[currentCaptureIndex].video = url;
+                      }
+                    })
+                    .catch((err) => {
+                      console.error(
+                        '❌ [Canon] Background video processing failed:',
+                        err,
+                      );
+                    });
                 }
               } catch (err) {
                 console.error('❌ [Canon] Video data parse failed:', err);
@@ -1077,7 +1152,9 @@ export default function MainShooting() {
               });
               // Update state to show progress
               setCaptures([...newCaptures]);
-              console.log(`✅ Capture ${i + 1} completed, total captures: ${newCaptures.length}`);
+              console.log(
+                `✅ Capture ${i + 1} completed, total captures: ${newCaptures.length}`,
+              );
             } else {
               console.error(`❌ Capture ${i + 1} FAILED - no photoData`);
             }
@@ -1133,20 +1210,27 @@ export default function MainShooting() {
       // Check if all captures have valid video URLs (not empty)
       // For Canon, videos are created asynchronously
       const allVideosReady = captures.every(
-        (capture) => capture.video && capture.video.length > 0
+        (capture) => capture.video && capture.video.length > 0,
       );
 
       if (!allVideosReady) {
-        console.log('⏳ [MainShooting] Waiting for Canon videos to be ready...');
-        console.log('📊 [MainShooting] Video status:', captures.map((c, i) => ({
-          index: i,
-          hasVideo: !!c.video,
-          videoLength: c.video?.length || 0,
-        })));
+        console.log(
+          '⏳ [MainShooting] Waiting for Canon videos to be ready...',
+        );
+        console.log(
+          '📊 [MainShooting] Video status:',
+          captures.map((c, i) => ({
+            index: i,
+            hasVideo: !!c.video,
+            videoLength: c.video?.length || 0,
+          })),
+        );
         return; // Wait for videos to be ready
       }
 
-      console.log('✅ [MainShooting] All captures and videos ready, navigating...');
+      console.log(
+        '✅ [MainShooting] All captures and videos ready, navigating...',
+      );
       setTimeout(() => {
         navigate('/photo-decorate', {
           state: {
@@ -1199,47 +1283,52 @@ export default function MainShooting() {
           )}
 
           {/* Canon waiting for live view */}
-          {cameraType === 'canon' && !canonCamera.liveViewFrame && !isCameraLoading && (
-            <div className="camera-feed canon-waiting">
-              <div className="waiting-text">Waiting for Canon Live View...</div>
-            </div>
-          )}
+          {cameraType === 'canon' &&
+            !canonCamera.liveViewFrame &&
+            !isCameraLoading && (
+              <div className="camera-feed canon-waiting">
+                <div className="waiting-text">
+                  Waiting for Canon Live View...
+                </div>
+              </div>
+            )}
 
           <canvas ref={canvasRef} style={{ display: 'none' }} />
 
           {/* Crop Overlay - shows the crop area based on current slot pixel size */}
           {/* For spare photos (beyond slots.length), use the largest slot dimensions */}
           {!isCameraLoading &&
-           state.selectedFrame?.slots &&
-           state.selectedFrame.slots.length > 0 && (() => {
-            const slots = state.selectedFrame.slots;
-            const currentIndex = captures.length;
+            state.selectedFrame?.slots &&
+            state.selectedFrame.slots.length > 0 &&
+            (() => {
+              const slots = state.selectedFrame.slots;
+              const currentIndex = captures.length;
 
-            // ถ้ายังไม่เกิน slots.length ให้ใช้ slot ปัจจุบัน
-            // ถ้าเกินแล้ว (รูปสำรอง) ให้หา slot ที่ใหญ่ที่สุด (พื้นที่มากสุด)
-            let targetSlot;
-            if (currentIndex < slots.length) {
-              targetSlot = slots[currentIndex];
-            } else {
-              // หา slot ที่มีพื้นที่มากที่สุด
-              targetSlot = slots.reduce((largest, current) => {
-                const largestArea = largest.width * largest.height;
-                const currentArea = current.width * current.height;
-                return currentArea > largestArea ? current : largest;
-              }, slots[0]);
-            }
+              // ถ้ายังไม่เกิน slots.length ให้ใช้ slot ปัจจุบัน
+              // ถ้าเกินแล้ว (รูปสำรอง) ให้หา slot ที่ใหญ่ที่สุด (พื้นที่มากสุด)
+              let targetSlot;
+              if (currentIndex < slots.length) {
+                targetSlot = slots[currentIndex];
+              } else {
+                // หา slot ที่มีพื้นที่มากที่สุด
+                targetSlot = slots.reduce((largest, current) => {
+                  const largestArea = largest.width * largest.height;
+                  const currentArea = current.width * current.height;
+                  return currentArea > largestArea ? current : largest;
+                }, slots[0]);
+              }
 
-            return (
-              <CropOverlay
-                slotWidth={targetSlot.width}
-                slotHeight={targetSlot.height}
-                videoWidth={videoDimensions.width}
-                videoHeight={videoDimensions.height}
-                containerWidth={containerDimensions.width}
-                containerHeight={containerDimensions.height}
-              />
-            );
-          })()}
+              return (
+                <CropOverlay
+                  slotWidth={targetSlot.width}
+                  slotHeight={targetSlot.height}
+                  videoWidth={videoDimensions.width}
+                  videoHeight={videoDimensions.height}
+                  containerWidth={containerDimensions.width}
+                  containerHeight={containerDimensions.height}
+                />
+              );
+            })()}
 
           {/* Camera Loading Overlay */}
           {isCameraLoading && (
