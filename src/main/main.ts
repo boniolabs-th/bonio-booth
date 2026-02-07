@@ -540,6 +540,20 @@ async function checkCamera(): Promise<void> {
 
       if (found && mainWindow) {
         mainWindow.webContents.send('device-found');
+      } else {
+        console.warn(`⚠️ [Main] webcam camera not connected`);
+
+        // ส่งแจ้งเตือน
+        await sendDeviceAlertWithRateLimit('camera', cameraConfig.label, [])
+          .catch(err => console.error('❌ [Main] Failed to send camera alert:', err));
+
+        // ส่ง event ไปที่ renderer
+        if (mainWindow) {
+          mainWindow.webContents.send('device-not-found', {
+            deviceType: 'camera',
+            deviceName: cameraConfig.label,
+          });
+        }
       }
       console.log(`📷 [Main] Webcam check result: ${found ? 'Found' : 'Not found'}`);
 
