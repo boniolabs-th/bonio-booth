@@ -1,6 +1,7 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import fixWebmDuration from 'fix-webm-duration';
 import { BackButton } from '..';
 import { FrameConfig } from '../../utils/frameConfig';
 import useCanonCameraV2 from '../../hooks/useCanonCameraV2';
@@ -666,9 +667,11 @@ export default function MainShooting() {
         `📷 [Canon] Creating video from ${frames.length} frames at ${fps}fps`,
       );
 
-      return new Promise((resolve, reject) => {
+      const recordingStartTime = performance.now();
+
+      const rawBlobUrl = await new Promise<string>((resolve, reject) => {
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+        const ctx = canvas.getContext('2d', { alpha: false });
         if (!ctx) {
           reject(new Error('Cannot create canvas context'));
           return;
@@ -682,8 +685,19 @@ export default function MainShooting() {
 
           // Setup MediaRecorder
           const stream = canvas.captureStream(fps);
+
+          // Prefer VP9 for better quality, fallback to VP8
+          const mimeTypes = [
+            'video/webm;codecs=vp9',
+            'video/webm;codecs=vp8',
+            'video/webm',
+          ];
+          const selectedMimeType =
+            mimeTypes.find((mt) => MediaRecorder.isTypeSupported(mt)) ||
+            mimeTypes[0];
+
           const mediaRecorder = new MediaRecorder(stream, {
-            mimeType: 'video/webm;codecs=vp9',
+            mimeType: selectedMimeType,
             videoBitsPerSecond: 15000000, // 15 Mbps for high quality video
           });
 
@@ -694,47 +708,77 @@ export default function MainShooting() {
             }
           };
 
-          mediaRecorder.onstop = () => {
-            const blob = new Blob(chunks, { type: 'video/webm' });
-            const url = URL.createObjectURL(blob);
+          mediaRecorder.onstop = async () => {
+            stream.getTracks().forEach((track) => track.stop());
+            const rawBlob = new Blob(chunks, { type: selectedMimeType });
+
+            // Fix WebM duration metadata (MediaRecorder สร้าง WebM ที่มี duration: Infinity)
+            const actualElapsedMs = Math.round(performance.now() - recordingStartTime);
             console.log(
-              `✅ [Canon] Video created: ${url} (${(blob.size / 1024).toFixed(1)} KB)`,
+              `📷 [Canon] Fixing WebM duration: ${actualElapsedMs}ms, size: ${(rawBlob.size / 1024).toFixed(1)} KB`,
             );
-            resolve(url);
+
+            try {
+              const fixedBlob = await fixWebmDuration(rawBlob, actualElapsedMs, {
+                logger: false,
+              });
+              const url = URL.createObjectURL(fixedBlob);
+              console.log(
+                `✅ [Canon] Video created (duration fixed): ${url} (${(fixedBlob.size / 1024).toFixed(1)} KB)`,
+              );
+              resolve(url);
+            } catch (err) {
+              console.warn('⚠️ [Canon] Failed to fix WebM duration, using raw:', err);
+              const url = URL.createObjectURL(rawBlob);
+              resolve(url);
+            }
           };
 
           mediaRecorder.onerror = (e) => {
             console.error('❌ [Canon] MediaRecorder error:', e);
+            stream.getTracks().forEach((track) => track.stop());
             reject(e);
           };
 
-          mediaRecorder.start();
+          // Start recording with timeslice เพื่อให้ได้ data อย่างสม่ำเสมอ
+          mediaRecorder.start(500);
 
-          // Draw frames sequentially
+          // Pre-load all frame images first for consistent timing
+          const loadImage = (src: string): Promise<HTMLImageElement> =>
+            new Promise((res) => {
+              const img = new Image();
+              img.onload = () => res(img);
+              img.onerror = () => {
+                console.warn('⚠️ [Canon] Failed to load frame, using blank');
+                res(img); // resolve anyway to keep going
+              };
+              img.src = src;
+            });
+
+          // Draw frames sequentially with pre-loaded images
           let frameIndex = 0;
           const frameInterval = 1000 / fps;
 
-          const drawNextFrame = () => {
+          const drawNextFrame = async () => {
             if (frameIndex >= frames.length) {
-              // All frames drawn, stop recording
+              // All frames drawn - stop recording immediately (no delay!)
+              // ไม่ต้องรอ frame interval เพิ่ม เพราะจะทำให้ frame สุดท้ายค้าง
+              if (mediaRecorder.state === 'recording') {
+                mediaRecorder.requestData(); // flush pending data
+              }
+              // Small delay เพื่อให้ requestData flush เสร็จ
               setTimeout(() => {
-                mediaRecorder.stop();
-              }, frameInterval); // Wait one more frame interval before stopping
+                if (mediaRecorder.state === 'recording') {
+                  mediaRecorder.stop();
+                }
+              }, 50);
               return;
             }
 
-            const img = new Image();
-            img.onload = () => {
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-              frameIndex++;
-              setTimeout(drawNextFrame, frameInterval);
-            };
-            img.onerror = () => {
-              console.warn(`⚠️ [Canon] Failed to load frame ${frameIndex}`);
-              frameIndex++;
-              setTimeout(drawNextFrame, frameInterval);
-            };
-            img.src = frames[frameIndex];
+            const img = await loadImage(frames[frameIndex]);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            frameIndex++;
+            setTimeout(drawNextFrame, frameInterval);
           };
 
           drawNextFrame();
@@ -745,6 +789,65 @@ export default function MainShooting() {
         };
         firstImg.src = frames[0];
       });
+
+      return rawBlobUrl;
+    },
+    [],
+  );
+
+  /**
+   * Convert a WebM blob URL to MP4 via FFmpeg for smooth looping
+   * H.264 MP4 มี keyframe ที่ตำแหน่ง 0 เสมอ ทำให้ loop ราบรื่นกว่า WebM (VP9)
+   */
+  const convertCanonWebmToMp4 = useCallback(
+    async (webmBlobUrl: string): Promise<string> => {
+      try {
+        console.log('📷 [Canon] Converting WebM to MP4 for smooth loop...');
+
+        // 1. Fetch blob จาก URL
+        const response = await fetch(webmBlobUrl);
+        const blob = await response.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+
+        // 2. Save WebM to temp file via IPC
+        const saveResult = await window.electron.video.saveTempVideo(arrayBuffer);
+        if (!saveResult.success || !saveResult.path) {
+          console.warn('⚠️ [Canon] Failed to save temp WebM, using original');
+          return webmBlobUrl;
+        }
+
+        // 3. Convert WebM → MP4 via FFmpeg
+        const convertResult = await window.electron.video.convertToMp4(saveResult.path);
+        if (!convertResult.success || !convertResult.path) {
+          console.warn('⚠️ [Canon] Failed to convert to MP4, using WebM');
+          return webmBlobUrl;
+        }
+
+        // 4. Read MP4 file back as ArrayBuffer
+        const readResult = await window.electron.video.readVideoFile(convertResult.path);
+        if (!readResult.success || !readResult.data) {
+          console.warn('⚠️ [Canon] Failed to read MP4, using WebM');
+          return webmBlobUrl;
+        }
+
+        // 5. Create blob URL from MP4 data
+        const mp4Blob = new Blob([readResult.data], { type: 'video/mp4' });
+        const mp4Url = URL.createObjectURL(mp4Blob);
+
+        // 6. Cleanup: revoke old WebM blob URL
+        URL.revokeObjectURL(webmBlobUrl);
+
+        // 7. Cleanup temp files via IPC
+        window.electron.video.cleanupTemp([saveResult.path, convertResult.path]).catch(() => {});
+
+        console.log(
+          `✅ [Canon] Converted to MP4: ${mp4Url} (${(mp4Blob.size / 1024).toFixed(1)} KB)`,
+        );
+        return mp4Url;
+      } catch (err) {
+        console.warn('⚠️ [Canon] MP4 conversion failed, using WebM:', err);
+        return webmBlobUrl;
+      }
     },
     [],
   );
@@ -1107,9 +1210,10 @@ export default function MainShooting() {
                   const currentCaptureIndex = i;
 
                   createVideoFromFrames(data.frames, 30)
+                    .then((webmUrl) => convertCanonWebmToMp4(webmUrl))
                     .then((url) => {
                       console.log(
-                        `✅ [Canon] Background video ready for capture ${currentCaptureIndex + 1}: ${url}`,
+                        `✅ [Canon] Background video ready (MP4) for capture ${currentCaptureIndex + 1}: ${url}`,
                       );
                       // Update state with the generated video URL
                       setCaptures((prevCaptures) => {

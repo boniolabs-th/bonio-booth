@@ -657,13 +657,14 @@ const generateFramedVideo = async (
     'seconds',
   );
 
-  // ใช้ native loop เป็นหลัก + manual sync เพื่อ smooth loop
-  // สำหรับ MP4 ที่ผ่าน LUT filter, native loop อาจมี stutter
+  // ===== Frame-driven loop: ใช้ requestVideoFrameCallback =====
+  // ปิด native loop → ใช้ manual loop ด้วย currentTime check แทน
+  // เพื่อป้องกัน freeze/gap ตรงจุด loop ที่ native loop มักเกิด
   videoElements.forEach((video) => {
     // eslint-disable-next-line no-param-reassign
     video.currentTime = 0; // เริ่มจากต้น video
     // eslint-disable-next-line no-param-reassign
-    video.loop = true; // ใช้ native loop เป็นหลัก
+    video.loop = false; // ปิด native loop — ใช้ manual loop แทน
     // eslint-disable-next-line no-param-reassign
     video.muted = true; // Ensure muted for autoplay
     // eslint-disable-next-line no-param-reassign
@@ -672,27 +673,6 @@ const generateFramedVideo = async (
     video.playbackRate = 1.0; // Ensure normal speed
     // eslint-disable-next-line no-param-reassign
     video.preload = 'auto'; // Ensure video is fully buffered
-
-    // Fallback: ถ้า video จบจริงๆ (ended event) ให้ loop กลับทันที
-    // กรณี WebM/MP4 ที่ native loop ไม่ทำงาน
-    const handleEnded = () => {
-      // eslint-disable-next-line no-param-reassign
-      video.currentTime = 0;
-      video.play().catch(() => undefined);
-    };
-    video.addEventListener('ended', handleEnded);
-
-    // Handle stall/waiting - restart playback
-    const handleWaiting = () => {
-      console.log('⚠️ Video waiting/stalled, attempting to continue...');
-    };
-    video.addEventListener('waiting', handleWaiting);
-
-    // เก็บ handlers ไว้ cleanup ทีหลัง
-    // eslint-disable-next-line no-param-reassign
-    (video as any).__endedHandler = handleEnded;
-    // eslint-disable-next-line no-param-reassign
-    (video as any).__waitingHandler = handleWaiting;
   });
 
   await Promise.all(
@@ -723,15 +703,13 @@ const generateFramedVideo = async (
     });
 
     const chunks: Blob[] = [];
-    let drawIntervalId: number | null = null; // เปลี่ยนจาก animationFrameId เป็น interval
     // ใช้ FIXED_OUTPUT_DURATION (9 วินาที) แทน maxDuration เพื่อให้แน่ใจว่า output ยาว 9 วินาทีเสมอ
     const recordingDuration = FIXED_OUTPUT_DURATION; // 9 seconds fixed
     const startTime = performance.now();
     let recording = true;
     let frameCount = 0;
     let actualElapsedMs = 0; // เก็บ elapsed time จริงสำหรับ fix-webm-duration
-    const TARGET_FPS = 30;
-    const FRAME_INTERVAL = 1000 / TARGET_FPS; // ~33.33ms per frame
+    const LOOP_EPSILON = 0.1; // 100ms ก่อนจบ video → seek กลับ (manual loop)
 
     console.log(
       '🎬 [generateFramedVideo] Starting recording with duration:',
@@ -741,21 +719,8 @@ const generateFramedVideo = async (
 
     const cleanup = () => {
       recording = false;
-      if (drawIntervalId !== null) {
-        clearInterval(drawIntervalId);
-      }
       stream.getTracks().forEach((track) => track.stop());
       videoElements.forEach((video) => {
-        // ลบ ended event listener
-        const endedHandler = (video as any).__endedHandler;
-        if (endedHandler) {
-          video.removeEventListener('ended', endedHandler);
-        }
-        // ลบ waiting event listener
-        const waitingHandler = (video as any).__waitingHandler;
-        if (waitingHandler) {
-          video.removeEventListener('waiting', waitingHandler);
-        }
         video.pause();
         // eslint-disable-next-line no-param-reassign
         video.src = '';
@@ -830,6 +795,9 @@ const generateFramedVideo = async (
       );
     };
 
+    // ===== Frame-driven draw: ใช้ requestVideoFrameCallback =====
+    // วาด canvas เมื่อ video decode frame ใหม่เสร็จจริงๆ
+    // sync กับ video decoder โดยตรง → ไม่มี duplicate/skip frame
     const drawFrame = () => {
       if (!recording) {
         return;
@@ -838,20 +806,23 @@ const generateFramedVideo = async (
       const elapsed = (performance.now() - startTime) / 1000;
       frameCount++;
 
-      // ตรวจสอบว่า video ยังเล่นอยู่หรือไม่ - ถ้าหยุดให้ restart
-      // ตรวจสอบทุก video element และ force play ถ้าจำเป็น
+      // ===== Manual Loop: seek กลับก่อน video จบ =====
+      // ใช้ epsilon 100ms — requestVideoFrameCallback fire ทุก ~33ms
+      // → มีโอกาสจับได้อย่างน้อย 3 ครั้งก่อนจบ
       videoElements.forEach((video, idx) => {
-        // ตรวจสอบหลายเงื่อนไข: paused, ended, หรือ readyState ไม่พร้อม
-        const needsRestart =
-          video.paused || video.ended || video.readyState < 3;
+        const dur = video.duration;
+        const ct = video.currentTime;
+        const hasValidDuration =
+          dur && Number.isFinite(dur) && dur > 0 && dur < 60;
 
-        if (needsRestart) {
-          console.log(`⚠️ [generateFramedVideo] Video ${idx} needs restart:`, {
-            paused: video.paused,
-            ended: video.ended,
-            readyState: video.readyState,
-            currentTime: video.currentTime.toFixed(2),
-          });
+        if (hasValidDuration && ct >= dur - LOOP_EPSILON) {
+          // eslint-disable-next-line no-param-reassign
+          video.currentTime = 0;
+          // video ยังเล่นอยู่ ไม่ต้อง play() ใหม่
+        }
+
+        // Safety: ถ้า video หยุด/จบ (ไม่ควรเกิดถ้า manual loop ทำงาน) → restart
+        if (video.paused || video.ended) {
           // eslint-disable-next-line no-param-reassign
           video.currentTime = 0;
           video.play().catch(() => undefined);
@@ -894,8 +865,6 @@ const generateFramedVideo = async (
         }, 100);
         return;
       }
-
-      // Video loop ถูกจัดการโดย native loop (video.loop = true)
 
       // Fill with white background first (paper color)
       ctx.fillStyle = '#ffffff';
@@ -981,20 +950,37 @@ const generateFramedVideo = async (
         }
       });
 
-      // ไม่ต้อง schedule frame ถัดไป เพราะใช้ setInterval แล้ว
+      // Schedule ถัดไปผ่าน requestVideoFrameCallback
+      scheduleNextFrame();
+    };
+
+    // ===== requestVideoFrameCallback: sync กับ video decoder =====
+    // ใช้ video ตัวแรกเป็น driver — เมื่อ decode frame ใหม่เสร็จ → วาด canvas
+    // captureStream(30) จะจับ canvas ตาม frame rate ที่ตั้งไว้
+    const primaryVideo = videoElements[0];
+
+    const scheduleNextFrame = () => {
+      if (!recording) return;
+      if ('requestVideoFrameCallback' in primaryVideo) {
+        (primaryVideo as any).requestVideoFrameCallback(() => {
+          drawFrame();
+        });
+      } else {
+        // Fallback สำหรับ browser ที่ไม่รองรับ requestVideoFrameCallback
+        // (ไม่ควรเกิดใน Electron/Chromium)
+        requestAnimationFrame(() => {
+          drawFrame();
+        });
+      }
     };
 
     // Start recording with timeslice เพื่อให้ได้ data อย่างสม่ำเสมอ
     // timeslice 500ms ช่วยป้องกัน data loss ถ้า recording หยุดกลางคัน
     mediaRecorder.start(500);
 
-    // ใช้ setInterval แทน requestAnimationFrame
-    // เพราะ setInterval ทำงานต่อเนื่องแม้ tab ไม่ active
-    // และให้ timing ที่สม่ำเสมอกว่า
-    drawIntervalId = window.setInterval(drawFrame, FRAME_INTERVAL);
-
-    // Draw first frame immediately
+    // Draw first frame + start requestVideoFrameCallback chain
     drawFrame();
+    scheduleNextFrame();
   });
 };
 
