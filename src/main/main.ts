@@ -496,7 +496,7 @@ async function checkCamera(): Promise<void> {
     const cameraConfig = await getCameraConfig();
     if (!cameraConfig) {
       console.log('ℹ️ [Main] No camera config found');
-      await sendDeviceAlertWithRateLimit('camera', 'Camera config found', [])
+      await machineService.sendDeviceAlert('camera', 'Camera config found', [])
         .catch(err => console.error('❌ [Main] Failed to send camera alert:', err));
 
 
@@ -540,20 +540,6 @@ async function checkCamera(): Promise<void> {
 
       if (found && mainWindow) {
         mainWindow.webContents.send('device-found');
-      } else {
-        console.warn(`⚠️ [Main] webcam camera not connected`);
-
-        // ส่งแจ้งเตือน
-        await sendDeviceAlertWithRateLimit('camera', cameraConfig.label, [])
-          .catch(err => console.error('❌ [Main] Failed to send camera alert:', err));
-
-        // ส่ง event ไปที่ renderer
-        if (mainWindow) {
-          mainWindow.webContents.send('device-not-found', {
-            deviceType: 'camera',
-            deviceName: cameraConfig.label,
-          });
-        }
       }
       console.log(`📷 [Main] Webcam check result: ${found ? 'Found' : 'Not found'}`);
 
@@ -569,7 +555,7 @@ async function checkCamera(): Promise<void> {
         console.warn(`⚠️ [Main] Canon camera not connected: ${cameraConfig.cameraName}`);
 
         // ส่งแจ้งเตือน
-        await sendDeviceAlertWithRateLimit('camera', cameraConfig.cameraName, [])
+        await machineService.sendDeviceAlert('camera', cameraConfig.cameraName, [])
           .catch(err => console.error('❌ [Main] Failed to send camera alert:', err));
 
         // ส่ง event ไปที่ renderer
@@ -604,7 +590,7 @@ async function checkPrinter(): Promise<void> {
     const printerConfig = await getPrinterConfig();
     if (!printerConfig) {
       console.log('ℹ️ [Main] No printer config found');
-      await sendDeviceAlertWithRateLimit('printer', 'Printer config found', [])
+      await machineService.sendDeviceAlert('printer', 'Printer config found', [])
         .catch(err => console.error('❌ [Main] Failed to send printer alert:', err));
 
       if (mainWindow) {
@@ -636,7 +622,7 @@ async function checkPrinter(): Promise<void> {
     if (!mainPrinterFound) {
       console.warn(`⚠️ [Main] Main printer not found: ${printerConfig.main.printerName}`);
 
-      await sendDeviceAlertWithRateLimit('printer', `Main: ${printerConfig.main.printerName}`, printerNames)
+      await machineService.sendDeviceAlert('printer', `Main: ${printerConfig.main.printerName}`, printerNames)
         .catch(err => console.error('❌ [Main] Failed to send printer alert:', err));
 
       if (mainWindow) {
@@ -661,7 +647,7 @@ async function checkPrinter(): Promise<void> {
       if (!secondaryPrinterFound) {
         console.warn(`⚠️ [Main] Secondary printer not found: ${printerConfig.secondary.printerName}`);
 
-        sendDeviceAlertWithRateLimit('printer', `Secondary: ${printerConfig.secondary.printerName}`, printerNames)
+        machineService.sendDeviceAlert('printer', `Secondary: ${printerConfig.secondary.printerName}`, printerNames)
           .catch(err => console.error('❌ [Main] Failed to send printer alert:', err));
 
         if (mainWindow) {
@@ -917,25 +903,7 @@ const lastDeviceAlertTime: Record<'printer' | 'camera', number> = {
  * @param deviceName ชื่ออุปกรณ์
  * @param availableDevices รายการอุปกรณ์ที่มีอยู่
  */
-async function sendDeviceAlertWithRateLimit(
-  deviceType: 'printer' | 'camera',
-  deviceName: string,
-  availableDevices: string[]
-): Promise<void> {
-  const now = Date.now();
-  const lastSent = lastDeviceAlertTime[deviceType];
-  const timeSinceLastAlert = now - lastSent;
 
-  if (timeSinceLastAlert < ALERT_RATE_LIMIT_MS) {
-    console.log(
-      `⏱️ [Main] Skipping ${deviceType} alert - rate limited (${Math.round(timeSinceLastAlert / 1000)}s since last alert)`
-    );
-    return;
-  }
-
-  lastDeviceAlertTime[deviceType] = now;
-  await machineService.sendDeviceAlert(deviceType, deviceName, availableDevices);
-}
 let cachedInitData: {
   machine?: { prices?: unknown[] };
   prices?: unknown[];
@@ -2786,37 +2754,10 @@ ipcMain.on('camera-availability-result', async (event, result: {
   if (!result.found) {
     console.warn(`⚠️ [Main] Configured camera not found: ${result.configuredLabel} (${result.configuredDeviceId})`);
     // ส่งแจ้งเตือน
-    sendDeviceAlertWithRateLimit('camera', result.configuredLabel, result.availableDevices)
+    machineService.sendDeviceAlert('camera', result.configuredLabel, result.availableDevices)
       .catch(err => console.error('❌ [Main] Failed to send camera alert:', err));
 
     // ส่ง event ไปที่ renderer เพื่อแสดงหน้า maintenance
-    if (mainWindow) {
-      mainWindow.webContents.send('device-not-found', {
-        deviceType: 'camera',
-        deviceName: result.configuredLabel,
-      });
-    }
-  } else {
-    console.log(`✅ [Main] Configured camera found: ${result.configuredLabel}`);
-  }
-});
-
-ipcMain.on('camera-availability-result', async (event, result: {
-  found: boolean;
-  configuredDeviceId: string;
-  configuredLabel: string;
-  availableDevices: string[];
-}) => {
-  console.log('📷 [Main] Received camera availability result:', result);
-
-  if (!result.found) {
-    console.warn(`⚠️ [Main] Configured camera not found: ${result.configuredLabel}`);
-
-    // ส่งแจ้งเตือน
-    sendDeviceAlertWithRateLimit('camera', result.configuredLabel, result.availableDevices)
-      .catch(err => console.error('❌ [Main] Failed to send camera alert:', err));
-
-    // ส่ง event ไปที่ renderer
     if (mainWindow) {
       mainWindow.webContents.send('device-not-found', {
         deviceType: 'camera',
