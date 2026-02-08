@@ -139,6 +139,97 @@ const applyFilterToPhoto = async (
   });
 };
 
+/**
+ * Pre-extract ทุก frame จาก video element ลง ImageBitmap[]
+ * วิธีนี้เล่น video 1 ครั้ง จับทุก decoded frame เข้า memory
+ * ทำให้ตอน record loop ไม่ต้องพึ่ง real-time decoder เลย
+ * → ไม่ freeze บนเครื่องสเปคต่ำ (BMAX mini PC)
+ */
+const preExtractFrames = (
+  video: HTMLVideoElement,
+): Promise<ImageBitmap[]> => {
+  return new Promise<ImageBitmap[]>((resolve) => {
+    const frames: ImageBitmap[] = [];
+    let resolved = false;
+
+    const finish = () => {
+      if (resolved) return;
+      resolved = true;
+      video.pause();
+      console.log(
+        `📸 [preExtractFrames] Done: ${frames.length} frames captured`,
+      );
+      resolve(frames);
+    };
+
+    // Safety timeout: ถ้า extraction ใช้เวลานานเกิน 15 วินาที → หยุด
+    const timeout = setTimeout(() => {
+      console.warn(
+        '⚠️ [preExtractFrames] Timeout, finishing with',
+        frames.length,
+        'frames',
+      );
+      finish();
+    }, 15000);
+
+    const onFrame = async () => {
+      if (resolved) return;
+
+      if (video.ended || video.paused) {
+        clearTimeout(timeout);
+        finish();
+        return;
+      }
+
+      try {
+        const bitmap = await createImageBitmap(video);
+        frames.push(bitmap);
+      } catch {
+        // skip frame if capture fails
+      }
+
+      if ('requestVideoFrameCallback' in video) {
+        (video as any).requestVideoFrameCallback(onFrame);
+      } else {
+        requestAnimationFrame(onFrame);
+      }
+    };
+
+    // เมื่อ video จบ → finish
+    video.addEventListener(
+      'ended',
+      () => {
+        clearTimeout(timeout);
+        finish();
+      },
+      { once: true },
+    );
+
+    // เริ่มเล่น video แล้วจับ frame
+    // eslint-disable-next-line no-param-reassign
+    video.currentTime = 0;
+    // eslint-disable-next-line no-param-reassign
+    video.loop = false;
+    // eslint-disable-next-line no-param-reassign
+    video.muted = true;
+    // eslint-disable-next-line no-param-reassign
+    video.playbackRate = 1.0;
+    video
+      .play()
+      .then(() => {
+        if ('requestVideoFrameCallback' in video) {
+          (video as any).requestVideoFrameCallback(onFrame);
+        } else {
+          requestAnimationFrame(onFrame);
+        }
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        finish();
+      });
+  });
+};
+
 const generateFramedVideo = async (
   captures: Capture[],
   frame: FrameConfig,
@@ -657,27 +748,40 @@ const generateFramedVideo = async (
     'seconds',
   );
 
-  // ===== Frame-driven loop: ใช้ requestVideoFrameCallback =====
-  // ปิด native loop → ใช้ manual loop ด้วย currentTime check แทน
-  // เพื่อป้องกัน freeze/gap ตรงจุด loop ที่ native loop มักเกิด
+  // ===== Pre-extract all video frames into memory =====
+  // วิธีนี้ decode video ครั้งเดียว เก็บทุก frame เป็น ImageBitmap
+  // แล้ว loop จาก memory → ไม่ต้องพึ่ง real-time decoder ตอน record
+  // ทำให้ไม่ freeze บน hardware สเปคต่ำ (เช่น BMAX mini PC)
+  console.log('📸 [generateFramedVideo] Pre-extracting video frames...');
+  const allVideoFrames: ImageBitmap[][] = [];
+  for (let i = 0; i < videoElements.length; i++) {
+    // eslint-disable-next-line no-await-in-loop
+    const frames = await preExtractFrames(videoElements[i]);
+    allVideoFrames.push(frames);
+    console.log(
+      `📸 [generateFramedVideo] Video ${i}: ${frames.length} frames extracted`,
+    );
+  }
+
+  // Release video elements — ไม่ต้องใช้แล้วตอน record
   videoElements.forEach((video) => {
-    // eslint-disable-next-line no-param-reassign
-    video.currentTime = 0; // เริ่มจากต้น video
-    // eslint-disable-next-line no-param-reassign
-    video.loop = false; // ปิด native loop — ใช้ manual loop แทน
-    // eslint-disable-next-line no-param-reassign
-    video.muted = true; // Ensure muted for autoplay
-    // eslint-disable-next-line no-param-reassign
-    video.playsInline = true; // Ensure inline playback
-    // eslint-disable-next-line no-param-reassign
-    video.playbackRate = 1.0; // Ensure normal speed
-    // eslint-disable-next-line no-param-reassign
-    video.preload = 'auto'; // Ensure video is fully buffered
+    video.pause();
+    video.removeAttribute('src');
+    video.load(); // release decoder resources
   });
 
-  await Promise.all(
-    videoElements.map((video) => video.play().catch(() => undefined)),
-  );
+  // Safety check: ต้องมี frame อย่างน้อย 1 ตัวต่อ video
+  if (allVideoFrames.some((frames) => frames.length === 0)) {
+    throw new Error('ไม่สามารถดึง frame จากวิดีโอได้');
+  }
+
+  console.log('📸 [generateFramedVideo] Frame extraction complete:', {
+    videos: allVideoFrames.length,
+    framesPerVideo: allVideoFrames.map((f) => f.length),
+    firstFrameSize: allVideoFrames[0]?.[0]
+      ? `${allVideoFrames[0][0].width}x${allVideoFrames[0][0].height}`
+      : 'N/A',
+  });
 
   return new Promise<string>((resolve, reject) => {
     const stream = canvas.captureStream(30);
@@ -709,7 +813,7 @@ const generateFramedVideo = async (
     let recording = true;
     let frameCount = 0;
     let actualElapsedMs = 0; // เก็บ elapsed time จริงสำหรับ fix-webm-duration
-    const LOOP_EPSILON = 0.1; // 100ms ก่อนจบ video → seek กลับ (manual loop)
+    let drawIntervalId: number | null = null; // setInterval สำหรับ frame-based drawing
 
     console.log(
       '🎬 [generateFramedVideo] Starting recording with duration:',
@@ -719,12 +823,12 @@ const generateFramedVideo = async (
 
     const cleanup = () => {
       recording = false;
+      if (drawIntervalId !== null) clearInterval(drawIntervalId);
       stream.getTracks().forEach((track) => track.stop());
-      videoElements.forEach((video) => {
-        video.pause();
-        // eslint-disable-next-line no-param-reassign
-        video.src = '';
-      });
+      // Release ImageBitmaps — คืน memory
+      allVideoFrames.forEach((frames) =>
+        frames.forEach((bitmap) => bitmap.close()),
+      );
     };
 
     mediaRecorder.ondataavailable = (event) => {
@@ -795,9 +899,9 @@ const generateFramedVideo = async (
       );
     };
 
-    // ===== Frame-driven draw: ใช้ requestVideoFrameCallback =====
-    // วาด canvas เมื่อ video decode frame ใหม่เสร็จจริงๆ
-    // sync กับ video decoder โดยตรง → ไม่มี duplicate/skip frame
+    // ===== Frame-based draw: วาดจาก ImageBitmap[] ที่ extract ไว้ =====
+    // ไม่พึ่ง real-time video decoder ตอน record → ไม่ freeze บนเครื่องสเปคต่ำ
+    // ใช้ time-based index เลือก frame → loop ด้วย modulo
     const drawFrame = () => {
       if (!recording) {
         return;
@@ -806,36 +910,12 @@ const generateFramedVideo = async (
       const elapsed = (performance.now() - startTime) / 1000;
       frameCount++;
 
-      // ===== Manual Loop: seek กลับก่อน video จบ =====
-      // ใช้ epsilon 100ms — requestVideoFrameCallback fire ทุก ~33ms
-      // → มีโอกาสจับได้อย่างน้อย 3 ครั้งก่อนจบ
-      videoElements.forEach((video, idx) => {
-        const dur = video.duration;
-        const ct = video.currentTime;
-        const hasValidDuration =
-          dur && Number.isFinite(dur) && dur > 0 && dur < 60;
-
-        if (hasValidDuration && ct >= dur - LOOP_EPSILON) {
-          // eslint-disable-next-line no-param-reassign
-          video.currentTime = 0;
-          // video ยังเล่นอยู่ ไม่ต้อง play() ใหม่
-        }
-
-        // Safety: ถ้า video หยุด/จบ (ไม่ควรเกิดถ้า manual loop ทำงาน) → restart
-        if (video.paused || video.ended) {
-          // eslint-disable-next-line no-param-reassign
-          video.currentTime = 0;
-          video.play().catch(() => undefined);
-        }
-      });
-
       // Log progress every 30 frames (~1 second at 30fps)
       if (frameCount % 30 === 0) {
         console.log('🎬 [generateFramedVideo] Recording progress:', {
           elapsed: elapsed.toFixed(2),
           targetDuration: recordingDuration,
           frameCount,
-          videoCurrentTimes: videoElements.map((v) => v.currentTime.toFixed(2)),
         });
       }
 
@@ -845,16 +925,16 @@ const generateFramedVideo = async (
       const recordBuffer = 1; // 1 second extra to ensure enough frames
       if (elapsed >= recordingDuration + recordBuffer) {
         // เก็บ elapsed time จริงสำหรับ fix-webm-duration
-        actualElapsedMs = Math.round(performance.now() - startTime); // elapsed จริงใน ms
+        actualElapsedMs = Math.round(performance.now() - startTime);
         console.log('🎬 [generateFramedVideo] Recording completed:', {
           elapsed: elapsed.toFixed(2),
           targetDuration: recordingDuration,
           recordBuffer,
           actualElapsedMs,
           totalFrames: frameCount,
-          videoCurrentTimes: videoElements.map((v) => v.currentTime.toFixed(2)),
         });
         recording = false;
+        if (drawIntervalId !== null) clearInterval(drawIntervalId);
         // Request final data before stopping
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.requestData();
@@ -866,68 +946,73 @@ const generateFramedVideo = async (
         return;
       }
 
+      // คำนวณ frame index สำหรับ loop
+      // loopTime = เวลาภายใน loop ปัจจุบัน (0 ~ actualVideoDuration)
+      const loopTime = elapsed % actualVideoDuration;
+      const loopProgress = loopTime / actualVideoDuration; // 0.0 ~ 1.0
+
       // Fill with white background first (paper color)
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, targetWidth, targetHeight);
 
       const drawSlot = (slot: (typeof frame.slots)[0], index: number) => {
-        const video = videoElements[index];
-        if (!video) {
+        const frames = allVideoFrames[index];
+        if (!frames || frames.length === 0) {
           return;
         }
 
-        const slotAspect = slot.width / slot.height;
-        const videoAspect = video.videoWidth / video.videoHeight || 1;
+        // เลือก frame จาก progress ภายใน loop
+        const frameIdx = Math.min(
+          Math.floor(loopProgress * frames.length),
+          frames.length - 1,
+        );
+        const bitmap = frames[frameIdx];
 
-        let sourceWidth = video.videoWidth;
-        let sourceHeight = video.videoHeight;
+        const slotAspect = slot.width / slot.height;
+        const bitmapAspect = bitmap.width / bitmap.height || 1;
+
+        let sourceWidth = bitmap.width;
+        let sourceHeight = bitmap.height;
         let sourceX = 0;
         let sourceY = 0;
 
-        if (videoAspect > slotAspect) {
-          sourceWidth = video.videoHeight * slotAspect;
-          sourceX = (video.videoWidth - sourceWidth) / 2;
+        if (bitmapAspect > slotAspect) {
+          sourceWidth = bitmap.height * slotAspect;
+          sourceX = (bitmap.width - sourceWidth) / 2;
         } else {
-          sourceHeight = video.videoWidth / slotAspect;
-          sourceY = (video.videoHeight - sourceHeight) / 2;
+          sourceHeight = bitmap.width / slotAspect;
+          sourceY = (bitmap.height - sourceHeight) / 2;
         }
 
         const targetX = slot.x * scaleX;
         const targetY = slot.y * scaleY;
-        const targetWidth = slot.width * scaleX;
-        const targetHeight = slot.height * scaleY;
-        const rotation = slot.rotate || 0; // Rotation in degrees
+        const targetW = slot.width * scaleX;
+        const targetH = slot.height * scaleY;
+        const rotation = slot.rotate || 0;
 
-        // Apply filter to video before drawing
-        // Only apply CSS filters here, LUT filters should be applied to source video
         ctx.save();
 
         // Apply rotation around center if needed
         if (rotation !== 0) {
-          const centerX = targetX + targetWidth / 2;
-          const centerY = targetY + targetHeight / 2;
+          const centerX = targetX + targetW / 2;
+          const centerY = targetY + targetH / 2;
           ctx.translate(centerX, centerY);
           ctx.rotate((rotation * Math.PI) / 180);
           ctx.translate(-centerX, -centerY);
         }
 
         // LUT filters are already applied to source, no additional CSS filter needed
-        // (CSS filters are no longer supported - LUT only)
 
         ctx.drawImage(
-          video,
+          bitmap,
           sourceX,
           sourceY,
           sourceWidth,
           sourceHeight,
-          // targetX - 2,
-          // targetY - 2,
-          // targetWidth + 4,
-          // targetHeight + 4, // ทำให้รูปกินขอบเข้าไปนิดนึง by all
           targetX,
           targetY,
-          targetWidth,
-          targetHeight,
+          targetW,
+          targetH,
         );
 
         ctx.restore();
@@ -949,38 +1034,15 @@ const generateFramedVideo = async (
           drawSlot(slot, index);
         }
       });
-
-      // Schedule ถัดไปผ่าน requestVideoFrameCallback
-      scheduleNextFrame();
     };
 
-    // ===== requestVideoFrameCallback: sync กับ video decoder =====
-    // ใช้ video ตัวแรกเป็น driver — เมื่อ decode frame ใหม่เสร็จ → วาด canvas
-    // captureStream(30) จะจับ canvas ตาม frame rate ที่ตั้งไว้
-    const primaryVideo = videoElements[0];
-
-    const scheduleNextFrame = () => {
-      if (!recording) return;
-      if ('requestVideoFrameCallback' in primaryVideo) {
-        (primaryVideo as any).requestVideoFrameCallback(() => {
-          drawFrame();
-        });
-      } else {
-        // Fallback สำหรับ browser ที่ไม่รองรับ requestVideoFrameCallback
-        // (ไม่ควรเกิดใน Electron/Chromium)
-        requestAnimationFrame(() => {
-          drawFrame();
-        });
-      }
-    };
-
-    // Start recording with timeslice เพื่อให้ได้ data อย่างสม่ำเสมอ
-    // timeslice 500ms ช่วยป้องกัน data loss ถ้า recording หยุดกลางคัน
+    // ===== setInterval: reliable frame driver =====
+    // เนื่องจากวาดจาก ImageBitmap ใน memory (ไม่มี video decoder)
+    // setInterval timing เพียงพอ — captureStream(30) จัดการ frame rate เอง
+    const FRAME_INTERVAL = 1000 / 30; // ~33.33ms
     mediaRecorder.start(500);
-
-    // Draw first frame + start requestVideoFrameCallback chain
-    drawFrame();
-    scheduleNextFrame();
+    drawFrame(); // วาด frame แรกทันที
+    drawIntervalId = window.setInterval(drawFrame, FRAME_INTERVAL);
   });
 };
 
