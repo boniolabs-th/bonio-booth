@@ -144,20 +144,41 @@ const applyFilterToPhoto = async (
  * วิธีนี้เล่น video 1 ครั้ง จับทุก decoded frame เข้า memory
  * ทำให้ตอน record loop ไม่ต้องพึ่ง real-time decoder เลย
  * → ไม่ freeze บนเครื่องสเปคต่ำ (BMAX mini PC)
+ *
+ * @param maxWidth ความกว้างสูงสุดของ bitmap ที่เก็บ
+ *   ลด GPU memory สำหรับ onboard GPU ที่ใช้ shared RAM
+ *   1920x1080 @ ~8.3 MB/frame → resize เหลือ ~720p @ ~2.8 MB/frame (ลด ~65%)
  */
 const preExtractFrames = (
   video: HTMLVideoElement,
+  maxWidth: number = 1280,
 ): Promise<ImageBitmap[]> => {
   return new Promise<ImageBitmap[]>((resolve) => {
     const frames: ImageBitmap[] = [];
     let resolved = false;
+
+    // คำนวณ resize dimension ลด memory สำหรับ onboard GPU
+    const vw = video.videoWidth || maxWidth;
+    const vh = video.videoHeight || 720;
+    let resizeWidth = vw;
+    let resizeHeight = vh;
+    if (resizeWidth > maxWidth) {
+      const scale = maxWidth / resizeWidth;
+      resizeWidth = maxWidth;
+      resizeHeight = Math.round(resizeHeight * scale);
+    }
+    // Ensure even dimensions (required by some codecs)
+    if (resizeWidth % 2 !== 0) resizeWidth++;
+    if (resizeHeight % 2 !== 0) resizeHeight++;
+
+    console.log(`📸 [preExtractFrames] Resize: ${vw}x${vh} → ${resizeWidth}x${resizeHeight} (maxWidth=${maxWidth})`);
 
     const finish = () => {
       if (resolved) return;
       resolved = true;
       video.pause();
       console.log(
-        `📸 [preExtractFrames] Done: ${frames.length} frames captured`,
+        `📸 [preExtractFrames] Done: ${frames.length} frames captured (${resizeWidth}x${resizeHeight})`,
       );
       resolve(frames);
     };
@@ -182,7 +203,11 @@ const preExtractFrames = (
       }
 
       try {
-        const bitmap = await createImageBitmap(video);
+        const bitmap = await createImageBitmap(video, {
+          resizeWidth,
+          resizeHeight,
+          resizeQuality: 'medium',
+        });
         frames.push(bitmap);
       } catch {
         // skip frame if capture fails
@@ -756,7 +781,7 @@ const generateFramedVideo = async (
   const allVideoFrames: ImageBitmap[][] = [];
   for (let i = 0; i < videoElements.length; i++) {
     // eslint-disable-next-line no-await-in-loop
-    const frames = await preExtractFrames(videoElements[i]);
+    const frames = await preExtractFrames(videoElements[i], targetWidth);
     allVideoFrames.push(frames);
     console.log(
       `📸 [generateFramedVideo] Video ${i}: ${frames.length} frames extracted`,
@@ -781,6 +806,20 @@ const generateFramedVideo = async (
     firstFrameSize: allVideoFrames[0]?.[0]
       ? `${allVideoFrames[0][0].width}x${allVideoFrames[0][0].height}`
       : 'N/A',
+  });
+
+  // ใช้ actualVideoDuration จาก video element (duration จริง) ไม่ใช่ frame-based
+  // เหตุผล: webcam อาจบันทึก VFR เช่น ~16fps ได้ 48 frames ใน 3 วินาที
+  //         ถ้าคำนวณ 48/30 = 1.6 วินาที → วิดีโอจะเร่งเร็วเกือบ 2 เท่า
+  //         ใช้ duration จริงจาก video element จะได้ความเร็วเดิมที่ถูกต้อง
+  const minFrameCount = Math.min(...allVideoFrames.map((f) => f.length));
+  const maxFrameCount = Math.max(...allVideoFrames.map((f) => f.length));
+  const effectiveFps = minFrameCount / actualVideoDuration;
+  console.log('📸 [generateFramedVideo] Frame info:', {
+    minFrameCount,
+    maxFrameCount,
+    actualVideoDuration: actualVideoDuration.toFixed(2),
+    effectiveFps: effectiveFps.toFixed(1),
   });
 
   return new Promise<string>((resolve, reject) => {

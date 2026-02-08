@@ -1158,6 +1158,17 @@ export default function MainShooting() {
         const captureLoop = async () => {
           const newCaptures: Capture[] = [];
 
+          // หน่วงเวลาให้กล้องพร้อมก่อนเริ่มถ่ายรอบแรก
+          // กล้อง webcam ต้องการเวลาปรับ exposure/white balance
+          const CAMERA_WARMUP_MS = 1500;
+          console.log(
+            `📷 Waiting ${CAMERA_WARMUP_MS}ms for camera to warm up...`,
+          );
+          await new Promise((resolve) =>
+            setTimeout(resolve, CAMERA_WARMUP_MS),
+          );
+          console.log('📷 Camera warm-up done, starting capture loop');
+
           // eslint-disable-next-line no-plusplus
           for (let i = 0; i < requiredCaptures; i += 1) {
             console.log(`📷 Starting capture ${i + 1}/${requiredCaptures}`);
