@@ -49,14 +49,16 @@ export const createBoomerangVideo = async (
     // 4. Use fast encoding preset
     // 5. Apply BT.709 colorspace contract (guideVideo.md)
     const args = [
+      // 1. ใส่ -fflags +genpts ไว้ข้างหน้าสุด เพื่อบังคับให้สร้าง Timestamp ใหม่ตั้งแต่ต้น
+      '-fflags', '+genpts+igndts',
       '-i',
       inputVideoPath,
       '-filter_complex',
-      // ยุบเหลือชุดเดียว: ลับคมนิดหน่อย (unsharp) + รวมวิดีโอ (concat) + ย่อเป็น 720p เพื่อความลื่น by all
-      '[0:v]fps=30,unsharp=3:3:0.8,reverse,fifo[r];' +
-      '[0:v]fps=30,unsharp=3:3:0.8[o];' +
-      '[o][r]concat=n=2:v=1:a=0,scale=1280:-2,setsar=1,format=yuv420p',
-      // BT.709 Colorspace Contract (guideVideo.md Section 7)
+    // บังคับเอาเฉพาะ 45 เฟรมแรก (ถ้าอัด 30fps = 1.5 วิ) เพื่อมาทำไป-กลับให้ได้ 3 วิพอดี
+      '[0:v]trim=0.3:1.8,setpts=PTS-STARTPTS,fps=30,scale=1280:-2,unsharp=3:3:0.8,setpts=N/30/TB[v0];' +
+      '[v0]reverse,setpts=N/30/TB[v1];' +
+      '[v0][v1]concat=n=2:v=1:a=0,setpts=N/30/TB,format=yuv420p[v]',
+      '-map', '[v]',      // BT.709 Colorspace Contract (guideVideo.md Section 7)
       '-colorspace', 'bt709',
       '-color_primaries', 'bt709',
       '-color_trc', 'bt709',
@@ -64,11 +66,12 @@ export const createBoomerangVideo = async (
       '-c:v',
       'libx264',
       '-preset',
-      'veryfast', //tune by all increase compression.
+      'superfast', //tune by all increase compression. to superfast
       '-crf',
       '24', // ปรับ 20 เป็น 24
       '-r',
       '30',
+      '-vsync', 'cfr',
       '-pix_fmt',
       'yuv420p',
       '-movflags',
@@ -310,12 +313,16 @@ export const applyLutToVideo = async (
     // Apply LUT with BT.709 colorspace (guideVideo.md Section 9)
     console.log('==========================applyLutToVideo==========================');
     const args = [
+      '-fflags', '+genpts+igndts',
       '-i',
       inputVideoPath,
       '-vf',
+      // จัดระเบียบเฟรมใหม่ (setpts) และใส่ LUT ใน pass เดียว
+      `setpts=PTS-STARTPTS,lut3d=${lutFileName},format=yuv420p`,
       // LUT + format in one pass (guideVideo.md Section 9)
       `lut3d=${lutFileName},format=yuv420p`,
       // BT.709 Colorspace Contract (guideVideo.md Section 7)
+
       '-colorspace', 'bt709',
       '-color_primaries', 'bt709',
       '-color_trc', 'bt709',
@@ -323,7 +330,7 @@ export const applyLutToVideo = async (
       '-c:v',
       'libx264',
       '-preset',
-      'medium',
+      'superfast',
       '-crf',
       '22',
       '-r',
@@ -668,29 +675,24 @@ export const startRecordingCallback = (
     }
 
     const {
-      saturation = 1.7,   // High saturation for deep colors
-      contrast = 1.3,     // High contrast for punchy look
-      brightness = -0.08, // Reduce brightness to fix washout
-      gamma = 0.8         // Lower gamma for richer midtones
+      saturation = 1.7,
+      contrast = 1.3,
+      brightness = -0.08,
+      gamma = 0.8
     } = options;
 
-    // Filter string for color correction (guideVideo.md Section 6)
-    // brightness: -1.0 to 1.0 (default 0)
-    // gamma: 0.1 to 10.0 (default 1)
     const vf = `eq=saturation=${saturation}:contrast=${contrast}:brightness=${brightness}:gamma=${gamma},format=yuv420p`;
 
-    // Native Recording with BT.709 colorspace (guideVideo.md Section 7)
     const args = [
       '-f', 'dshow',
       '-i', `video=${deviceName}`,
       '-vf', vf,
-      // BT.709 Colorspace Contract - CRITICAL for color accuracy
       '-colorspace', 'bt709',
       '-color_primaries', 'bt709',
       '-color_trc', 'bt709',
       '-color_range', 'tv',
       '-c:v', 'libx264',
-      '-preset', 'ultrafast', // Low CPU usage for real-time
+      '-preset', 'ultrafast',
       '-tune', 'zerolatency',
       '-r', '30',
       '-y',
@@ -701,28 +703,30 @@ export const startRecordingCallback = (
 
     activeRecordingProcess = spawn(getFFmpegPath(), args);
 
-    activeRecordingProcess.stderr!.on('data', (data) => {
-      // console.log(`FFmpeg Rec: ${data}`); // Optional: Log ffmpeg output
-    });
-
     activeRecordingProcess.on('error', (err) => {
       console.error('FFmpeg recording start error:', err);
       activeRecordingProcess = null;
       reject(err);
     });
 
-    // We consider it started if it doesn't crash immediately (e.g. within 500ms)
-    // But since it's async process, we just resolve immediately and handle errors via events if needed
-    // Better: wait a bit to ensure it started
+
+    // แก้ไขช่วงท้ายของ startRecordingCallback
+// แก้ไขช่วงท้ายของ startRecordingCallback
     setTimeout(() => {
         if (activeRecordingProcess && activeRecordingProcess.exitCode === null) {
-            resolve();
+            // หน่วงเพิ่ม 500ms เพื่อให้ FFmpeg บันทึก "เนื้อวิดีโอ" ช่วงต้นรอไว้ก่อน
+            // แล้วค่อยส่งสัญญาณให้ UI เริ่มนับถอยหลัง 3-2-1
+            setTimeout(() => {
+                console.log('Camera is ready and buffered, starting UI countdown...');
+                resolve();
+            }, 500);
         } else {
             reject(new Error('Process exited immediately (check device name)'));
         }
     }, 1000);
   });
 };
+
 
 /**
  * Stop the current recording
