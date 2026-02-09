@@ -312,16 +312,15 @@ export const applyLutToVideo = async (
     // we'll process the entire input without duration limit
     // Apply LUT with BT.709 colorspace (guideVideo.md Section 9)
     console.log('==========================applyLutToVideo==========================');
+    // ใช้ encoding params เดียวกับ convertWebmToMp4 → ให้ browser decode เหมือนกัน
+    // ป้องกัน freeze ที่เกิดจาก bitstream characteristics ต่างกัน
     const args = [
       '-i',
       inputVideoPath,
       '-vf',
-      // Apply LUT only — ไม่ manipulate timestamps
-      // Input เป็น MP4 ที่ clean แล้ว (ผ่าน convertCanonWebmToMp4 หรือ webcam recording)
-      // ถ้าใส่ genpts+igndts + setpts จะทำให้ frame แรกๆ bunch up ที่ time 0 → video ค้าง
-      `lut3d=${lutFileName},format=yuv420p`,
+      // Apply LUT + scale ให้ตรงกับ convertWebmToMp4 output
+      `lut3d=${lutFileName},scale=1280:-2,format=yuv420p`,
       // BT.709 Colorspace Contract (guideVideo.md Section 7)
-
       '-colorspace', 'bt709',
       '-color_primaries', 'bt709',
       '-color_trc', 'bt709',
@@ -329,15 +328,14 @@ export const applyLutToVideo = async (
       '-c:v',
       'libx264',
       '-preset',
-      'superfast',
+      'fast', // ใช้ fast เหมือน convertWebmToMp4 (ไม่ใช่ superfast)
       '-crf',
-      '22',
-      '-bf',
-      '0', // Disable B-frames — ป้องกัน decoder buffer delay ที่ทำให้ frame แรกค้าง
+      '20', // ใช้ crf 20 เหมือน convertWebmToMp4
       '-r',
       '30',
       '-pix_fmt',
       'yuv420p',
+      '-an', // Strip audio เหมือน convertWebmToMp4
       '-movflags',
       '+faststart',
       '-vsync',

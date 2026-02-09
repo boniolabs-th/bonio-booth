@@ -205,6 +205,9 @@ const preExtractFrames = async (
   // ===== Step 2: เล่นต่อที่ 3x speed สำหรับ frame ที่เหลือ =====
   await new Promise<void>((resolve) => {
     let resolved = false;
+    // Skip frame แรกหลัง play() เพราะ requestVideoFrameCallback จะ fire ที่ frame 0 อีกครั้ง
+    // (frame 0 ถูกจับไว้แล้วตอน paused) → ถ้าไม่ skip จะได้ frame ซ้ำ → เห็นเป็น freeze ~0.1-0.2s
+    let skipFirst = true;
 
     const finish = () => {
       if (resolved) return;
@@ -232,6 +235,17 @@ const preExtractFrames = async (
       if (video.ended || video.paused) {
         clearTimeout(timeout);
         finish();
+        return;
+      }
+
+      // Skip first callback — เป็น frame 0 ซ้ำที่จับไว้ตอน paused แล้ว
+      if (skipFirst) {
+        skipFirst = false;
+        if ('requestVideoFrameCallback' in video) {
+          (video as any).requestVideoFrameCallback(onFrame);
+        } else {
+          requestAnimationFrame(onFrame);
+        }
         return;
       }
 
@@ -307,7 +321,7 @@ const generateFramedVideo = async (
       videoElement.src = capture.video;
       videoElement.muted = true;
       videoElement.preload = 'auto';
-      videoElement.loop = true;
+      videoElement.loop = false; // ไม่ต้อง loop — preExtractFrames จะเล่น 1 รอบแล้วหยุด
       videoElement.playsInline = true;
 
       let resolved = false;
