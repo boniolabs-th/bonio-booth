@@ -1237,6 +1237,17 @@ sseClient.on(MachineEventType.SSE_DISCONNECTED, (_, data) => {
   }
 });
 
+sseClient.on(MachineEventType.HEARTBEAT, async (_, data) => {
+  log.debug('[Main] SSE Heartbeat received:', data);
+
+  // Check configured devices on every heartbeat
+  try {
+    await checkConfiguredDevices();
+  } catch (err) {
+    log.error('[Main] Error in checkConfiguredDevices on heartbeat:', err);
+  }
+});
+
 app.on('window-all-closed', () => {
   // หยุด power save blocker เมื่อปิด app
   if (powerSaveBlockerId !== null && powerSaveBlocker.isStarted(powerSaveBlockerId)) {
