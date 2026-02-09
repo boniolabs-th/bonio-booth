@@ -313,13 +313,12 @@ export const applyLutToVideo = async (
     // Apply LUT with BT.709 colorspace (guideVideo.md Section 9)
     console.log('==========================applyLutToVideo==========================');
     const args = [
-      '-fflags', '+genpts+igndts',
       '-i',
       inputVideoPath,
       '-vf',
-      // จัดระเบียบเฟรมใหม่ (setpts) และใส่ LUT ใน pass เดียว
-      `setpts=PTS-STARTPTS,lut3d=${lutFileName},format=yuv420p`,
-      // LUT + format in one pass (guideVideo.md Section 9)
+      // Apply LUT only — ไม่ manipulate timestamps
+      // Input เป็น MP4 ที่ clean แล้ว (ผ่าน convertCanonWebmToMp4 หรือ webcam recording)
+      // ถ้าใส่ genpts+igndts + setpts จะทำให้ frame แรกๆ bunch up ที่ time 0 → video ค้าง
       `lut3d=${lutFileName},format=yuv420p`,
       // BT.709 Colorspace Contract (guideVideo.md Section 7)
 
@@ -333,6 +332,8 @@ export const applyLutToVideo = async (
       'superfast',
       '-crf',
       '22',
+      '-bf',
+      '0', // Disable B-frames — ป้องกัน decoder buffer delay ที่ทำให้ frame แรกค้าง
       '-r',
       '30',
       '-pix_fmt',

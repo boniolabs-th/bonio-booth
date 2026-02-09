@@ -149,29 +149,62 @@ const applyFilterToPhoto = async (
  *   ลด GPU memory สำหรับ onboard GPU ที่ใช้ shared RAM
  *   1920x1080 @ ~8.3 MB/frame → resize เหลือ ~720p @ ~2.8 MB/frame (ลด ~65%)
  */
-const preExtractFrames = (
+const preExtractFrames = async (
   video: HTMLVideoElement,
   maxWidth: number = 1280,
 ): Promise<ImageBitmap[]> => {
-  return new Promise<ImageBitmap[]>((resolve) => {
-    const frames: ImageBitmap[] = [];
+  const frames: ImageBitmap[] = [];
+
+  // คำนวณ resize dimension ลด memory สำหรับ onboard GPU
+  const vw = video.videoWidth || maxWidth;
+  const vh = video.videoHeight || 720;
+  let resizeWidth = vw;
+  let resizeHeight = vh;
+  if (resizeWidth > maxWidth) {
+    const scale = maxWidth / resizeWidth;
+    resizeWidth = maxWidth;
+    resizeHeight = Math.round(resizeHeight * scale);
+  }
+  // Ensure even dimensions (required by some codecs)
+  if (resizeWidth % 2 !== 0) resizeWidth++;
+  if (resizeHeight % 2 !== 0) resizeHeight++;
+
+  console.log(`📸 [preExtractFrames] Resize: ${vw}x${vh} → ${resizeWidth}x${resizeHeight} (maxWidth=${maxWidth})`);
+
+  // ===== Step 1: จับ frame แรกตอน paused → แก้ปัญหา freeze ตอนเริ่ม =====
+  // เมื่อ video loaded (readyState >= HAVE_CURRENT_DATA) frame 0 ถูก decode พร้อมแล้ว
+  // จับ frame นี้ขณะ paused → ได้ clean first frame ไม่ต้องรอ decoder init
+  // eslint-disable-next-line no-param-reassign
+  video.currentTime = 0;
+  // eslint-disable-next-line no-param-reassign
+  video.loop = false;
+  // eslint-disable-next-line no-param-reassign
+  video.muted = true;
+  // eslint-disable-next-line no-param-reassign
+  video.preload = 'auto';
+
+  // รอให้ frame 0 ถูก decode พร้อม
+  if (video.readyState < 2) {
+    await new Promise<void>((r) => {
+      video.addEventListener('canplay', () => r(), { once: true });
+    });
+  }
+
+  // จับ frame 0 ขณะ paused — guaranteed clean, ไม่มี decoder delay
+  try {
+    const firstBitmap = await createImageBitmap(video, {
+      resizeWidth,
+      resizeHeight,
+      resizeQuality: 'medium',
+    });
+    frames.push(firstBitmap);
+  } catch {
+    // skip if fails
+  }
+
+  // ===== Step 2: เล่นต่อที่ 3x speed สำหรับ frame ที่เหลือ =====
+  await new Promise<void>((resolve) => {
     let resolved = false;
-
-    // คำนวณ resize dimension ลด memory สำหรับ onboard GPU
-    const vw = video.videoWidth || maxWidth;
-    const vh = video.videoHeight || 720;
-    let resizeWidth = vw;
-    let resizeHeight = vh;
-    if (resizeWidth > maxWidth) {
-      const scale = maxWidth / resizeWidth;
-      resizeWidth = maxWidth;
-      resizeHeight = Math.round(resizeHeight * scale);
-    }
-    // Ensure even dimensions (required by some codecs)
-    if (resizeWidth % 2 !== 0) resizeWidth++;
-    if (resizeHeight % 2 !== 0) resizeHeight++;
-
-    console.log(`📸 [preExtractFrames] Resize: ${vw}x${vh} → ${resizeWidth}x${resizeHeight} (maxWidth=${maxWidth})`);
 
     const finish = () => {
       if (resolved) return;
@@ -180,7 +213,7 @@ const preExtractFrames = (
       console.log(
         `📸 [preExtractFrames] Done: ${frames.length} frames captured (${resizeWidth}x${resizeHeight})`,
       );
-      resolve(frames);
+      resolve();
     };
 
     // Safety timeout: ถ้า extraction ใช้เวลานานเกิน 15 วินาที → หยุด
@@ -230,15 +263,8 @@ const preExtractFrames = (
       { once: true },
     );
 
-    // เริ่มเล่น video แล้วจับ frame
     // eslint-disable-next-line no-param-reassign
-    video.currentTime = 0;
-    // eslint-disable-next-line no-param-reassign
-    video.loop = false;
-    // eslint-disable-next-line no-param-reassign
-    video.muted = true;
-    // eslint-disable-next-line no-param-reassign
-    video.playbackRate = 1.0;
+    video.playbackRate = 3.0;
     video
       .play()
       .then(() => {
@@ -253,6 +279,8 @@ const preExtractFrames = (
         finish();
       });
   });
+
+  return frames;
 };
 
 const generateFramedVideo = async (
@@ -808,13 +836,18 @@ const generateFramedVideo = async (
       : 'N/A',
   });
 
-  // ใช้ actualVideoDuration จาก video element (duration จริง) ไม่ใช่ frame-based
-  // เหตุผล: webcam อาจบันทึก VFR เช่น ~16fps ได้ 48 frames ใน 3 วินาที
-  //         ถ้าคำนวณ 48/30 = 1.6 วินาที → วิดีโอจะเร่งเร็วเกือบ 2 เท่า
-  //         ใช้ duration จริงจาก video element จะได้ความเร็วเดิมที่ถูกต้อง
+  // ใช้ actualVideoDuration จาก video element (duration จริง) เป็น authoritative
+  // เหตุผล: preExtractFrames ใช้ playbackRate=3x ทำให้ frame count ต่ำกว่า 30fps ต่อวินาทีของ video
+  //         เช่น video 3 วิ จับได้ ~44 frames (แทนที่จะได้ ~90 ที่ 1x)
+  //         ดังนั้น frame count ไม่สามารถใช้ประมาณ duration ได้
+  //         video.duration จาก element มีค่าถูกต้องเสมอ:
+  //           - Canon → ผ่าน convertCanonWebmToMp4 (FFmpeg สร้าง MP4 ที่มี duration ถูกต้อง)
+  //           - Webcam → MediaRecorder + fixWebmDuration ได้ duration ถูกต้อง
+  //           - LUT → FFmpeg สร้าง MP4 ที่มี duration ถูกต้อง
   const minFrameCount = Math.min(...allVideoFrames.map((f) => f.length));
   const maxFrameCount = Math.max(...allVideoFrames.map((f) => f.length));
   const effectiveFps = minFrameCount / actualVideoDuration;
+
   console.log('📸 [generateFramedVideo] Frame info:', {
     minFrameCount,
     maxFrameCount,
@@ -961,7 +994,7 @@ const generateFramedVideo = async (
       // Stop recording when we reach target duration + buffer
       // บันทึกเกิน 1 วินาที เพื่อให้มี frames เพียงพอ
       // FFmpeg จะตัดให้เหลือ 9 วินาทีพอดีด้วย -t 9
-      const recordBuffer = 1; // 1 second extra to ensure enough frames
+      const recordBuffer = 0.2; // 0.2 second buffer — FFmpeg ตัดด้วย -t 9 อยู่แล้ว
       if (elapsed >= recordingDuration + recordBuffer) {
         // เก็บ elapsed time จริงสำหรับ fix-webm-duration
         actualElapsedMs = Math.round(performance.now() - startTime);

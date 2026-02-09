@@ -197,6 +197,7 @@ export default function MainShooting() {
   const [isCameraLoading, setIsCameraLoading] = useState(true);
   const [cameraError, setCameraError] = useState<string>('');
   const [isRecording, setIsRecording] = useState(false);
+  const [showGetReady, setShowGetReady] = useState(false);
   const [videoDimensions, setVideoDimensions] = useState<{
     width: number;
     height: number;
@@ -713,13 +714,18 @@ export default function MainShooting() {
             const rawBlob = new Blob(chunks, { type: selectedMimeType });
 
             // Fix WebM duration metadata (MediaRecorder สร้าง WebM ที่มี duration: Infinity)
-            const actualElapsedMs = Math.round(performance.now() - recordingStartTime);
+            // ⚠️ ใช้ actual elapsed time จาก mediaRecorder.start() ถึง stop()
+            // เพราะ captureStream(30) สร้าง frame ตาม wall-clock time
+            // ถ้าใช้ frames.length/fps จะผิดเพราะ captureStream สร้าง frame มากกว่า Canon source frames
+            // → ทำให้ video เล่นเร็วกว่าจริง
+            const actualRecordingMs = Math.round(performance.now() - recordingActualStartTime);
+            const computedDurationMs = Math.round((frames.length / fps) * 1000);
             console.log(
-              `📷 [Canon] Fixing WebM duration: ${actualElapsedMs}ms, size: ${(rawBlob.size / 1024).toFixed(1)} KB`,
+              `📷 [Canon] Fixing WebM duration: actualRecording=${actualRecordingMs}ms, computed=${computedDurationMs}ms (${frames.length}frames/${fps}fps), size: ${(rawBlob.size / 1024).toFixed(1)} KB`,
             );
 
             try {
-              const fixedBlob = await fixWebmDuration(rawBlob, actualElapsedMs, {
+              const fixedBlob = await fixWebmDuration(rawBlob, actualRecordingMs, {
                 logger: false,
               });
               const url = URL.createObjectURL(fixedBlob);
@@ -742,6 +748,7 @@ export default function MainShooting() {
 
           // Start recording with timeslice เพื่อให้ได้ data อย่างสม่ำเสมอ
           mediaRecorder.start(500);
+          const recordingActualStartTime = performance.now();
 
           // Pre-load all frame images first for consistent timing
           const loadImage = (src: string): Promise<HTMLImageElement> =>
@@ -761,17 +768,12 @@ export default function MainShooting() {
 
           const drawNextFrame = async () => {
             if (frameIndex >= frames.length) {
-              // All frames drawn - stop recording immediately (no delay!)
-              // ไม่ต้องรอ frame interval เพิ่ม เพราะจะทำให้ frame สุดท้ายค้าง
+              // All frames drawn — เรียก stop() ตรงๆ
+              // ตาม MediaRecorder spec: stop() จะ fire dataavailable (flush remaining data)
+              // ก่อน fire stop event เสมอ — ไม่ต้อง requestData() หรือ delay ใดๆ
               if (mediaRecorder.state === 'recording') {
-                mediaRecorder.requestData(); // flush pending data
+                mediaRecorder.stop();
               }
-              // Small delay เพื่อให้ requestData flush เสร็จ
-              setTimeout(() => {
-                if (mediaRecorder.state === 'recording') {
-                  mediaRecorder.stop();
-                }
-              }, 50);
               return;
             }
 
@@ -1158,15 +1160,53 @@ export default function MainShooting() {
         const captureLoop = async () => {
           const newCaptures: Capture[] = [];
 
-          // หน่วงเวลาให้กล้องพร้อมก่อนเริ่มถ่ายรอบแรก
-          // กล้อง webcam ต้องการเวลาปรับ exposure/white balance
-          const CAMERA_WARMUP_MS = 1500;
-          console.log(
-            `📷 Waiting ${CAMERA_WARMUP_MS}ms for camera to warm up...`,
-          );
-          await new Promise((resolve) =>
-            setTimeout(resolve, CAMERA_WARMUP_MS),
-          );
+          // รอให้กล้องพร้อมจริงๆ ก่อนเริ่มถ่าย
+          // Canon: รอจน Live View ส่ง frame ใหม่ต่อเนื่อง (ไม่ซ้ำกับ frame ก่อนหน้า)
+          // Webcam: fixed delay ให้ปรับ exposure/white balance
+          if (cameraTypeRef.current === 'canon') {
+            // Canon: รอให้ได้ frame ใหม่ที่ไม่ซ้ำกับ frame ก่อนหน้า 2 ตัวติด
+            // เพื่อให้แน่ใจว่ากล้อง settle แล้ว (exposure/focus พร้อม)
+            // ป้องกันช็อตแรกมี duplicate frames ตอนเริ่ม → video ค้าง ~0.2 วิ
+            const FRESH_FRAME_TIMEOUT = 5000; // รอสูงสุด 5 วินาที
+            const POLL_MS = 50;
+            let elapsed = 0;
+            let lastFingerprint = '';
+            let freshCount = 0;
+            const REQUIRED_FRESH = 2; // ต้องได้ frame ใหม่ติดกัน 2 ตัว
+
+            console.log('📷 [Canon] Waiting for fresh frames before first capture...');
+            setShowGetReady(true);
+
+            while (elapsed < FRESH_FRAME_TIMEOUT && freshCount < REQUIRED_FRESH) {
+              const frame = canonCamera.liveViewFrame;
+              if (frame) {
+                // Fingerprint: length + last 100 chars (ส่วนท้าย JPEG เปลี่ยนเยอะสุด)
+                const fp = `${frame.length}:${frame.slice(-100)}`;
+                if (fp !== lastFingerprint) {
+                  freshCount++;
+                  lastFingerprint = fp;
+                  console.log(`📷 [Canon] Fresh frame ${freshCount}/${REQUIRED_FRESH} after ${elapsed}ms`);
+                }
+              }
+              // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
+              await new Promise((r) => setTimeout(r, POLL_MS));
+              elapsed += POLL_MS;
+            }
+
+            setShowGetReady(false);
+            if (freshCount >= REQUIRED_FRESH) {
+              console.log(`✅ [Canon] Camera ready — ${freshCount} fresh frames in ${elapsed}ms`);
+            } else {
+              console.warn(`⚠️ [Canon] Fresh frame timeout after ${elapsed}ms (got ${freshCount}/${REQUIRED_FRESH}) — proceeding anyway`);
+            }
+          } else {
+            // Webcam: fixed delay ให้ปรับ exposure/white balance
+            const CAMERA_WARMUP_MS = 1500;
+            console.log(`📷 Waiting ${CAMERA_WARMUP_MS}ms for webcam to warm up...`);
+            setShowGetReady(true);
+            await new Promise((resolve) => setTimeout(resolve, CAMERA_WARMUP_MS));
+            setShowGetReady(false);
+          }
           console.log('📷 Camera warm-up done, starting capture loop');
 
           // eslint-disable-next-line no-plusplus
@@ -1353,7 +1393,7 @@ export default function MainShooting() {
             captures,
             useBoomerang: state.useBoomerang || false,
             // ส่ง videoDuration ไปด้วย เพราะ WebM ไม่มี duration metadata
-            videoDuration: cameraCountdownRef.current + 1, // countdown + buffer
+            videoDuration: 3, // Canon records exactly 3 seconds (VIDEO_RECORDING_DURATION)
             // ส่ง cameraType เพื่อให้ PhotoFilter รู้ว่าต้อง process อย่างไร
             cameraType,
           },
@@ -1464,6 +1504,12 @@ export default function MainShooting() {
               >
                 Retry
               </button>
+            </div>
+          )}
+
+          {showGetReady && !isCameraLoading && !showCountdown && (
+            <div className="countdown-overlay-shooting">
+              <div className="countdown-text" style={{ fontSize: '48px', fontWeight: 'bold' }}>Get ready...</div>
             </div>
           )}
 
