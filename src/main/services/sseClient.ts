@@ -232,6 +232,8 @@ export class SseClient {
         this.isConnectedFlag = true;
         this.reconnectAttempts = 0;
 
+        this.updateMachineInfo({ status: 'online' });
+
         // ⭐ เริ่ม heartbeat monitoring
         this.startHeartbeatMonitoring();
 
@@ -645,7 +647,7 @@ export class SseClient {
    */
   async destroy(): Promise<void> {
     console.log('🗑️ [SseClient] Destroying instance...');
-    await this.updateMachineInfo({ status: 'offline' });
+    // await this.updateMachineInfo({ status: 'offline' });
     this.disconnect();
     this.eventCallbacks.clear();
     console.log('✅ [SseClient] Instance destroyed');

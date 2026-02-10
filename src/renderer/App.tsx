@@ -43,7 +43,12 @@ function RouteListener() {
   const location = useLocation();
 
   useEffect(() => {
-    // Send route change message to index.tsx
+    console.log('[Renderer] Route changed to:', location.pathname);
+    // Send route change to main process
+    if (window.electron?.sendRouteChange) {
+      window.electron.sendRouteChange(location.pathname);
+    }
+    // Also keep the original postMessage for backward compatibility
     window.postMessage(
       { type: 'ROUTE_CHANGE', pathname: location.pathname },
       '*',

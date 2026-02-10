@@ -42,6 +42,7 @@ export default function SystemMaintenance() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const res = await (window as any).electron.payment.forceInit();
           console.log('SystemMaintenance res:', res);
+          console.log('SystemMaintenance isDeviceNotFound:', isDeviceNotFound);
 
           if (
             res.success &&
