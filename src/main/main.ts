@@ -10,7 +10,15 @@
  */
 
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain, session, powerSaveBlocker, dialog } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  shell,
+  ipcMain,
+  session,
+  powerSaveBlocker,
+  dialog,
+} from 'electron';
 import { promises as fs } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -67,7 +75,11 @@ import { backgroundUploadService } from './services/backgroundUploadService';
 import sseClient, { MachineEventType } from './services/sseClient';
 import shutdownManager, { ShutdownState } from './services/shutdownManager';
 import appCloseManager, { AppCloseState } from './services/appCloseManager';
-import { getEnvConfig, clearEnvConfigCache, DEFAULT_PORT } from './config/env.config';
+import {
+  getEnvConfig,
+  clearEnvConfigCache,
+  DEFAULT_PORT,
+} from './config/env.config';
 import {
   getMachineConfig,
   saveMachineConfig,
@@ -120,46 +132,58 @@ class AppUpdater {
 
     // Events
     autoUpdater.on('error', (error) => {
-      dialog.showErrorBox('Update Error', error == null ? "unknown" : (error.stack || error).toString());
+      dialog.showErrorBox(
+        'Update Error',
+        error == null ? 'unknown' : (error.stack || error).toString(),
+      );
     });
 
     autoUpdater.on('update-available', (info) => {
-      dialog.showMessageBox({
-        type: 'info',
-        title: 'Found Updates',
-        message: 'New version available: ' + info.version + '.\nDo you want to download it now?',
-        buttons: ['Yes', 'No']
-      }).then((result) => {
-        if (result.response === 0) {
-          autoUpdater.downloadUpdate();
-        }
-      });
+      dialog
+        .showMessageBox({
+          type: 'info',
+          title: 'Found Updates',
+          message:
+            'New version available: ' +
+            info.version +
+            '.\nDo you want to download it now?',
+          buttons: ['Yes', 'No'],
+        })
+        .then((result) => {
+          if (result.response === 0) {
+            autoUpdater.downloadUpdate();
+          }
+        });
     });
 
     autoUpdater.on('update-not-available', (info) => {
-       dialog.showMessageBox({
+      dialog.showMessageBox({
         title: 'No Updates',
         message: 'Current version is up-to-date.',
-        buttons: ['OK']
-       });
+        buttons: ['OK'],
+      });
     });
 
     autoUpdater.on('download-progress', (progressObj) => {
-       // Optional: Show progress?
-       // For now, let's just log it. A modal progress bar would be nice but simple dialog is requested.
-       log.info(`Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}%`);
+      // Optional: Show progress?
+      // For now, let's just log it. A modal progress bar would be nice but simple dialog is requested.
+      log.info(
+        `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}%`,
+      );
     });
 
     autoUpdater.on('update-downloaded', (info) => {
-      dialog.showMessageBox({
-        title: 'Install Updates',
-        message: 'Updates downloaded, application will be quit for update...',
-        buttons: ['Update Now', 'Later']
-      }).then((result) => {
-        if (result.response === 0) {
-          autoUpdater.quitAndInstall();
-        }
-      });
+      dialog
+        .showMessageBox({
+          title: 'Install Updates',
+          message: 'Updates downloaded, application will be quit for update...',
+          buttons: ['Update Now', 'Later'],
+        })
+        .then((result) => {
+          if (result.response === 0) {
+            autoUpdater.quitAndInstall();
+          }
+        });
     });
   }
 }
@@ -172,7 +196,6 @@ let isHandlingShutdownReady = false;
  * Helper function สำหรับเช็คและจัดการ isShutdownReady หลังจากเรียก init()
  */
 function handleShutdownReady(initResponse: any): void {
-
   if (isHandlingShutdownReady) {
     console.log('⚠️ [Main] Already handling shutdown ready, skipping');
     return;
@@ -182,9 +205,18 @@ function handleShutdownReady(initResponse: any): void {
 
   try {
     // ส่ง log ไปที่ renderer
-    const sendLog = (level: 'log' | 'warn' | 'error', message: string, data?: any) => {
+    const sendLog = (
+      level: 'log' | 'warn' | 'error',
+      message: string,
+      data?: any,
+    ) => {
       if (mainWindow) {
-        mainWindow.webContents.send('shutdown-log', { level, message, data, timestamp: new Date().toISOString() });
+        mainWindow.webContents.send('shutdown-log', {
+          level,
+          message,
+          data,
+          timestamp: new Date().toISOString(),
+        });
       }
     };
 
@@ -192,32 +224,47 @@ function handleShutdownReady(initResponse: any): void {
     console.log('isClosedAppReady', initResponse?.isClosedAppReady);
 
     // ดึง isShutdownReady โดยเช็คทั้ง undefined, null, false
-    const isShutdownReady = (initResponse as any)?.isShutdownReady ?? initResponse?.isShutdownReady;
-    const isShutdownReadyBool = isShutdownReady === true || isShutdownReady === 'true';
+    const isShutdownReady =
+      (initResponse as any)?.isShutdownReady ?? initResponse?.isShutdownReady;
+    const isShutdownReadyBool =
+      isShutdownReady === true || isShutdownReady === 'true';
 
     // ดึง isClosedAppReady
-    const isClosedAppReady = (initResponse as any)?.isClosedAppReady ?? initResponse?.isClosedAppReady;
-    const isClosedAppReadyBool = isClosedAppReady === true || isClosedAppReady === 'true';
+    const isClosedAppReady =
+      (initResponse as any)?.isClosedAppReady ?? initResponse?.isClosedAppReady;
+    const isClosedAppReadyBool =
+      isClosedAppReady === true || isClosedAppReady === 'true';
 
     // Log ทุกครั้งที่ function ถูกเรียก (สำคัญมาก!)
     console.log('🔍 [Main] ========== HANDLING SHUTDOWN READY ==========');
     console.log('🔍 [Main] isShutdownReady from init (raw):', isShutdownReady);
     console.log('🔍 [Main] isShutdownReady (boolean):', isShutdownReadyBool);
-    console.log('🔍 [Main] isClosedAppReady from init (raw):', isClosedAppReady);
+    console.log(
+      '🔍 [Main] isClosedAppReady from init (raw):',
+      isClosedAppReady,
+    );
     console.log('🔍 [Main] isClosedAppReady (boolean):', isClosedAppReadyBool);
-    console.log('🔍 [Main] Current shutdown state BEFORE:', shutdownManager.getState());
+    console.log(
+      '🔍 [Main] Current shutdown state BEFORE:',
+      shutdownManager.getState(),
+    );
 
     sendLog('warn', '🔍 ========== HANDLING SHUTDOWN READY ==========');
     sendLog('log', '🔍 isShutdownReady & isClosedAppReady', {
       isShutdownReady: { raw: isShutdownReady, boolean: isShutdownReadyBool },
-      isClosedAppReady: { raw: isClosedAppReady, boolean: isClosedAppReadyBool },
+      isClosedAppReady: {
+        raw: isClosedAppReady,
+        boolean: isClosedAppReadyBool,
+      },
       stateBefore: shutdownManager.getState(),
     });
 
     // จัดการ isShutdownReady (shutdown เครื่อง)
     if (isShutdownReadyBool) {
       // ถ้า isShutdownReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
-      console.log('🛑 [Main] isShutdownReady is TRUE, ensuring countdown is running');
+      console.log(
+        '🛑 [Main] isShutdownReady is TRUE, ensuring countdown is running',
+      );
       sendLog('error', '🛑 isShutdownReady = TRUE, starting countdown');
       shutdownManager.ensureCountdown(2, 'manual'); // ใช้ 2 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
       const stateAfter = shutdownManager.getState();
@@ -225,7 +272,9 @@ function handleShutdownReady(initResponse: any): void {
       sendLog('log', '🛑 Countdown started', { stateAfter });
     } else {
       // ถ้า isShutdownReady เป็น false, undefined, หรือ null ให้เคลียร์ shutdown ทันที
-      console.log('🔄 [Main] isShutdownReady is FALSE/undefined/null, cancelling shutdown immediately');
+      console.log(
+        '🔄 [Main] isShutdownReady is FALSE/undefined/null, cancelling shutdown immediately',
+      );
       sendLog('error', '🔄 isShutdownReady = FALSE, cancelling shutdown NOW!');
       shutdownManager.cancelShutdown();
       const stateAfter = shutdownManager.getState();
@@ -236,19 +285,32 @@ function handleShutdownReady(initResponse: any): void {
     // จัดการ isClosedAppReady (ปิดโปรแกรม)
     if (isClosedAppReadyBool) {
       // ถ้า isClosedAppReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
-      console.log('🚪 [Main] isClosedAppReady is TRUE, ensuring app close countdown is running');
-      sendLog('error', '🚪 isClosedAppReady = TRUE, starting app close countdown');
+      console.log(
+        '🚪 [Main] isClosedAppReady is TRUE, ensuring app close countdown is running',
+      );
+      sendLog(
+        'error',
+        '🚪 isClosedAppReady = TRUE, starting app close countdown',
+      );
       appCloseManager.ensureCountdown(2); // ใช้ 2 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
       const stateAfter = appCloseManager.getState();
       console.log('🚪 [Main] Current app close state AFTER:', stateAfter);
       sendLog('log', '🚪 App close countdown started', { stateAfter });
     } else {
       // ถ้า isClosedAppReady เป็น false, undefined, หรือ null ให้เคลียร์ app close ทันที
-      console.log('🔄 [Main] isClosedAppReady is FALSE/undefined/null, cancelling app close immediately');
-      sendLog('error', '🔄 isClosedAppReady = FALSE, cancelling app close NOW!');
+      console.log(
+        '🔄 [Main] isClosedAppReady is FALSE/undefined/null, cancelling app close immediately',
+      );
+      sendLog(
+        'error',
+        '🔄 isClosedAppReady = FALSE, cancelling app close NOW!',
+      );
       appCloseManager.cancelAppClose();
       const stateAfter = appCloseManager.getState();
-      console.log('🔄 [Main] Current app close state AFTER cancel:', stateAfter);
+      console.log(
+        '🔄 [Main] Current app close state AFTER cancel:',
+        stateAfter,
+      );
       sendLog('log', '🔄 App close cancelled', { stateAfter });
     }
   } finally {
@@ -268,7 +330,9 @@ async function initializeApp() {
 
     machineId = envConfig.MACHINE_ID;
     const machineIdFromConfig = envConfig.MACHINE_ID;
-    const machinePortFromConfig = envConfig.PORT ? Number(envConfig.PORT) : Number(DEFAULT_PORT);
+    const machinePortFromConfig = envConfig.PORT
+      ? Number(envConfig.PORT)
+      : Number(DEFAULT_PORT);
 
     console.log('🔍 [Main] Config from storage:', {
       machineId: machineIdFromConfig,
@@ -350,9 +414,18 @@ async function initializeApp() {
     // }
 
     // Helper function สำหรับส่ง log ไปที่ renderer (DevTools)
-    const sendLogToRenderer = (level: 'log' | 'warn' | 'error', message: string, data?: any) => {
+    const sendLogToRenderer = (
+      level: 'log' | 'warn' | 'error',
+      message: string,
+      data?: any,
+    ) => {
       if (mainWindow) {
-        mainWindow.webContents.send('shutdown-log', { level, message, data, timestamp: new Date().toISOString() });
+        mainWindow.webContents.send('shutdown-log', {
+          level,
+          message,
+          data,
+          timestamp: new Date().toISOString(),
+        });
       }
     };
 
@@ -362,7 +435,11 @@ async function initializeApp() {
         // ส่งสถานะ countdown ไปที่ renderer
         if (mainWindow) {
           mainWindow.webContents.send('shutdown-countdown-update', state);
-          sendLogToRenderer('log', `⏱️ Shutdown countdown: ${state.remainingSeconds}s / ${state.totalSeconds}s`, state);
+          sendLogToRenderer(
+            'log',
+            `⏱️ Shutdown countdown: ${state.remainingSeconds}s / ${state.totalSeconds}s`,
+            state,
+          );
         }
       },
       onShutdownStarting: () => {
@@ -383,7 +460,10 @@ async function initializeApp() {
         // แจ้ง renderer ว่า countdown ถูก reset
         if (mainWindow) {
           mainWindow.webContents.send('shutdown-countdown-reset');
-          sendLogToRenderer('log', '👆 User activity detected, shutdown countdown reset');
+          sendLogToRenderer(
+            'log',
+            '👆 User activity detected, shutdown countdown reset',
+          );
         }
       },
     });
@@ -394,7 +474,11 @@ async function initializeApp() {
         // ส่งสถานะ countdown ไปที่ renderer
         if (mainWindow) {
           mainWindow.webContents.send('app-close-countdown-update', state);
-          sendLogToRenderer('log', `⏱️ App close countdown: ${state.remainingSeconds}s / ${state.totalSeconds}s`, state);
+          sendLogToRenderer(
+            'log',
+            `⏱️ App close countdown: ${state.remainingSeconds}s / ${state.totalSeconds}s`,
+            state,
+          );
         }
       },
       onAppCloseStarting: () => {
@@ -409,8 +493,14 @@ async function initializeApp() {
         // ปิด window (จะไม่ถูก preventDefault เพราะ shouldQuit = true)
         if (mainWindow) {
           console.log('🚪 [Main] Main window exists, closing...');
-          console.log('🚪 [Main] mainWindow.isDestroyed():', mainWindow.isDestroyed());
-          console.log('🚪 [Main] mainWindow.isVisible():', mainWindow.isVisible());
+          console.log(
+            '🚪 [Main] mainWindow.isDestroyed():',
+            mainWindow.isDestroyed(),
+          );
+          console.log(
+            '🚪 [Main] mainWindow.isVisible():',
+            mainWindow.isVisible(),
+          );
           try {
             console.log('🚪 [Main] Executing mainWindow.close()...');
             mainWindow.close();
@@ -433,7 +523,10 @@ async function initializeApp() {
         // แจ้ง renderer ว่า countdown ถูก reset
         if (mainWindow) {
           mainWindow.webContents.send('app-close-countdown-reset');
-          sendLogToRenderer('log', '👆 User activity detected, app close countdown reset');
+          sendLogToRenderer(
+            'log',
+            '👆 User activity detected, app close countdown reset',
+          );
         }
       },
     });
@@ -449,8 +542,6 @@ async function initializeApp() {
     throw error;
   }
 }
-
-
 
 /**
  * ตรวจสอบว่า device (camera/printer) ที่เคยตั้งค่าไว้ยังมีอยู่หรือไม่
@@ -478,7 +569,6 @@ async function checkConfiguredDevices(): Promise<void> {
     });
   }
 
-
   // 1. เช็ค Camera
   await checkCamera();
 
@@ -498,7 +588,6 @@ async function checkCamera(): Promise<void> {
       console.log('ℹ️ [Main] No camera config found');
       await sendDeviceAlertWithRateLimit('camera', 'Camera config found', []);
 
-
       if (mainWindow) {
         mainWindow.webContents.send('device-not-found', {
           deviceType: 'camera',
@@ -509,7 +598,9 @@ async function checkCamera(): Promise<void> {
     }
 
     if (cameraConfig.type === 'webcam') {
-      console.log(`📷 [Main] Webcam config found: ${cameraConfig.label} (${cameraConfig.deviceId})`);
+      console.log(
+        `📷 [Main] Webcam config found: ${cameraConfig.label} (${cameraConfig.deviceId})`,
+      );
 
       // สร้าง Promise เพื่อรอผลจาก renderer
       const checkPromise = new Promise<boolean>((resolve) => {
@@ -540,21 +631,30 @@ async function checkCamera(): Promise<void> {
       if (found && mainWindow) {
         mainWindow.webContents.send('device-found');
       }
-      console.log(`📷 [Main] Webcam check result: ${found ? 'Found' : 'Not found'}`);
-
+      console.log(
+        `📷 [Main] Webcam check result: ${found ? 'Found' : 'Not found'}`,
+      );
     } else if (cameraConfig.type === 'canon') {
-      console.log(`📷 [Main] Canon camera config found: ${cameraConfig.cameraName}`);
+      console.log(
+        `📷 [Main] Canon camera config found: ${cameraConfig.cameraName}`,
+      );
 
       // รอให้ Canon SDK พร้อม (ถ้าจำเป็น)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       const isConnected = isCanonCameraConnected();
 
       if (!isConnected) {
-        console.warn(`⚠️ [Main] Canon camera not connected: ${cameraConfig.cameraName}`);
+        console.warn(
+          `⚠️ [Main] Canon camera not connected: ${cameraConfig.cameraName}`,
+        );
 
         // ส่งแจ้งเตือน
-        await sendDeviceAlertWithRateLimit('camera', cameraConfig.cameraName, []);
+        await sendDeviceAlertWithRateLimit(
+          'camera',
+          cameraConfig.cameraName,
+          [],
+        );
 
         // ส่ง event ไปที่ renderer
         if (mainWindow) {
@@ -568,7 +668,9 @@ async function checkCamera(): Promise<void> {
           mainWindow.webContents.send('device-found');
         }
 
-        console.log(`✅ [Main] Canon camera connected: ${cameraConfig.cameraName}`);
+        console.log(
+          `✅ [Main] Canon camera connected: ${cameraConfig.cameraName}`,
+        );
       }
     }
   } catch (error) {
@@ -583,7 +685,7 @@ async function checkPrinter(): Promise<void> {
   try {
     console.log('ℹ️ [Main] Checking printer config...');
 
-    let isConnected = false
+    let isConnected = false;
 
     const printerConfig = await getPrinterConfig();
     if (!printerConfig) {
@@ -604,22 +706,42 @@ async function checkPrinter(): Promise<void> {
       return;
     }
 
-    console.log(`🖨️ [Main] Printer config found - Main: ${printerConfig.main.printerName}`);
+    console.log(
+      `🖨️ [Main] Printer config found - Main: ${printerConfig.main.printerName}`,
+    );
     if (printerConfig.secondary) {
-      console.log(`🖨️ [Main] Secondary printer: ${printerConfig.secondary.printerName}`);
+      console.log(
+        `🖨️ [Main] Secondary printer: ${printerConfig.secondary.printerName}`,
+      );
     }
 
     // ดึงรายการ printers
     const printers = await mainWindow.webContents.getPrintersAsync();
-    const printerNames = printers.map(p => p.name);
+    const printerNames = printers.map((p) => p.name);
     console.log('🖨️ [Main] Available printers:', printerNames);
 
     // เช็ค Main printer
-    const mainPrinterFound = printers.some(p => p.name === printerConfig.main.printerName);
-    if (!mainPrinterFound) {
-      console.warn(`⚠️ [Main] Main printer not found: ${printerConfig.main.printerName}`);
+    const mainPrinterFound = printers.some((p) => {
+      // 1. เช็คชื่อก่อน
+      if (p.name !== printerConfig.main.printerName) return false;
 
-      await sendDeviceAlertWithRateLimit('printer', `Main: ${printerConfig.main.printerName}`, printerNames);
+      // 2. เช็คสถานะ (0 คือสถานะพื้นฐานที่แปลว่าพร้อม)
+      // แต่เราจะดักจับค่า Offline ทั่วไปไว้ด้วย
+      const isReady = p.status === 0;
+      const isOffline = p.status & 0x00000400 || p.status === 1024; // เช็ค Bitmask ของ Offline
+
+      return isReady || !isOffline;
+    });
+    if (!mainPrinterFound) {
+      console.warn(
+        `⚠️ [Main] Main printer not found: ${printerConfig.main.printerName}`,
+      );
+
+      await sendDeviceAlertWithRateLimit(
+        'printer',
+        `Main: ${printerConfig.main.printerName}`,
+        printerNames,
+      );
 
       if (mainWindow) {
         mainWindow.webContents.send('device-not-found', {
@@ -628,22 +750,38 @@ async function checkPrinter(): Promise<void> {
         });
       }
 
-      isConnected = false
+      isConnected = false;
     } else {
-      isConnected = true
-      console.log(`✅ [Main] Main printer found: ${printerConfig.main.printerName}`);
+      isConnected = true;
+      console.log(
+        `✅ [Main] Main printer found: ${printerConfig.main.printerName}`,
+      );
     }
 
     // เช็ค Secondary printer (ถ้ามี)
     if (printerConfig.secondary) {
-      const secondaryPrinterFound = printers.some(
-        p => p.name === printerConfig.secondary!.printerName
-      );
+      const secondaryPrinterFound = printers.some((p) => {
+        // 1. เช็คชื่อก่อน
+        if (p.name !== printerConfig.secondary!.printerName) return false;
+
+        // 2. เช็คสถานะ (0 คือสถานะพื้นฐานที่แปลว่าพร้อม)
+        // แต่เราจะดักจับค่า Offline ทั่วไปไว้ด้วย
+        const isReady = p.status === 0;
+        const isOffline = p.status & 0x00000400 || p.status === 1024; // เช็ค Bitmask ของ Offline
+
+        return isReady || !isOffline;
+      });
 
       if (!secondaryPrinterFound) {
-        console.warn(`⚠️ [Main] Secondary printer not found: ${printerConfig.secondary.printerName}`);
+        console.warn(
+          `⚠️ [Main] Secondary printer not found: ${printerConfig.secondary.printerName}`,
+        );
 
-        await sendDeviceAlertWithRateLimit('printer', `Secondary: ${printerConfig.secondary.printerName}`, printerNames);
+        await sendDeviceAlertWithRateLimit(
+          'printer',
+          `Secondary: ${printerConfig.secondary.printerName}`,
+          printerNames,
+        );
 
         if (mainWindow) {
           mainWindow.webContents.send('device-not-found', {
@@ -651,10 +789,12 @@ async function checkPrinter(): Promise<void> {
             deviceName: `Secondary: ${printerConfig.secondary.printerName}`,
           });
         }
-        isConnected = false
+        isConnected = false;
       } else {
-        isConnected = true
-          console.log(`✅ [Main] Secondary printer found: ${printerConfig.secondary.printerName}`);
+        isConnected = true;
+        console.log(
+          `✅ [Main] Secondary printer found: ${printerConfig.secondary.printerName}`,
+        );
       }
     }
 
@@ -671,7 +811,9 @@ async function checkPrinter(): Promise<void> {
  * @param base64 - Base64 data URL ของรูปภาพ
  * @returns Promise<{ width: number; height: number }>
  */
-async function getImageDimensions(base64: string): Promise<{ width: number; height: number }> {
+async function getImageDimensions(
+  base64: string,
+): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
     // ถอด base64 data ออกมา
     const matches = base64.match(/^data:image\/(\w+);base64,(.+)$/);
@@ -720,9 +862,8 @@ async function generateImageWithPadding(
   orientation: 'portrait' | 'landscape' = 'portrait',
   horizontal: number = 0,
   vertical: number = 0,
-  scale: number = 100
+  scale: number = 100,
 ): Promise<Buffer> {
-
   try {
     // แปลง base64 เป็น buffer
     const base64Data = base64.replace(/^data:image\/\w+;base64,/, '');
@@ -735,12 +876,14 @@ async function generateImageWithPadding(
 
     // โหลด paper position config จากไฟล์
     const paperPositionConfig = await getPaperPositionConfig();
-    const typeTransform = paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
+    const typeTransform =
+      paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
 
     // ดึง scale จาก config ตาม orientation (ถ้าไม่มีใน config ให้ใช้ค่าจาก parameter หรือ default 100)
-    const configScale = orientation === 'landscape'
-      ? (paperPositionConfig.landscapeScale ?? scale ?? 100)
-      : (paperPositionConfig.portraitScale ?? scale ?? 100);
+    const configScale =
+      orientation === 'landscape'
+        ? (paperPositionConfig.landscapeScale ?? scale ?? 100)
+        : (paperPositionConfig.portraitScale ?? scale ?? 100);
 
     // ตรวจสอบว่าต้องหมุนภาพหรือไม่
     const willRotate = orientation !== typeTransform;
@@ -780,15 +923,27 @@ async function generateImageWithPadding(
       });
 
       // 2. คำนวณ padding เพื่อให้ content อยู่ตรงกลาง + offset
-      const extraPaddingH = Math.round((originalWidth - scaledContentWidth) / 2);
-      const extraPaddingV = Math.round((originalHeight - scaledContentHeight) / 2);
+      const extraPaddingH = Math.round(
+        (originalWidth - scaledContentWidth) / 2,
+      );
+      const extraPaddingV = Math.round(
+        (originalHeight - scaledContentHeight) / 2,
+      );
 
       // รวม offset จาก user กับ centering padding
-      const paddingLeft = Math.round(Math.max(0, extraPaddingH + effectiveHorizontal));
-      const paddingRight = Math.round(Math.max(0, extraPaddingH - effectiveHorizontal));
+      const paddingLeft = Math.round(
+        Math.max(0, extraPaddingH + effectiveHorizontal),
+      );
+      const paddingRight = Math.round(
+        Math.max(0, extraPaddingH - effectiveHorizontal),
+      );
       // สลับ vertical เพื่อให้ + = ลง, - = ขึ้น
-      const paddingTop = Math.round(Math.max(0, extraPaddingV + effectiveVertical));
-      const paddingBottom = Math.round(Math.max(0, extraPaddingV - effectiveVertical));
+      const paddingTop = Math.round(
+        Math.max(0, extraPaddingV + effectiveVertical),
+      );
+      const paddingBottom = Math.round(
+        Math.max(0, extraPaddingV - effectiveVertical),
+      );
 
       // 3. เพิ่ม padding รอบภาพด้วยพื้นหลังขาว
       image = image.extend({
@@ -804,7 +959,6 @@ async function generateImageWithPadding(
         offset: `H=${effectiveHorizontal}, V=${effectiveVertical}`,
         finalPadding: `L=${paddingLeft}, R=${paddingRight}, T=${paddingTop}, B=${paddingBottom}`,
       });
-
     } else if (scaleValue > 1) {
       // ======= ZOOM IN (scale > 100%) =======
       // 1. ขยาย content ขึ้น
@@ -815,12 +969,22 @@ async function generateImageWithPadding(
 
       // 2. คำนวณจุดเริ่มต้น crop (crop ตรงกลาง + offset)
       // สลับ vertical เพื่อให้ + = ลง, - = ขึ้น
-      const cropStartX = Math.round(((scaledContentWidth - originalWidth) / 2) - effectiveHorizontal);
-      const cropStartY = Math.round(((scaledContentHeight - originalHeight) / 2) - effectiveVertical);
+      const cropStartX = Math.round(
+        (scaledContentWidth - originalWidth) / 2 - effectiveHorizontal,
+      );
+      const cropStartY = Math.round(
+        (scaledContentHeight - originalHeight) / 2 - effectiveVertical,
+      );
 
       // Clamp ให้ไม่เกินขอบ
-      const finalCropX = Math.max(0, Math.min(scaledContentWidth - originalWidth, cropStartX));
-      const finalCropY = Math.max(0, Math.min(scaledContentHeight - originalHeight, cropStartY));
+      const finalCropX = Math.max(
+        0,
+        Math.min(scaledContentWidth - originalWidth, cropStartX),
+      );
+      const finalCropY = Math.max(
+        0,
+        Math.min(scaledContentHeight - originalHeight, cropStartY),
+      );
 
       // 3. Crop กลับมาเป็นขนาดเดิม
       image = image.extract({
@@ -836,7 +1000,6 @@ async function generateImageWithPadding(
         finalCrop: `X=${finalCropX}, Y=${finalCropY}`,
         outputSize: `${originalWidth}x${originalHeight}`,
       });
-
     } else {
       // ======= NO SCALE (scale = 100%) =======
       // เพิ่ม padding เฉพาะถ้ามี offset
@@ -846,7 +1009,12 @@ async function generateImageWithPadding(
       const paddingTop = Math.round(Math.max(0, effectiveVertical));
       const paddingBottom = Math.round(Math.max(0, -effectiveVertical));
 
-      if (paddingLeft > 0 || paddingRight > 0 || paddingTop > 0 || paddingBottom > 0) {
+      if (
+        paddingLeft > 0 ||
+        paddingRight > 0 ||
+        paddingTop > 0 ||
+        paddingBottom > 0
+      ) {
         image = image.extend({
           top: paddingTop,
           bottom: paddingBottom,
@@ -873,12 +1041,10 @@ async function generateImageWithPadding(
     const outputMetadata = await sharp(outputBuffer).metadata();
     console.log('🖼️ [generateImageWithPadding] Final output:', outputMetadata);
     return outputBuffer;
-
   } catch (err) {
     console.error('❌ [generateImageWithPadding] Sharp error:', err);
     throw err instanceof Error ? err : new Error(String(err));
   }
-
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -909,8 +1075,12 @@ async function sendDeviceAlertWithRateLimit(
 
   // Check rate limit (5 minutes)
   if (now - lastAlertTime < ALERT_RATE_LIMIT_MS) {
-    const remainingMinutes = Math.ceil((ALERT_RATE_LIMIT_MS - (now - lastAlertTime)) / 60000);
-    console.log(`⏳ [Main] Device alert for ${deviceType} skipped (rate limited, ${remainingMinutes} min remaining)`);
+    const remainingMinutes = Math.ceil(
+      (ALERT_RATE_LIMIT_MS - (now - lastAlertTime)) / 60000,
+    );
+    console.log(
+      `⏳ [Main] Device alert for ${deviceType} skipped (rate limited, ${remainingMinutes} min remaining)`,
+    );
     return false;
   }
 
@@ -919,7 +1089,11 @@ async function sendDeviceAlertWithRateLimit(
 
   // Send alert
   try {
-    await machineService.sendDeviceAlert(deviceType, deviceName, availableDevices);
+    await machineService.sendDeviceAlert(
+      deviceType,
+      deviceName,
+      availableDevices,
+    );
     return true;
   } catch (err) {
     console.error(`❌ [Main] Failed to send ${deviceType} alert:`, err);
@@ -931,7 +1105,12 @@ let cachedInitData: {
   machine?: { prices?: unknown[] };
   prices?: unknown[];
   theme?: any;
-  paperPosition?: { _id: string; scale: number; horizontal: number; vertical: number } | null;
+  paperPosition?: {
+    _id: string;
+    scale: number;
+    horizontal: number;
+    vertical: number;
+  } | null;
 } | null = null;
 
 const installExtensions = async () => {
@@ -948,7 +1127,6 @@ const installExtensions = async () => {
 };
 
 const createWindow = async () => {
-
   if (
     process.env.NODE_ENV === 'development' ||
     process.env.DEBUG_PROD === 'true'
@@ -1260,17 +1438,19 @@ sseClient.on(MachineEventType.SSE_DISCONNECTED, (_, data) => {
   }
 });
 
-
 app.on('window-all-closed', () => {
   // หยุด power save blocker เมื่อปิด app
-  if (powerSaveBlockerId !== null && powerSaveBlocker.isStarted(powerSaveBlockerId)) {
+  if (
+    powerSaveBlockerId !== null &&
+    powerSaveBlocker.isStarted(powerSaveBlockerId)
+  ) {
     powerSaveBlocker.stop(powerSaveBlockerId);
     log.info('[Main] Power save blocker stopped');
     powerSaveBlockerId = null;
   }
 
-   // ⭐ Disconnect SSE Client
-   try {
+  // ⭐ Disconnect SSE Client
+  try {
     sseClient.destroy();
     log.info('[Main] SSE Client disconnected');
   } catch (error) {
@@ -1344,8 +1524,14 @@ app
       powerSaveBlockerId = powerSaveBlocker.start('prevent-display-sleep');
 
       if (powerSaveBlocker.isStarted(powerSaveBlockerId)) {
-        log.info('[Main] Power save blocker started with ID:', powerSaveBlockerId);
-        log.info('[Main] Power save blocker is active:', powerSaveBlocker.isStarted(powerSaveBlockerId));
+        log.info(
+          '[Main] Power save blocker started with ID:',
+          powerSaveBlockerId,
+        );
+        log.info(
+          '[Main] Power save blocker is active:',
+          powerSaveBlocker.isStarted(powerSaveBlockerId),
+        );
       } else {
         log.error('[Main] Power save blocker failed to start');
         powerSaveBlockerId = null;
@@ -1354,7 +1540,6 @@ app
       log.error('[Main] Error starting power save blocker:', error);
       powerSaveBlockerId = null;
     }
-
 
     // ตั้งค่า permissions ก่อนสร้าง window
     // ตั้งค่า permissions สำหรับกล้องและไมโครโฟนใน default session
@@ -1391,36 +1576,33 @@ app
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
       if (mainWindow === null) createWindow();
-
-
     });
   })
   .catch(console.log);
 
-  app.on('before-quit', async (event) => {
-    const pendingCount = await backgroundUploadService.getPendingCount();
+app.on('before-quit', async (event) => {
+  const pendingCount = await backgroundUploadService.getPendingCount();
 
-    if (pendingCount > 0) {
-      console.log(`⏳ [Main] Waiting for ${pendingCount} pending uploads...`);
-      event.preventDefault(); // ยกเลิกการปิดชั่วคราว
+  if (pendingCount > 0) {
+    console.log(`⏳ [Main] Waiting for ${pendingCount} pending uploads...`);
+    event.preventDefault(); // ยกเลิกการปิดชั่วคราว
 
-      // รอ uploads เสร็จ (max 30 วินาที)
-      const maxWaitTime = 30000;
-      const startTime = Date.now();
+    // รอ uploads เสร็จ (max 30 วินาที)
+    const maxWaitTime = 30000;
+    const startTime = Date.now();
 
-      const checkInterval = setInterval(async () => {
-        const remaining = await backgroundUploadService.getPendingCount();
-        const elapsed = Date.now() - startTime;
+    const checkInterval = setInterval(async () => {
+      const remaining = await backgroundUploadService.getPendingCount();
+      const elapsed = Date.now() - startTime;
 
-        if (remaining === 0 || elapsed > maxWaitTime) {
-          clearInterval(checkInterval);
-          console.log('✅ [Main] All uploads completed or timeout, quitting');
-          app.quit();
-        }
-      }, 1000);
-    }
-  });
-
+      if (remaining === 0 || elapsed > maxWaitTime) {
+        clearInterval(checkInterval);
+        console.log('✅ [Main] All uploads completed or timeout, quitting');
+        app.quit();
+      }
+    }, 1000);
+  }
+});
 
 interface PrintConfig {
   imageDataUrl: string;
@@ -1442,11 +1624,11 @@ const PRINT_DEBOUNCE_MS = 3000; // ป้องกันการพิมพ์
 // สร้าง hash จาก imageDataUrl เพื่อตรวจสอบว่าเป็นรูปเดียวกันหรือไม่
 const getImageHash = (imageDataUrl: string): string => {
   // ใช้ส่วนแรกของ base64 data เป็น hash (ประมาณ 100 ตัวอักษร)
-  const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, "");
+  const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
   return base64Data.substring(0, 100);
 };
 
-ipcMain.on("print-photo", async (event, printConfig) => {
+ipcMain.on('print-photo', async (event, printConfig) => {
   const now = Date.now();
   const imageHash = getImageHash(printConfig.imageDataUrl);
 
@@ -1461,9 +1643,9 @@ ipcMain.on("print-photo", async (event, printConfig) => {
   // ตรวจสอบว่ากำลังพิมพ์อยู่หรือไม่
   if (isPrinting) {
     log.warn('🖨️ [Print] Already printing, rejecting request');
-    event.reply("print-response", {
+    event.reply('print-response', {
       success: false,
-      error: "กำลังพิมพ์อยู่ กรุณารอสักครู่"
+      error: 'กำลังพิมพ์อยู่ กรุณารอสักครู่',
     });
     return;
   }
@@ -1474,9 +1656,9 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     now - lastPrintTime < PRINT_DEBOUNCE_MS
   ) {
     log.warn('🖨️ [Print] Duplicate print detected, rejecting request');
-    event.reply("print-response", {
+    event.reply('print-response', {
       success: false,
-      error: "รูปภาพนี้เพิ่งพิมพ์ไปเมื่อสักครู่"
+      error: 'รูปภาพนี้เพิ่งพิมพ์ไปเมื่อสักครู่',
     });
     return;
   }
@@ -1533,10 +1715,10 @@ ipcMain.on("print-photo", async (event, printConfig) => {
       orientation,
       horizontal,
       vertical,
-      scale
+      scale,
     );
 
-    const tempDir = app.getPath("temp");
+    const tempDir = app.getPath('temp');
     // ใช้ .png เพื่อรักษาสีต้นฉบับ (ไม่มี compression loss)
     const pngPath = path.join(tempDir, `photo-${Date.now()}.png`);
     await fs.writeFile(pngPath, paddedImageBuffer);
@@ -1557,7 +1739,7 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     });
 
     // ดึง printer name จาก config ก่อน
-    let printerName = "DP-QW410";
+    let printerName = 'DP-QW410';
 
     // 1. ลองดึงจาก printer config ที่บันทึกไว้
     const printerConfig = await getPrinterConfig();
@@ -1582,7 +1764,9 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     } else if (mainWindow) {
       // 2. ถ้าไม่มี config ให้หา QW410 จากรายการ printers
       const printers = await mainWindow.webContents.getPrintersAsync();
-      const target = printers.find(p => p.name.toLowerCase().includes("qw410"));
+      const target = printers.find((p) =>
+        p.name.toLowerCase().includes('qw410'),
+      );
       if (target) printerName = target.name;
       log.info('🖨️ [Print] Using auto-detected printer:', printerName);
     }
@@ -1590,7 +1774,7 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     // พิมพ์หลายครั้งตาม copies
     let completedPrints = 0;
     let hasError = false;
-    let errorMessage = "";
+    let errorMessage = '';
 
     const printNext = async (copyNumber: number) => {
       if (copyNumber > copies) {
@@ -1598,11 +1782,21 @@ ipcMain.on("print-photo", async (event, printConfig) => {
         setTimeout(() => fs.unlink(pngPath).catch(() => {}), 2000);
 
         if (hasError) {
-          log.error('🖨️ [Print] Print failed:', { error: errorMessage, completedPrints, totalCopies: copies });
-          event.reply("print-response", { success: false, error: errorMessage });
+          log.error('🖨️ [Print] Print failed:', {
+            error: errorMessage,
+            completedPrints,
+            totalCopies: copies,
+          });
+          event.reply('print-response', {
+            success: false,
+            error: errorMessage,
+          });
         } else {
-          log.info('🖨️ [Print] Print completed successfully:', { completedPrints, totalCopies: copies });
-          event.reply("print-response", { success: true });
+          log.info('🖨️ [Print] Print completed successfully:', {
+            completedPrints,
+            totalCopies: copies,
+          });
+          event.reply('print-response', { success: true });
         }
 
         // ปลดล็อคหลังพิมพ์เสร็จ (รอสักครู่เพื่อป้องกันการพิมพ์ซ้ำ)
@@ -1620,16 +1814,25 @@ ipcMain.on("print-photo", async (event, printConfig) => {
         // หมายเหตุ: วิธีนี้ส่งไฟล์รูปไปยัง printer โดยตรงโดยไม่ผ่าน HTML rendering
         // ทำให้ไม่มีการ scale หรือ resampling ที่อาจทำให้ภาพเบลอ
         const printCmd = `rundll32 shimgvw.dll,ImageView_PrintTo /pt "${pngPath}" "${printerName}"`;
-        log.info('🖨️ [Print] Using rundll32 shimgvw.dll:', { copyNumber, printerName, pngPath });
+        log.info('🖨️ [Print] Using rundll32 shimgvw.dll:', {
+          copyNumber,
+          printerName,
+          pngPath,
+        });
 
         exec(printCmd, (err) => {
           if (err) {
-            log.error(`🖨️ [Print] Print error (copy ${copyNumber}):`, err.message);
+            log.error(
+              `🖨️ [Print] Print error (copy ${copyNumber}):`,
+              err.message,
+            );
             hasError = true;
             errorMessage = err.message;
           } else {
             completedPrints++;
-            log.info(`🖨️ [Print] Copy ${copyNumber} sent to printer successfully (shimgvw.dll)`);
+            log.info(
+              `🖨️ [Print] Copy ${copyNumber} sent to printer successfully (shimgvw.dll)`,
+            );
           }
 
           // พิมพ์ copy ถัดไป (รอสักครู่เพื่อให้เครื่องพิมพ์พร้อม)
@@ -1637,7 +1840,6 @@ ipcMain.on("print-photo", async (event, printConfig) => {
             printNext(copyNumber + 1);
           }, 1000);
         });
-
       } else {
         // macOS และ Linux: ใช้ command line เหมือนเดิม
         let printCmd: string;
@@ -1650,16 +1852,25 @@ ipcMain.on("print-photo", async (event, printConfig) => {
           printCmd = `lp -d "${printerName}" "${pngPath}"`;
         }
 
-        log.info('🖨️ [Print] Executing print command:', { copyNumber, printerName, platform });
+        log.info('🖨️ [Print] Executing print command:', {
+          copyNumber,
+          printerName,
+          platform,
+        });
 
         exec(printCmd, (err) => {
           if (err) {
-            log.error(`🖨️ [Print] Print error (copy ${copyNumber}):`, err.message);
+            log.error(
+              `🖨️ [Print] Print error (copy ${copyNumber}):`,
+              err.message,
+            );
             hasError = true;
             errorMessage = err.message;
           } else {
             completedPrints++;
-            log.info(`🖨️ [Print] Copy ${copyNumber} sent to printer successfully`);
+            log.info(
+              `🖨️ [Print] Copy ${copyNumber} sent to printer successfully`,
+            );
           }
 
           // พิมพ์ copy ถัดไป (รอสักครู่เพื่อให้เครื่องพิมพ์พร้อม)
@@ -1674,12 +1885,11 @@ ipcMain.on("print-photo", async (event, printConfig) => {
     printNext(1).then(() => {
       machineService.reducePaperLevel(copies);
     });
-
   } catch (err) {
     log.error('🖨️ [Print] Exception during print:', err);
-    event.reply("print-response", {
+    event.reply('print-response', {
       success: false,
-      error: err instanceof Error ? err.message : "Unknown error"
+      error: err instanceof Error ? err.message : 'Unknown error',
     });
     isPrinting = false;
   }
@@ -1687,96 +1897,106 @@ ipcMain.on("print-photo", async (event, printConfig) => {
 
 // ============ Sharp Image Encoding IPC Handler ============
 // ใช้ Sharp (libjpeg-turbo/libpng) แทน canvas.toDataURL เพื่อคุณภาพที่ดีกว่า
-ipcMain.handle('encode-image-sharp', async (
-  _event,
-  options: {
-    rawData: Uint8Array | number[];  // RGBA pixel data
-    width: number;
-    height: number;
-    format: 'png' | 'jpeg';
-    quality?: number;  // JPEG quality 1-100
-  }
-) => {
-  try {
-    const startTime = Date.now();
-    const { rawData, width, height, format, quality = 92 } = options;
+ipcMain.handle(
+  'encode-image-sharp',
+  async (
+    _event,
+    options: {
+      rawData: Uint8Array | number[]; // RGBA pixel data
+      width: number;
+      height: number;
+      format: 'png' | 'jpeg';
+      quality?: number; // JPEG quality 1-100
+    },
+  ) => {
+    try {
+      const startTime = Date.now();
+      const { rawData, width, height, format, quality = 92 } = options;
 
-    // แปลง array/Uint8Array เป็น Buffer
-    const inputBuffer = Buffer.from(rawData);
+      // แปลง array/Uint8Array เป็น Buffer
+      const inputBuffer = Buffer.from(rawData);
 
-    console.log(`🖼️ [Sharp Encode] Starting ${format.toUpperCase()} encode:`, {
-      width,
-      height,
-      inputSize: `${(inputBuffer.length / 1024 / 1024).toFixed(2)} MB`,
-      quality: format === 'jpeg' ? quality : 'N/A (PNG)',
-    });
+      console.log(
+        `🖼️ [Sharp Encode] Starting ${format.toUpperCase()} encode:`,
+        {
+          width,
+          height,
+          inputSize: `${(inputBuffer.length / 1024 / 1024).toFixed(2)} MB`,
+          quality: format === 'jpeg' ? quality : 'N/A (PNG)',
+        },
+      );
 
-    // สร้าง Sharp instance จาก raw RGBA data
-    let image = sharp(inputBuffer, {
-      raw: {
-        width,
-        height,
-        channels: 4  // RGBA
+      // สร้าง Sharp instance จาก raw RGBA data
+      let image = sharp(inputBuffer, {
+        raw: {
+          width,
+          height,
+          channels: 4, // RGBA
+        },
+      });
+
+      let outputBuffer: Buffer;
+      let mimeType: string;
+
+      if (format === 'jpeg') {
+        // JPEG: ใช้ mozjpeg encoder (คุณภาพดีกว่า standard libjpeg)
+        outputBuffer = await image
+          .jpeg({
+            quality,
+            mozjpeg: true, // ใช้ mozjpeg สำหรับ compression ที่ดีกว่า
+            chromaSubsampling: '4:4:4', // ไม่ลด chroma สำหรับคุณภาพสูงสุด
+          })
+          .toBuffer();
+        mimeType = 'image/jpeg';
+      } else {
+        // PNG: lossless
+        outputBuffer = await image
+          .png({
+            compressionLevel: 6,
+            adaptiveFiltering: true,
+          })
+          .toBuffer();
+        mimeType = 'image/png';
       }
-    });
 
-    let outputBuffer: Buffer;
-    let mimeType: string;
+      // แปลงเป็น base64 data URL
+      const base64 = outputBuffer.toString('base64');
+      const dataUrl = `data:${mimeType};base64,${base64}`;
 
-    if (format === 'jpeg') {
-      // JPEG: ใช้ mozjpeg encoder (คุณภาพดีกว่า standard libjpeg)
-      outputBuffer = await image
-        .jpeg({
-          quality,
-          mozjpeg: true,  // ใช้ mozjpeg สำหรับ compression ที่ดีกว่า
-          chromaSubsampling: '4:4:4',  // ไม่ลด chroma สำหรับคุณภาพสูงสุด
-        })
-        .toBuffer();
-      mimeType = 'image/jpeg';
-    } else {
-      // PNG: lossless
-      outputBuffer = await image
-        .png({
-          compressionLevel: 6,
-          adaptiveFiltering: true,
-        })
-        .toBuffer();
-      mimeType = 'image/png';
+      const endTime = Date.now();
+      const compressionRatio = (
+        (1 - outputBuffer.length / inputBuffer.length) *
+        100
+      ).toFixed(1);
+
+      console.log(
+        `🖼️ [Sharp Encode] ${format.toUpperCase()} encode complete:`,
+        {
+          outputSize: `${(outputBuffer.length / 1024 / 1024).toFixed(2)} MB`,
+          compressionRatio: `${compressionRatio}%`,
+          duration: `${endTime - startTime}ms`,
+        },
+      );
+
+      return {
+        success: true,
+        dataUrl,
+        stats: {
+          inputSize: inputBuffer.length,
+          outputSize: outputBuffer.length,
+          compressionRatio: parseFloat(compressionRatio),
+          duration: endTime - startTime,
+        },
+      };
+    } catch (err) {
+      console.error('❌ [Sharp Encode] Error:', err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      };
     }
-
-    // แปลงเป็น base64 data URL
-    const base64 = outputBuffer.toString('base64');
-    const dataUrl = `data:${mimeType};base64,${base64}`;
-
-    const endTime = Date.now();
-    const compressionRatio = ((1 - outputBuffer.length / inputBuffer.length) * 100).toFixed(1);
-
-    console.log(`🖼️ [Sharp Encode] ${format.toUpperCase()} encode complete:`, {
-      outputSize: `${(outputBuffer.length / 1024 / 1024).toFixed(2)} MB`,
-      compressionRatio: `${compressionRatio}%`,
-      duration: `${endTime - startTime}ms`,
-    });
-
-    return {
-      success: true,
-      dataUrl,
-      stats: {
-        inputSize: inputBuffer.length,
-        outputSize: outputBuffer.length,
-        compressionRatio: parseFloat(compressionRatio),
-        duration: endTime - startTime,
-      }
-    };
-
-  } catch (err) {
-    console.error('❌ [Sharp Encode] Error:', err);
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : 'Unknown error'
-    };
-  }
-});
-
+  },
+);
 
 // // KSher Payment IPC handlers
 // ipcMain.handle(
@@ -1809,9 +2029,20 @@ ipcMain.handle('encode-image-sharp', async (
 // Machine Payment API handler
 ipcMain.handle(
   'create-machine-payment',
-  async (event, amount: number, numberPhoto: number, channel: string = 'promptpay', couponCodeId?: string) => {
+  async (
+    event,
+    amount: number,
+    numberPhoto: number,
+    channel: string = 'promptpay',
+    couponCodeId?: string,
+  ) => {
     try {
-      const result = await machineService.createPayment(amount, numberPhoto, channel, couponCodeId);
+      const result = await machineService.createPayment(
+        amount,
+        numberPhoto,
+        channel,
+        couponCodeId,
+      );
       return result;
     } catch (error) {
       console.error('Error in create-machine-payment handler:', error);
@@ -1823,20 +2054,17 @@ ipcMain.handle(
 );
 
 // Machine Coupon API handler
-ipcMain.handle(
-  'check-machine-coupon',
-  async (event, code: string) => {
-    try {
-      const result = await machineService.checkCoupon(code);
-      return result;
-    } catch (error) {
-      console.error('Error in check-machine-coupon handler:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      return { valid: false, message: errorMessage };
-    }
-  },
-);
+ipcMain.handle('check-machine-coupon', async (event, code: string) => {
+  try {
+    const result = await machineService.checkCoupon(code);
+    return result;
+  } catch (error) {
+    console.error('Error in check-machine-coupon handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { valid: false, message: errorMessage };
+  }
+});
 
 ipcMain.handle(
   'check-machine-payment-status',
@@ -1893,7 +2121,8 @@ ipcMain.handle('get-machine-data', async () => {
     if (printerConfig) {
       // ใช้ main.canCut เป็นค่าหลัก
       // ถ้ามี secondary ที่ canCut=true ก็ถือว่าระบบตัดได้
-      canCut = printerConfig.main.canCut || (printerConfig.secondary?.canCut ?? false);
+      canCut =
+        printerConfig.main.canCut || (printerConfig.secondary?.canCut ?? false);
     }
 
     if (cachedInitData?.machine) {
@@ -1947,13 +2176,13 @@ ipcMain.handle('force-init', async () => {
 
     return {
       success: true,
-      data: initResponse
+      data: initResponse,
     };
   } catch (error) {
-     console.error('❌ [Main] Force init failed:', error);
-     const errorMessage =
-       error instanceof Error ? error.message : 'Unknown error';
-     return { success: false, error: errorMessage };
+    console.error('❌ [Main] Force init failed:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
   }
 });
 
@@ -1986,73 +2215,87 @@ ipcMain.handle('save-temp-video', async (event, arrayBuffer: ArrayBuffer) => {
 });
 
 // Handler สำหรับ apply LUT to video
-ipcMain.handle('apply-lut-to-video', async (event, videoPath: string, lutFileName: string) => {
-  try {
-    const outputPath = await applyLutToVideo(videoPath, lutFileName);
-    return {
-      success: true,
-      path: outputPath,
-    };
-  } catch (error) {
-    console.error('❌ [Main] Error applying LUT to video:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    return {
-      success: false,
-      error: errorMessage,
-    };
-  }
-});
-
-// Handler สำหรับ create boomerang with LUT
-ipcMain.handle('create-boomerang-with-lut', async (event, videoPath: string, lutFileName: string) => {
-  try {
-    const outputPath = await createBoomerangWithLut(videoPath, lutFileName);
-    return {
-      success: true,
-      path: outputPath,
-    };
-  } catch (error) {
-    console.error('❌ [Main] Error creating boomerang with LUT:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    return {
-      success: false,
-      error: errorMessage,
-    };
-  }
-});
-
-// Handler สำหรับ convert WebM to MP4 (iPhone/Safari compatibility)
-ipcMain.handle('convert-to-mp4', async (event, videoPath: string, returnBase64: boolean = false) => {
-  try {
-    console.log('🎬 [Main] Converting WebM to MP4:', videoPath, 'returnBase64:', returnBase64);
-
-    if (returnBase64) {
-      // Return as Base64 data URL (useful for direct download/embedding)
-      const dataUrl = await convertWebmToMp4Base64(videoPath);
-      return {
-        success: true,
-        dataUrl,
-      };
-    } else {
-      // Return file path
-      const outputPath = await convertWebmToMp4(videoPath);
+ipcMain.handle(
+  'apply-lut-to-video',
+  async (event, videoPath: string, lutFileName: string) => {
+    try {
+      const outputPath = await applyLutToVideo(videoPath, lutFileName);
       return {
         success: true,
         path: outputPath,
       };
+    } catch (error) {
+      console.error('❌ [Main] Error applying LUT to video:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        error: errorMessage,
+      };
     }
-  } catch (error) {
-    console.error('❌ [Main] Error converting to MP4:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    return {
-      success: false,
-      error: errorMessage,
-    };
-  }
-});
+  },
+);
+
+// Handler สำหรับ create boomerang with LUT
+ipcMain.handle(
+  'create-boomerang-with-lut',
+  async (event, videoPath: string, lutFileName: string) => {
+    try {
+      const outputPath = await createBoomerangWithLut(videoPath, lutFileName);
+      return {
+        success: true,
+        path: outputPath,
+      };
+    } catch (error) {
+      console.error('❌ [Main] Error creating boomerang with LUT:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  },
+);
+
+// Handler สำหรับ convert WebM to MP4 (iPhone/Safari compatibility)
+ipcMain.handle(
+  'convert-to-mp4',
+  async (event, videoPath: string, returnBase64: boolean = false) => {
+    try {
+      console.log(
+        '🎬 [Main] Converting WebM to MP4:',
+        videoPath,
+        'returnBase64:',
+        returnBase64,
+      );
+
+      if (returnBase64) {
+        // Return as Base64 data URL (useful for direct download/embedding)
+        const dataUrl = await convertWebmToMp4Base64(videoPath);
+        return {
+          success: true,
+          dataUrl,
+        };
+      } else {
+        // Return file path
+        const outputPath = await convertWebmToMp4(videoPath);
+        return {
+          success: true,
+          path: outputPath,
+        };
+      }
+    } catch (error) {
+      console.error('❌ [Main] Error converting to MP4:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  },
+);
 
 // Handler สำหรับ List DShow Video Devices
 ipcMain.handle('list-video-devices', async () => {
@@ -2072,20 +2315,33 @@ ipcMain.handle('list-video-devices', async () => {
 });
 
 // Handler สำหรับเริ่มอัด Native (DirectShow)
-ipcMain.handle('start-native-recording', async (event, deviceName: string, outputPath: string, options?: { saturation?: number, contrast?: number, brightness?: number, gamma?: number }) => {
-  try {
-    await startRecordingCallback(deviceName, outputPath, options);
-    return {
-      success: true,
-    };
-  } catch (error) {
-    console.error('❌ [Main] Error start native recording:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-});
+ipcMain.handle(
+  'start-native-recording',
+  async (
+    event,
+    deviceName: string,
+    outputPath: string,
+    options?: {
+      saturation?: number;
+      contrast?: number;
+      brightness?: number;
+      gamma?: number;
+    },
+  ) => {
+    try {
+      await startRecordingCallback(deviceName, outputPath, options);
+      return {
+        success: true,
+      };
+    } catch (error) {
+      console.error('❌ [Main] Error start native recording:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  },
+);
 
 // Handler สำหรับหยุดอัด Native
 ipcMain.handle('stop-native-recording', async () => {
@@ -2110,32 +2366,39 @@ ipcMain.handle('stop-native-recording', async () => {
 // ============================================================================
 
 // Start native camera live view (FFmpeg pipes JPEG frames)
-ipcMain.handle('native-camera-start-live-view', async (event, deviceName: string, options?: {
-  width?: number;
-  height?: number;
-  frameRate?: number;
-  quality?: number;
-}) => {
-  try {
-    await nativeCameraService.startLiveView(deviceName, options);
+ipcMain.handle(
+  'native-camera-start-live-view',
+  async (
+    event,
+    deviceName: string,
+    options?: {
+      width?: number;
+      height?: number;
+      frameRate?: number;
+      quality?: number;
+    },
+  ) => {
+    try {
+      await nativeCameraService.startLiveView(deviceName, options);
 
-    // Setup frame forwarding to renderer
-    const forwardFrame = (frameData: string) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('native-camera-frame', frameData);
-      }
-    };
-    nativeCameraService.addFrameListener(forwardFrame);
+      // Setup frame forwarding to renderer
+      const forwardFrame = (frameData: string) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('native-camera-frame', frameData);
+        }
+      };
+      nativeCameraService.addFrameListener(forwardFrame);
 
-    return { success: true };
-  } catch (error) {
-    console.error('❌ [Main] Error starting native camera live view:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-});
+      return { success: true };
+    } catch (error) {
+      console.error('❌ [Main] Error starting native camera live view:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  },
+);
 
 // Stop native camera live view
 ipcMain.handle('native-camera-stop-live-view', async () => {
@@ -2157,27 +2420,35 @@ ipcMain.handle('native-camera-get-live-view-status', async () => {
 });
 
 // Start native camera recording (FFmpeg encodes directly to MP4)
-ipcMain.handle('native-camera-start-recording', async (event, deviceName: string, outputPath: string, options?: {
-  width?: number;
-  height?: number;
-  frameRate?: number;
-  duration?: number;
-  saturation?: number;
-  contrast?: number;
-  brightness?: number;
-  gamma?: number;
-}) => {
-  try {
-    await nativeCameraService.startRecording(deviceName, outputPath, options);
-    return { success: true };
-  } catch (error) {
-    console.error('❌ [Main] Error starting native camera recording:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-});
+ipcMain.handle(
+  'native-camera-start-recording',
+  async (
+    event,
+    deviceName: string,
+    outputPath: string,
+    options?: {
+      width?: number;
+      height?: number;
+      frameRate?: number;
+      duration?: number;
+      saturation?: number;
+      contrast?: number;
+      brightness?: number;
+      gamma?: number;
+    },
+  ) => {
+    try {
+      await nativeCameraService.startRecording(deviceName, outputPath, options);
+      return { success: true };
+    } catch (error) {
+      console.error('❌ [Main] Error starting native camera recording:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  },
+);
 
 // Stop native camera recording
 ipcMain.handle('native-camera-stop-recording', async () => {
@@ -2199,82 +2470,113 @@ ipcMain.handle('native-camera-get-recording-status', async () => {
 });
 
 // Capture single JPEG frame from camera
-ipcMain.handle('native-camera-capture-frame', async (event, deviceName: string, options?: {
-  width?: number;
-  height?: number;
-  quality?: number;
-}) => {
-  try {
-    const dataUrl = await nativeCameraService.captureFrame(deviceName, options);
-    return { success: true, dataUrl };
-  } catch (error) {
-    console.error('❌ [Main] Error capturing frame:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-});
+ipcMain.handle(
+  'native-camera-capture-frame',
+  async (
+    event,
+    deviceName: string,
+    options?: {
+      width?: number;
+      height?: number;
+      quality?: number;
+    },
+  ) => {
+    try {
+      const dataUrl = await nativeCameraService.captureFrame(
+        deviceName,
+        options,
+      );
+      return { success: true, dataUrl };
+    } catch (error) {
+      console.error('❌ [Main] Error capturing frame:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  },
+);
 
 // Capture single frame to file
-ipcMain.handle('native-camera-capture-frame-to-file', async (event, deviceName: string, outputPath: string, options?: {
-  width?: number;
-  height?: number;
-  quality?: number;
-}) => {
-  try {
-    const filePath = await nativeCameraService.captureFrameToFile(deviceName, outputPath, options);
-    return { success: true, filePath };
-  } catch (error) {
-    console.error('❌ [Main] Error capturing frame to file:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-});
+ipcMain.handle(
+  'native-camera-capture-frame-to-file',
+  async (
+    event,
+    deviceName: string,
+    outputPath: string,
+    options?: {
+      width?: number;
+      height?: number;
+      quality?: number;
+    },
+  ) => {
+    try {
+      const filePath = await nativeCameraService.captureFrameToFile(
+        deviceName,
+        outputPath,
+        options,
+      );
+      return { success: true, filePath };
+    } catch (error) {
+      console.error('❌ [Main] Error capturing frame to file:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  },
+);
 
 // Start live view and recording simultaneously
-ipcMain.handle('native-camera-start-live-and-record', async (event, deviceName: string, recordingPath: string, liveViewOptions?: {
-  width?: number;
-  height?: number;
-  frameRate?: number;
-  quality?: number;
-}, recordingOptions?: {
-  width?: number;
-  height?: number;
-  frameRate?: number;
-  duration?: number;
-  saturation?: number;
-  contrast?: number;
-  brightness?: number;
-  gamma?: number;
-}) => {
-  try {
-    await nativeCameraService.startLiveViewAndRecording(
-      deviceName,
-      recordingPath,
-      liveViewOptions,
-      recordingOptions
-    );
+ipcMain.handle(
+  'native-camera-start-live-and-record',
+  async (
+    event,
+    deviceName: string,
+    recordingPath: string,
+    liveViewOptions?: {
+      width?: number;
+      height?: number;
+      frameRate?: number;
+      quality?: number;
+    },
+    recordingOptions?: {
+      width?: number;
+      height?: number;
+      frameRate?: number;
+      duration?: number;
+      saturation?: number;
+      contrast?: number;
+      brightness?: number;
+      gamma?: number;
+    },
+  ) => {
+    try {
+      await nativeCameraService.startLiveViewAndRecording(
+        deviceName,
+        recordingPath,
+        liveViewOptions,
+        recordingOptions,
+      );
 
-    // Setup frame forwarding
-    const forwardFrame = (frameData: string) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('native-camera-frame', frameData);
-      }
-    };
-    nativeCameraService.addFrameListener(forwardFrame);
+      // Setup frame forwarding
+      const forwardFrame = (frameData: string) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('native-camera-frame', frameData);
+        }
+      };
+      nativeCameraService.addFrameListener(forwardFrame);
 
-    return { success: true };
-  } catch (error) {
-    console.error('❌ [Main] Error starting live view and recording:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-});
+      return { success: true };
+    } catch (error) {
+      console.error('❌ [Main] Error starting live view and recording:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  },
+);
 
 // Stop all native camera processes
 ipcMain.handle('native-camera-stop-all', async () => {
@@ -2282,7 +2584,10 @@ ipcMain.handle('native-camera-stop-all', async () => {
     const result = await nativeCameraService.stopAll();
     return { success: true, ...result };
   } catch (error) {
-    console.error('❌ [Main] Error stopping all native camera processes:', error);
+    console.error(
+      '❌ [Main] Error stopping all native camera processes:',
+      error,
+    );
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -2303,22 +2608,25 @@ ipcMain.handle('get-machine-config', async () => {
   }
 });
 
-ipcMain.handle('save-machine-config', async (event, config: { machineId: string; machinePort: string }) => {
-  try {
-    const success = await saveMachineConfig(config);
-    if (success) {
-      // Clear cache เพื่อให้อ่าน config ใหม่
-      clearEnvConfigCache();
-      return { success: true };
+ipcMain.handle(
+  'save-machine-config',
+  async (event, config: { machineId: string; machinePort: string }) => {
+    try {
+      const success = await saveMachineConfig(config);
+      if (success) {
+        // Clear cache เพื่อให้อ่าน config ใหม่
+        clearEnvConfigCache();
+        return { success: true };
+      }
+      return { success: false, error: 'Failed to save config' };
+    } catch (error) {
+      console.error('❌ [Main] Error saving machine config:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
     }
-    return { success: false, error: 'Failed to save config' };
-  } catch (error) {
-    console.error('❌ [Main] Error saving machine config:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMessage };
-  }
-});
+  },
+);
 
 ipcMain.handle('has-machine-config', async () => {
   try {
@@ -2420,28 +2728,37 @@ ipcMain.handle('get-paper-position-config', async () => {
   }
 });
 
-ipcMain.handle('save-paper-position-config', async (event, config: PaperPositionConfig) => {
-  try {
-    const success = await savePaperPositionConfig(config);
-    if (success) {
-      return { success: true };
+ipcMain.handle(
+  'save-paper-position-config',
+  async (event, config: PaperPositionConfig) => {
+    try {
+      const success = await savePaperPositionConfig(config);
+      if (success) {
+        return { success: true };
+      }
+      return { success: false, error: 'Failed to save config' };
+    } catch (error) {
+      console.error('Error in save-paper-position-config handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
     }
-    return { success: false, error: 'Failed to save config' };
-  } catch (error) {
-    console.error('Error in save-paper-position-config handler:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMessage };
-  }
-});
+  },
+);
 
 ipcMain.handle('get-default-paper-position-config', async () => {
   try {
     console.log('📋 [Main] get-default-paper-position-config called');
-    console.log('📋 [Main] DEFAULT_PAPER_POSITION_CONFIG:', DEFAULT_PAPER_POSITION_CONFIG);
+    console.log(
+      '📋 [Main] DEFAULT_PAPER_POSITION_CONFIG:',
+      DEFAULT_PAPER_POSITION_CONFIG,
+    );
     return { success: true, config: DEFAULT_PAPER_POSITION_CONFIG };
   } catch (error) {
-    console.error('❌ [Main] Error in get-default-paper-position-config handler:', error);
+    console.error(
+      '❌ [Main] Error in get-default-paper-position-config handler:',
+      error,
+    );
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage };
@@ -2501,29 +2818,28 @@ ipcMain.handle('get-print-test-position', async () => {
   }
 });
 
-ipcMain.handle('save-print-test-position', async (event, position: PrintTestPosition) => {
-  try {
-    const success = await savePrintTestPosition(position);
-    if (success) {
-      return { success: true };
+ipcMain.handle(
+  'save-print-test-position',
+  async (event, position: PrintTestPosition) => {
+    try {
+      const success = await savePrintTestPosition(position);
+      if (success) {
+        return { success: true };
+      }
+      return { success: false, error: 'Failed to save position' };
+    } catch (error) {
+      console.error('Error in save-print-test-position handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
     }
-    return { success: false, error: 'Failed to save position' };
-  } catch (error) {
-    console.error('Error in save-print-test-position handler:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMessage };
-  }
-});
+  },
+);
 
 // Handler สำหรับสร้าง photo session
 ipcMain.handle(
   'create-photo-session',
-  async (
-    event,
-    transactionId: string,
-    transactionCode?: string,
-  ) => {
+  async (event, transactionId: string, transactionCode?: string) => {
     try {
       const result = await machineService.createPhotoSession(
         transactionId,
@@ -2595,7 +2911,11 @@ ipcMain.handle(
   async (
     event,
     sessionId: string,
-    uploadedFiles: Array<{ key: string; type: 'photo' | 'video'; order: number }>,
+    uploadedFiles: Array<{
+      key: string;
+      type: 'photo' | 'video';
+      order: number;
+    }>,
   ) => {
     try {
       const result = await machineService.confirmUpload(
@@ -2619,12 +2939,7 @@ ipcMain.handle(
 // Handler สำหรับ upload files ไปยัง session (Legacy - ใช้ presigned upload แทน)
 ipcMain.handle(
   'upload-files-to-session',
-  async (
-    event,
-    sessionId: string,
-    photos: string[],
-    videos: string[] = [],
-  ) => {
+  async (event, sessionId: string, photos: string[], videos: string[] = []) => {
     try {
       const result = await machineService.uploadFilesToSession(
         sessionId,
@@ -2633,7 +2948,10 @@ ipcMain.handle(
       );
       return result;
     } catch (error) {
-      console.error('❌ [Main] Error in upload-files-to-session handler:', error);
+      console.error(
+        '❌ [Main] Error in upload-files-to-session handler:',
+        error,
+      );
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       return {
@@ -2711,9 +3029,13 @@ ipcMain.handle(
   ) => {
     try {
       console.log('📤 [Main] Queueing background presigned upload...');
-      console.log(`📤 [Main] Session: ${sessionId}, Photos: ${photos.length}, Videos: ${videos.length}, UploadUrls: ${uploadUrls?.length || 0}`);
+      console.log(
+        `📤 [Main] Session: ${sessionId}, Photos: ${photos.length}, Videos: ${videos.length}, UploadUrls: ${uploadUrls?.length || 0}`,
+      );
       if (webmVideoPath) {
-        console.log(`📤 [Main] WebM video path: ${webmVideoPath} (will convert in background)`);
+        console.log(
+          `📤 [Main] WebM video path: ${webmVideoPath} (will convert in background)`,
+        );
       }
 
       if (!uploadUrls || uploadUrls.length === 0) {
@@ -2735,7 +3057,10 @@ ipcMain.handle(
         message: 'Upload queued successfully',
       };
     } catch (error) {
-      console.error('❌ [Main] Error in queue-background-upload handler:', error);
+      console.error(
+        '❌ [Main] Error in queue-background-upload handler:',
+        error,
+      );
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       return {
@@ -2773,7 +3098,10 @@ ipcMain.handle('get-pending-uploads-count', async () => {
       count,
     };
   } catch (error) {
-    console.error('❌ [Main] Error in get-pending-uploads-count handler:', error);
+    console.error(
+      '❌ [Main] Error in get-pending-uploads-count handler:',
+      error,
+    );
     return {
       success: false,
       count: 0,
@@ -2880,29 +3208,44 @@ ipcMain.handle('get-camera-config', async () => {
 });
 
 // Handler สำหรับรับผลการเช็ค camera availability จาก renderer
-ipcMain.on('camera-availability-result', async (event, result: {
-  found: boolean;
-  configuredDeviceId: string;
-  configuredLabel: string;
-  availableDevices: string[];
-}) => {
-  if (!result.found) {
-    console.warn(`⚠️ [Main] Configured camera not found: ${result.configuredLabel} (${result.configuredDeviceId})`);
-    // ส่งแจ้งเตือน
-    sendDeviceAlertWithRateLimit('camera', result.configuredLabel, result.availableDevices)
-      .catch(err => console.error('❌ [Main] Failed to send camera alert:', err));
+ipcMain.on(
+  'camera-availability-result',
+  async (
+    event,
+    result: {
+      found: boolean;
+      configuredDeviceId: string;
+      configuredLabel: string;
+      availableDevices: string[];
+    },
+  ) => {
+    if (!result.found) {
+      console.warn(
+        `⚠️ [Main] Configured camera not found: ${result.configuredLabel} (${result.configuredDeviceId})`,
+      );
+      // ส่งแจ้งเตือน
+      sendDeviceAlertWithRateLimit(
+        'camera',
+        result.configuredLabel,
+        result.availableDevices,
+      ).catch((err) =>
+        console.error('❌ [Main] Failed to send camera alert:', err),
+      );
 
-    // ส่ง event ไปที่ renderer เพื่อแสดงหน้า maintenance
-    if (mainWindow) {
-      mainWindow.webContents.send('device-not-found', {
-        deviceType: 'camera',
-        deviceName: result.configuredLabel,
-      });
+      // ส่ง event ไปที่ renderer เพื่อแสดงหน้า maintenance
+      if (mainWindow) {
+        mainWindow.webContents.send('device-not-found', {
+          deviceType: 'camera',
+          deviceName: result.configuredLabel,
+        });
+      }
+    } else {
+      console.log(
+        `✅ [Main] Configured camera found: ${result.configuredLabel}`,
+      );
     }
-  } else {
-    console.log(`✅ [Main] Configured camera found: ${result.configuredLabel}`);
-  }
-});
+  },
+);
 
 ipcMain.handle('save-camera-config', async (event, config: CameraConfig) => {
   try {
