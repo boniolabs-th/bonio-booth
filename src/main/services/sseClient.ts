@@ -305,7 +305,7 @@ export class SseClient {
       this.request.end();
     } catch (error) {
       console.error('❌ [SseClient] Failed to create connection:', error);
-      this.updateMachineInfo({ status: 'offline' });
+      // this.updateMachineInfo({ status: 'offline' });
       this.isConnecting = false;
       this.clearConnectionTimeout();
 

@@ -1237,16 +1237,6 @@ sseClient.on(MachineEventType.SSE_DISCONNECTED, (_, data) => {
   }
 });
 
-sseClient.on(MachineEventType.HEARTBEAT, async (_, data) => {
-  log.debug('[Main] SSE Heartbeat received:', data);
-
-  // Check configured devices on every heartbeat
-  try {
-    await checkConfiguredDevices();
-  } catch (err) {
-    log.error('[Main] Error in checkConfiguredDevices on heartbeat:', err);
-  }
-});
 
 app.on('window-all-closed', () => {
   // หยุด power save blocker เมื่อปิด app
@@ -1289,6 +1279,22 @@ app
       if (mainWindow) {
         mainWindow.webContents.send('sse-connected', data);
       }
+    });
+
+    // ========== CHECK CONFIGURED DEVICES INTERVAL ==========
+    // Check configured devices every 10 seconds
+    const deviceCheckInterval = setInterval(async () => {
+      try {
+        await checkConfiguredDevices();
+      } catch (err) {
+        log.error('[Main] Error in checkConfiguredDevices interval:', err);
+      }
+    }, 10000); // 10 seconds
+
+    // Store interval ID for cleanup
+    app.on('before-quit', () => {
+      clearInterval(deviceCheckInterval);
+      log.info('[Main] Device check interval cleared');
     });
 
     // ========== POWER SAVE BLOCKER ==========
