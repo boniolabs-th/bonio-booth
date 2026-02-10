@@ -2505,7 +2505,73 @@ ipcMain.handle(
   },
 );
 
-// Handler สำหรับ upload files ไปยัง session
+// Handler สำหรับสร้าง presigned upload URLs (Presigned Upload flow)
+ipcMain.handle(
+  'create-presign-upload',
+  async (
+    event,
+    transactionId: string,
+    files: Array<{ type: 'photo' | 'video'; contentType: string }>,
+    transactionCode?: string,
+  ) => {
+    try {
+      const result = await machineService.createPresignUpload(
+        transactionId,
+        files,
+        transactionCode,
+      );
+      return result;
+    } catch (error) {
+      console.error('❌ [Main] Error in create-presign-upload handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        message: errorMessage,
+        error: errorMessage,
+        photoSession: {
+          id: '',
+          transactionId,
+          numPhotosSelected: 0,
+          status: 'failed',
+        },
+        qrcodeStorageUrl: '',
+        uploadUrls: [],
+        expiresIn: 0,
+        expiresAt: '',
+      };
+    }
+  },
+);
+
+// Handler สำหรับ confirm upload (Presigned Upload flow)
+ipcMain.handle(
+  'confirm-upload',
+  async (
+    event,
+    sessionId: string,
+    uploadedFiles: Array<{ key: string; type: 'photo' | 'video'; order: number }>,
+  ) => {
+    try {
+      const result = await machineService.confirmUpload(
+        sessionId,
+        uploadedFiles,
+      );
+      return result;
+    } catch (error) {
+      console.error('❌ [Main] Error in confirm-upload handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        message: errorMessage,
+        error: errorMessage,
+      };
+    }
+  },
+);
+
+// Handler สำหรับ upload files ไปยัง session (Legacy - ใช้ presigned upload แทน)
 ipcMain.handle(
   'upload-files-to-session',
   async (
@@ -2578,8 +2644,8 @@ ipcMain.handle(
   },
 );
 
-// Handler สำหรับ background upload (ส่ง job ไป queue และ return ทันที)
-// ใช้เมื่อต้องการให้ upload ทำงานเบื้องหลังโดยไม่ต้องรอ
+// Handler สำหรับ background upload (Presigned Upload flow)
+// ส่ง job ไป queue และ return ทันที - ใช้ presigned URLs สำหรับ PUT ตรงไป Storage
 // ถ้าส่ง webmVideoPath มาด้วย จะแปลง WebM→MP4 ในเบื้องหลังก่อน upload
 ipcMain.handle(
   'queue-background-upload',
@@ -2589,12 +2655,24 @@ ipcMain.handle(
     photos: string[],
     videos: string[] = [],
     webmVideoPath?: string,
+    uploadUrls?: Array<{
+      type: 'photo' | 'video';
+      order: number;
+      uploadUrl: string;
+      key: string;
+      publicUrl: string;
+      contentType: string;
+    }>,
   ) => {
     try {
-      console.log('📤 [Main] Queueing background upload...');
-      console.log(`📤 [Main] Session: ${sessionId}, Photos: ${photos.length}, Videos: ${videos.length}`);
+      console.log('📤 [Main] Queueing background presigned upload...');
+      console.log(`📤 [Main] Session: ${sessionId}, Photos: ${photos.length}, Videos: ${videos.length}, UploadUrls: ${uploadUrls?.length || 0}`);
       if (webmVideoPath) {
         console.log(`📤 [Main] WebM video path: ${webmVideoPath} (will convert in background)`);
+      }
+
+      if (!uploadUrls || uploadUrls.length === 0) {
+        throw new Error('uploadUrls is required for presigned upload');
       }
 
       const result = await backgroundUploadService.queueUpload(
@@ -2602,6 +2680,7 @@ ipcMain.handle(
         photos,
         videos,
         webmVideoPath,
+        uploadUrls,
       );
 
       console.log(`✅ [Main] Upload queued with job ID: ${result.jobId}`);

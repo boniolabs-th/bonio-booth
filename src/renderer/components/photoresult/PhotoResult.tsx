@@ -1156,19 +1156,30 @@ export default function PhotoResult() {
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [qrcodeStorageUrl, setQrcodeStorageUrl] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null); // เก็บ sessionId สำหรับ upload files
+  const [uploadUrls, setUploadUrls] = useState<
+    Array<{
+      type: 'photo' | 'video';
+      order: number;
+      uploadUrl: string;
+      key: string;
+      publicUrl: string;
+      contentType: string;
+    }>
+  >([]); // Presigned upload URLs จาก Step 1
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadQueued, setIsUploadQueued] = useState(false); // track ว่า queue upload สำเร็จหรือยัง
   const hasUploaded = useRef(false); // ป้องกันการ upload ซ้ำ
   const hasCreatedSession = useRef(false); // ป้องกันการสร้าง session ซ้ำ
 
-  // สร้าง photo session ทันทีเมื่อมี transactionId (เพื่อรับ qrcodeStorageUrl ทันที)
+  // สร้าง presigned upload session ทันทีเมื่อมี transactionId
+  // (เพื่อรับ qrcodeStorageUrl + presigned URLs ทันที)
   useEffect(() => {
     if (state?.transactionId && !hasCreatedSession.current) {
-      const createSession = async () => {
+      const createPresignSession = async () => {
         try {
           hasCreatedSession.current = true;
           console.log(
-            '📸 [PhotoResult] Creating photo session to get QR code URL immediately...',
+            '📸 [PhotoResult] Creating presigned upload session...',
           );
 
           // Format transaction code (optional)
@@ -1178,43 +1189,84 @@ export default function PhotoResult() {
               : `TXN-${state.referenceId}`
             : undefined;
 
-          const transactionId = state.transactionId!; // Already checked above
+          // คำนวณ files metadata สำหรับ presign request
+          const filesMeta: Array<{
+            type: 'photo' | 'video';
+            contentType: string;
+          }> = [];
+
+          // finalImage (order 1) - always present
+          if (state.finalImage) {
+            filesMeta.push({ type: 'photo', contentType: 'image/jpeg' });
+          }
+
+          // Individual capture photos (order 2, 3, ...)
+          if (state.selectedCaptures && state.selectedCaptures.length > 0) {
+            state.selectedCaptures.forEach((capture) => {
+              if (capture.photo) {
+                filesMeta.push({ type: 'photo', contentType: 'image/jpeg' });
+              }
+            });
+          }
+
+          // Video (ถ้ามี captures จะมี compiled video)
+          if (state.selectedCaptures && state.selectedCaptures.length > 0) {
+            filesMeta.push({ type: 'video', contentType: 'video/mp4' });
+          }
+
+          console.log('📸 [PhotoResult] Files metadata for presign:', {
+            totalFiles: filesMeta.length,
+            photos: filesMeta.filter((f) => f.type === 'photo').length,
+            videos: filesMeta.filter((f) => f.type === 'video').length,
+          });
+
+          const transactionId = state.transactionId!;
           const sessionResult =
-            await window.electron.payment.createPhotoSession(
+            await window.electron.payment.createPresignUpload(
               transactionId,
+              filesMeta,
               transactionCode,
             );
 
           if (sessionResult.success && sessionResult.qrcodeStorageUrl) {
             console.log(
-              '✅ [PhotoResult] Photo session created! QR Code URL:',
+              '✅ [PhotoResult] Presign session created! QR Code URL:',
               sessionResult.qrcodeStorageUrl,
             );
             // Set state ทันทีเพื่อให้ QR code แสดงได้เลย
             setQrcodeStorageUrl(sessionResult.qrcodeStorageUrl);
             setSessionId(sessionResult.photoSession.id);
+            setUploadUrls(sessionResult.uploadUrls || []);
             console.log(
               '✅ [PhotoResult] Session ID:',
               sessionResult.photoSession.id,
             );
+            console.log(
+              '✅ [PhotoResult] Upload URLs count:',
+              sessionResult.uploadUrls?.length || 0,
+            );
+            console.log(
+              '✅ [PhotoResult] Expires at:',
+              sessionResult.expiresAt,
+            );
             console.log('✅ [PhotoResult] QR code should be visible now!');
           } else {
             console.error(
-              '❌ [PhotoResult] Failed to create photo session:',
+              '❌ [PhotoResult] Failed to create presign session:',
               sessionResult.error || sessionResult.message,
             );
             hasCreatedSession.current = false; // Reset เพื่อให้ลองใหม่ได้
           }
         } catch (error) {
           console.error(
-            '❌ [PhotoResult] Error creating photo session:',
+            '❌ [PhotoResult] Error creating presign session:',
             error,
           );
           hasCreatedSession.current = false; // Reset เพื่อให้ลองใหม่ได้
         }
       };
 
-      createSession();
+      createPresignSession();
     }
   }, [state?.transactionId, state?.referenceId]);
 
@@ -1982,34 +2034,35 @@ export default function PhotoResult() {
           );
         }
 
-        // ตรวจสอบว่ามี sessionId หรือไม่ (ควรมีจาก createPhotoSession แล้ว)
-        if (!sessionId) {
+        // ตรวจสอบว่ามี sessionId + uploadUrls หรือไม่ (ควรมีจาก createPresignUpload แล้ว)
+        if (!sessionId || uploadUrls.length === 0) {
           console.warn(
-            '⚠️ [PhotoResult] No sessionId found! Waiting for session to be created...',
+            '⚠️ [PhotoResult] No sessionId/uploadUrls found! Waiting for presign session to be created...',
           );
-          // รอ sessionId สักครู่ (อาจจะยังสร้าง session ไม่เสร็จ)
+          // รอ presign session สักครู่ (อาจจะยังสร้างไม่เสร็จ)
           await new Promise((resolve) => setTimeout(resolve, 1000));
-          if (!sessionId) {
+          if (!sessionId || uploadUrls.length === 0) {
             throw new Error(
-              'Session ID is required. Please ensure photo session was created successfully.',
+              'Session ID and uploadUrls are required. Please ensure presign session was created successfully.',
             );
           }
         }
 
-        // ใช้ queueBackgroundUpload พร้อม webmVideoPath
-        // การแปลง WebM → MP4 จะทำในเบื้องหลังโดย backgroundUploadService
+        // ใช้ queueBackgroundUpload (Presigned Upload) พร้อม uploadUrls + webmVideoPath
+        // backgroundUploadService จะ PUT ตรงไป Storage แล้ว confirm
         const uploadResult =
           await window.electron.payment.queueBackgroundUpload(
             sessionId,
             photos,
             videos,
             webmVideoPath, // ส่ง path ไปให้ convert ในเบื้องหลัง
+            uploadUrls, // Presigned URLs สำหรับ PUT ตรงไป Storage
           );
 
-        // qrcodeStorageUrl ควรมีอยู่แล้วจาก createPhotoSession (ไม่ต้องรอจาก upload)
+        // qrcodeStorageUrl ควรมีอยู่แล้วจาก createPresignUpload (ไม่ต้องรอจาก upload)
         if (!qrcodeStorageUrl) {
           console.warn(
-            '⚠️ [PhotoResult] No qrcodeStorageUrl found (should have been set from createPhotoSession)',
+            '⚠️ [PhotoResult] No qrcodeStorageUrl found (should have been set from createPresignUpload)',
           );
         }
 
@@ -2294,27 +2347,28 @@ export default function PhotoResult() {
                 }
               }
 
-              // ตรวจสอบว่ามี sessionId หรือไม่
-              if (!sessionId) {
+              // ตรวจสอบว่ามี sessionId + uploadUrls หรือไม่
+              if (!sessionId || uploadUrls.length === 0) {
                 console.warn(
-                  '⚠️ [PhotoResult] No sessionId found! Waiting for session to be created...',
+                  '⚠️ [PhotoResult] No sessionId/uploadUrls found! Waiting for presign session...',
                 );
                 await new Promise((resolve) => setTimeout(resolve, 1000));
-                if (!sessionId) {
+                if (!sessionId || uploadUrls.length === 0) {
                   throw new Error(
-                    'Session ID is required. Please ensure photo session was created successfully.',
+                    'Session ID and uploadUrls are required. Please ensure presign session was created successfully.',
                   );
                 }
               }
 
-              // ใช้ queueBackgroundUpload พร้อม webmVideoPath
-              // การแปลง WebM → MP4 จะทำในเบื้องหลังโดย backgroundUploadService
+              // ใช้ queueBackgroundUpload (Presigned Upload) พร้อม uploadUrls + webmVideoPath
+              // backgroundUploadService จะ PUT ตรงไป Storage แล้ว confirm
               const uploadResult =
                 await window.electron.payment.queueBackgroundUpload(
                   sessionId,
                   photos,
                   videos,
                   webmVideoPath, // ส่ง path ไปให้ convert ในเบื้องหลัง
+                  uploadUrls, // Presigned URLs สำหรับ PUT ตรงไป Storage
                 );
 
               if (uploadResult.success) {

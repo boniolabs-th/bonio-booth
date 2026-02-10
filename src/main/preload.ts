@@ -87,6 +87,19 @@ const electronHandler = {
         transactionCode,
       );
     },
+    // Presigned Upload - สร้าง session พร้อม presigned URLs (upload ตรงไป Storage)
+    createPresignUpload: (
+      transactionId: string,
+      files: Array<{ type: 'photo' | 'video'; contentType: string }>,
+      transactionCode?: string,
+    ) => {
+      return ipcRenderer.invoke(
+        'create-presign-upload',
+        transactionId,
+        files,
+        transactionCode,
+      );
+    },
     uploadFilesToSession: (
       sessionId: string,
       photos: string[],
@@ -99,13 +112,22 @@ const electronHandler = {
         videos || [],
       );
     },
-    // Background upload - ส่ง job ไป queue และ return ทันที
+    // Background upload (Presigned) - ส่ง job ไป queue และ return ทันที
+    // ใช้ presigned URLs สำหรับ PUT ตรงไป Storage
     // ถ้าส่ง webmVideoPath มาด้วย จะแปลง WebM→MP4 ในเบื้องหลังก่อน upload
     queueBackgroundUpload: (
       sessionId: string,
       photos: string[],
-      videos?: string[],
-      webmVideoPath?: string,
+      videos: string[] | undefined,
+      webmVideoPath: string | undefined,
+      uploadUrls: Array<{
+        type: 'photo' | 'video';
+        order: number;
+        uploadUrl: string;
+        key: string;
+        publicUrl: string;
+        contentType: string;
+      }>,
     ) => {
       return ipcRenderer.invoke(
         'queue-background-upload',
@@ -113,6 +135,18 @@ const electronHandler = {
         photos,
         videos || [],
         webmVideoPath,
+        uploadUrls,
+      );
+    },
+    // Confirm upload - ยืนยันว่า upload เสร็จแล้ว (ใช้ในกรณีต้องเรียกตรงจาก renderer)
+    confirmUpload: (
+      sessionId: string,
+      uploadedFiles: Array<{ key: string; type: 'photo' | 'video'; order: number }>,
+    ) => {
+      return ipcRenderer.invoke(
+        'confirm-upload',
+        sessionId,
+        uploadedFiles,
       );
     },
     // ตรวจสอบสถานะ upload job

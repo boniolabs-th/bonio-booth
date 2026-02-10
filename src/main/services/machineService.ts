@@ -225,6 +225,53 @@ export interface CreatePhotoSessionResponse {
   error?: string;
 }
 
+// ============ Presigned Upload Types ============
+
+export interface PresignUploadFileRequest {
+  type: 'photo' | 'video';
+  contentType: string;
+}
+
+export interface PresignUploadUrlInfo {
+  type: 'photo' | 'video';
+  order: number;
+  uploadUrl: string;
+  key: string;
+  publicUrl: string;
+  contentType: string;
+}
+
+export interface CreatePresignUploadResponse {
+  success: boolean;
+  message: string;
+  photoSession: PhotoSession;
+  qrcodeStorageUrl: string;
+  uploadUrls: PresignUploadUrlInfo[];
+  expiresIn: number;
+  expiresAt: string;
+  error?: string;
+}
+
+export interface ConfirmUploadFileInfo {
+  key: string;
+  type: 'photo' | 'video';
+  order: number;
+}
+
+export interface ConfirmUploadResponse {
+  success: boolean;
+  message: string;
+  photoSession: PhotoSession;
+  verifiedFiles: Array<{
+    key: string;
+    type: string;
+    order: number;
+    verified: boolean;
+    publicUrl: string;
+  }>;
+  error?: string;
+}
+
 export interface UploadFilesResponse {
   success: boolean;
   message: string;
@@ -760,8 +807,80 @@ export class MachineService {
   }
 
   /**
+   * 10b. POST /api/machines-public/photo-session/create-presign-upload
+   * สร้าง PhotoSession พร้อม Presigned Upload URLs (upload ตรงไป Storage โดยไม่ผ่าน Backend)
+   */
+  async createPresignUpload(
+    transactionId: string,
+    files: PresignUploadFileRequest[],
+    transactionCode?: string,
+    machineId?: string,
+  ): Promise<CreatePresignUploadResponse> {
+    try {
+      const requestBody: {
+        transactionId: string;
+        files: PresignUploadFileRequest[];
+        transactionCode?: string;
+      } = {
+        transactionId,
+        files,
+        ...(transactionCode && { transactionCode }),
+      };
+
+      console.log('📤 [MachineService] Creating presign upload:', {
+        transactionId,
+        filesCount: files.length,
+        fileTypes: files.map((f) => `${f.type}:${f.contentType}`),
+      });
+
+      const response = await this.makeRequest<CreatePresignUploadResponse>(
+        '/api/machines-public/photo-session/create-presign-upload',
+        'POST',
+        requestBody,
+        machineId ? { machineId } : undefined,
+      );
+      return response;
+    } catch (error) {
+      console.error('❌ [MachineService] Create presign upload failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 10c. POST /api/machines-public/photo-session/{sessionId}/confirm-upload
+   * ยืนยันว่าไฟล์ถูก upload ไปยัง Storage แล้ว (หลังจาก PUT presigned URLs เสร็จ)
+   */
+  async confirmUpload(
+    sessionId: string,
+    uploadedFiles: ConfirmUploadFileInfo[],
+    machineId?: string,
+  ): Promise<ConfirmUploadResponse> {
+    try {
+      const requestBody = { uploadedFiles };
+
+      console.log('📤 [MachineService] Confirming upload:', {
+        sessionId,
+        uploadedFilesCount: uploadedFiles.length,
+        files: uploadedFiles.map((f) => `${f.type}:${f.order}`),
+      });
+
+      const response = await this.makeRequest<ConfirmUploadResponse>(
+        `/api/machines-public/photo-session/${sessionId}/confirm-upload`,
+        'POST',
+        requestBody,
+        machineId ? { machineId } : undefined,
+      );
+      return response;
+    } catch (error) {
+      console.error('❌ [MachineService] Confirm upload failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 11. POST /api/machines-public/photo-session/{sessionId}/upload
    * Upload รูปภาพและวิดีโอไปยัง session ที่สร้างไว้แล้ว (ใช้ form-data)
+   * @deprecated ใช้ createPresignUpload + PUT + confirmUpload แทน
    */
   async uploadFilesToSession(
     sessionId: string,

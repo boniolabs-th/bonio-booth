@@ -55,6 +55,7 @@ function RouteListener() {
 
 function MaintenanceListener() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showQuitPasswordModal, setShowQuitPasswordModal] = useState(false);
@@ -93,15 +94,38 @@ function MaintenanceListener() {
   };
 
   useEffect(() => {
-    // Check status on mount
+    // Check status on mount - but only navigate if we're not in a normal flow page
     const checkStatus = async () => {
       try {
         const res = await (window as any).electron.payment.getMachineData();
         if (res.success && res.machine) {
+          const currentPath = location.pathname;
+          // Only navigate to maintenance/out-of-paper if we're not in a normal flow
+          // Don't interrupt user flow (photo-prepare, main-shooting, photo-decorate, etc.)
+          const isInNormalFlow = [
+            '/select-print',
+            '/discount-coupon',
+            '/frame-selection',
+            '/payment',
+            '/payment-qr',
+            '/photo-prepare',
+            '/main-shooting',
+            '/photo-confirmation',
+            '/photo-decorate',
+            '/photo-filter',
+            '/photo-result',
+          ].includes(currentPath);
+
           if (res.machine.isMaintenanceMode) {
-            navigate('/system-maintenance', { state: { maintenance: true } });
+            // Only navigate if not already in maintenance or in normal flow
+            if (currentPath !== '/system-maintenance' && !isInNormalFlow) {
+              navigate('/system-maintenance', { state: { maintenance: true } });
+            }
           } else if (res.machine.paperLevel === 0) {
-            navigate('/out-of-paper', { state: { maintenance: true } });
+            // Only navigate if not already in out-of-paper or in normal flow
+            if (currentPath !== '/out-of-paper' && !isInNormalFlow) {
+              navigate('/out-of-paper', { state: { maintenance: true } });
+            }
           }
         }
       } catch (error) {
@@ -114,10 +138,32 @@ function MaintenanceListener() {
     const unsubscribe = (window as any).electron.ipcRenderer.on(
       'machine-init',
       (arg: any) => {
+        const currentPath = location.pathname;
+        // Only navigate if we're not in a normal flow page
+        const isInNormalFlow = [
+          '/select-print',
+          '/discount-coupon',
+          '/frame-selection',
+          '/payment',
+          '/payment-qr',
+          '/photo-prepare',
+          '/main-shooting',
+          '/photo-confirmation',
+          '/photo-decorate',
+          '/photo-filter',
+          '/photo-result',
+        ].includes(currentPath);
+
         if (arg?.machine?.isMaintenanceMode) {
-          navigate('/system-maintenance', { state: { maintenance: true } });
+          // Only navigate if not already in maintenance or in normal flow
+          if (currentPath !== '/system-maintenance' && !isInNormalFlow) {
+            navigate('/system-maintenance', { state: { maintenance: true } });
+          }
         } else if (arg?.machine?.paperLevel === 0) {
-          navigate('/out-of-paper', { state: { maintenance: true } });
+          // Only navigate if not already in out-of-paper or in normal flow
+          if (currentPath !== '/out-of-paper' && !isInNormalFlow) {
+            navigate('/out-of-paper', { state: { maintenance: true } });
+          }
         }
       },
     );
@@ -219,7 +265,15 @@ function MaintenanceListener() {
     const unsubscribeDeviceFound = (window as any).electron.ipcRenderer.on(
       'device-found',
       () => {
-        navigate('/');
+        // Navigate to home only if we're in maintenance or out-of-paper pages
+        // Don't interrupt normal user flow
+        const currentPath = location.pathname;
+        if (
+          currentPath === '/system-maintenance' ||
+          currentPath === '/out-of-paper'
+        ) {
+          navigate('/');
+        }
       },
     );
 
@@ -236,7 +290,7 @@ function MaintenanceListener() {
       unsubscribeDeviceNotFound();
       unsubscribeDeviceFound();
     };
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   // ---------------- PASSWORD HANDLERS ----------------
 
