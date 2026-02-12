@@ -3350,23 +3350,20 @@ ipcMain.on('webcam-instant-status', async (_event, data) => {
     `⚡ [Main] Instant webcam status: ${found ? 'found' : 'NOT found'} - ${configuredLabel}`,
   );
 
+  const previousStatus = deviceStatus.camera;
   deviceStatus.camera = found;
 
-  if (!found) {
-    await sendDeviceAlertWithRateLimit(
-      'camera',
-      configuredLabel || 'Webcam',
-      [],
-    );
+  // แจ้งเตือนเฉพาะเมื่อสถานะเปลี่ยน (false → true หรือ true → false)
+  if (!found && previousStatus !== found) {
+    // กล้องหาย → แจ้งเตือน
+    await sendDeviceAlertWithRateLimit('camera', configuredLabel || 'Webcam', []);
     sendDeviceStatus({
       deviceType: 'camera',
       deviceName: configuredLabel || 'Webcam',
     });
-  } else {
-    // Webcam กลับมาแล้ว → ส่ง sendDeviceStatus() เพื่อเช็คว่าทุกอุปกรณ์ OK หรือยัง
-    if (mainWindow) {
-      mainWindow.webContents.send('device-found');
-    }
+  } else if (found && previousStatus !== found) {
+    // กล้องกลับมา → ส่ง status เพื่อเช็คว่าทุกอุปกรณ์ OK หรือยัง
+    sendDeviceStatus();
   }
 });
 
