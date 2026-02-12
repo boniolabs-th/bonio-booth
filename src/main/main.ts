@@ -1053,7 +1053,7 @@ let powerSaveBlockerId: number | null = null; // ID สำหรับ powerSave
 let currentRoute: string = '/'; // Track current React route
 
 // Rate limiting สำหรับ device alerts (5 นาที)
-const ALERT_RATE_LIMIT_MS = 5 * 60 * 1000; // 5 นาที
+const ALERT_RATE_LIMIT_MS = 2000; // 2 วินาที
 const lastDeviceAlertTime: Record<'printer' | 'camera', number> = {
   printer: 0,
   camera: 0,
@@ -1073,27 +1073,30 @@ async function sendDeviceAlertWithRateLimit(
   const now = Date.now();
   const lastAlertTime = lastDeviceAlertTime[deviceType];
 
-  // Check rate limit (5 minutes)
+  // ตรวจสอบ Rate Limit (2 วินาที)
   if (now - lastAlertTime < ALERT_RATE_LIMIT_MS) {
-    const remainingMinutes = Math.ceil(
-      (ALERT_RATE_LIMIT_MS - (now - lastAlertTime)) / 60000,
-    );
+    // ปรับการแสดงผลวินาทีให้เหมาะสม (ใช้หน่วยวินาทีแทนนาทีเพื่อให้เมคเซนส์ขึ้น)
+    const remainingSeconds = (
+      (ALERT_RATE_LIMIT_MS - (now - lastAlertTime)) /
+      1000
+    ).toFixed(1);
+
     console.log(
-      `⏳ [Main] Device alert for ${deviceType} skipped (rate limited, ${remainingMinutes} min remaining)`,
+      `⏳ [Main] Device alert for ${deviceType} skipped (rate limited, ${remainingSeconds}s remaining)`,
     );
     return false;
   }
 
-  // Update last alert time
+  // อัปเดตเวลาล่าสุดที่ส่ง Alert
   lastDeviceAlertTime[deviceType] = now;
 
-  // Send alert
   try {
     await machineService.sendDeviceAlert(
       deviceType,
       deviceName,
       availableDevices,
     );
+
     return true;
   } catch (err) {
     console.error(`❌ [Main] Failed to send ${deviceType} alert:`, err);
