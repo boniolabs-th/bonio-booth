@@ -150,7 +150,40 @@ export default function CameraConfigModal({
     try {
       console.log('[CameraConfigModal] Starting Canon camera detection...');
 
+      // 1) เช็คสถานะการเชื่อมต่อปัจจุบันก่อน
       // @ts-ignore - canonCamera API from preload
+      const isAlreadyConnected = await window.electron?.canonCamera?.isConnected();
+      // @ts-ignore
+      const isAlreadySessionOpen = await window.electron?.canonCamera?.isSessionOpen();
+      console.log('[CameraConfigModal] Current status - connected:', isAlreadyConnected, 'session:', isAlreadySessionOpen);
+
+      // 2) ถ้ากล้อง connected และ session เปิดอยู่แล้ว → แค่ดึงข้อมูลแสดงผล
+      if (isAlreadyConnected && isAlreadySessionOpen) {
+        console.log('[CameraConfigModal] Camera already connected, loading info...');
+        setCanonConnected(true);
+        setCanonSessionOpen(true);
+
+        // ดึง battery level
+        // @ts-ignore
+        const batteryLevel = await window.electron?.canonCamera?.getBatteryLevel();
+        if (batteryLevel !== null && batteryLevel !== undefined) {
+          setCanonBatteryLevel(batteryLevel);
+        }
+
+        // ดึงรายชื่อกล้อง (ไม่กระทบ connection ที่เปิดอยู่)
+        // @ts-ignore
+        const cameras = await window.electron?.canonCamera?.getCameraList();
+        if (cameras && Array.isArray(cameras)) {
+          setCanonCameras(cameras);
+          if (cameras.length > 0) {
+            setSelectedCanonIndex(0);
+          }
+        }
+        return;
+      }
+
+      // 3) ยังไม่ connected → initialize SDK และสแกนหากล้อง
+      // @ts-ignore
       const initResult = await window.electron?.canonCamera?.initialize();
       console.log('[CameraConfigModal] SDK initialize result:', initResult);
 
@@ -165,22 +198,52 @@ export default function CameraConfigModal({
 
       if (cameras && Array.isArray(cameras)) {
         setCanonCameras(cameras);
-        if (cameras.length > 0) {
-          setSelectedCanonIndex(0);
-        }
       } else {
         setCanonCameras([]);
       }
 
-      // Check connection status
-      // @ts-ignore
-      const isConnected = await window.electron?.canonCamera?.isConnected();
-      // @ts-ignore
-      const isSessionOpen = await window.electron?.canonCamera?.isSessionOpen();
-      console.log('[CameraConfigModal] Status - connected:', isConnected, 'session:', isSessionOpen);
+      setCanonConnected(false);
+      setCanonSessionOpen(false);
+      setCanonBatteryLevel(null);
 
-      setCanonConnected(!!isConnected);
-      setCanonSessionOpen(!!isSessionOpen);
+      // 4) ถ้าเจอกล้องและมี saved config → ลอง auto-reconnect
+      if (cameras && cameras.length > 0) {
+        // @ts-ignore
+        const configResult = await window.electron?.payment?.getCameraConfig();
+        if (configResult?.success && configResult.config?.type === 'canon') {
+          const savedIndex = configResult.config.cameraIndex ?? 0;
+          const validIndex = savedIndex < cameras.length ? savedIndex : 0;
+          setSelectedCanonIndex(validIndex);
+
+          console.log('[CameraConfigModal] Auto-reconnecting with saved config, index:', validIndex);
+
+          try {
+            // @ts-ignore
+            const camera = await window.electron?.canonCamera?.connectByIndex(validIndex);
+            if (camera) {
+              setCanonConnected(true);
+              // @ts-ignore
+              const sessionOpened = await window.electron?.canonCamera?.openSession();
+              if (sessionOpened) {
+                setCanonSessionOpen(true);
+                // @ts-ignore
+                const batteryLevel = await window.electron?.canonCamera?.getBatteryLevel();
+                if (batteryLevel !== null && batteryLevel !== undefined) {
+                  setCanonBatteryLevel(batteryLevel);
+                }
+                console.log('[CameraConfigModal] Auto-reconnect successful');
+              }
+            }
+          } catch (autoErr) {
+            console.warn('[CameraConfigModal] Auto-reconnect failed, user can connect manually:', autoErr);
+            // ไม่ set error — แค่ให้ user กดเชื่อมต่อเอง
+            setCanonConnected(false);
+            setCanonSessionOpen(false);
+          }
+        } else if (cameras.length > 0) {
+          setSelectedCanonIndex(0);
+        }
+      }
     } catch (err: any) {
       console.error('[CameraConfigModal] Failed to load Canon cameras:', err);
       setCanonError(
