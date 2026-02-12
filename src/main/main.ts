@@ -559,9 +559,12 @@ const deviceStatus: Record<string, boolean> = {
  * ส่งสถานะอุปกรณ์รวมไปให้ renderer ตัดสินใจว่าจะไปหน้า maintenance หรือไม่
  * - ถ้ามีอุปกรณ์ตัวใดตัวหนึ่งหาย → ส่ง device-not-found พร้อมข้อมูล
  * - ถ้าทุกอุปกรณ์ OK → ส่ง all-devices-found
+ * @param failedDevice - ข้อมูลอุปกรณ์ที่หาย (optional)
+ * @param isInUserFlow - ถ้า true จะ skip การแจ้งเตือนหน้าจอ (เพื่อไม่รบกวน user)
  */
 function sendDeviceStatus(
   failedDevice?: { deviceType: string; deviceName: string },
+  isInUserFlow = false,
 ): void {
   if (!mainWindow || mainWindow.isDestroyed()) return;
 
@@ -571,20 +574,21 @@ function sendDeviceStatus(
     // ทุกอุปกรณ์ OK → ส่ง all-devices-found เพื่อให้ออกจาก maintenance ได้
     mainWindow.webContents.send('all-devices-found');
     console.log('✅ [Main] All devices OK');
-  } else if (failedDevice) {
+  } else if (failedDevice && !isInUserFlow) {
     // มีอุปกรณ์ขาดหาย → ส่ง device-not-found
+    // แต่ skip ถ้าอยู่ใน user flow เพื่อไม่รบกวน user ระหว่างใช้งาน
     mainWindow.webContents.send('device-not-found', failedDevice);
     console.log(
       `❌ [Main] Device not found: ${failedDevice.deviceType} - ${failedDevice.deviceName}`,
     );
+  } else if (failedDevice && isInUserFlow) {
+    // อยู่ใน user flow และมีอุปกรณ์หาย → log เฉยๆ ไม่ส่งไปหน้าจอ
+    console.log(
+      `⏳ [Main] Device not found but in user flow, skipping navigation: ${failedDevice.deviceType} - ${failedDevice.deviceName}`,
+    );
   }
 }
-
-/**
- * ตรวจสอบว่า device (camera/printer) ที่เคยตั้งค่าไว้ยังมีอยู่หรือไม่
- * ถ้าไม่พบจะส่งแจ้งเตือนไปยัง Telegram ผ่าน API
- */
-async function checkConfiguredDevices(): Promise<void> {
+async function checkConfiguredDevices(isInUserFlow = false): Promise<void> {
   console.log('🔍 [Main] Checking configured devices...');
 
   // รอให้ renderer พร้อม
@@ -602,22 +606,23 @@ async function checkConfiguredDevices(): Promise<void> {
   }
 
   // 1. เช็ค Camera
-  await checkCamera();
+  await checkCamera(isInUserFlow);
 
   // 2. เช็ค Printer
-  await checkPrinter();
+  await checkPrinter(isInUserFlow);
 
   // 3. ส่งสถานะรวมสุดท้าย — ถ้าทุกอุปกรณ์ OK ให้ออกจาก maintenance ได้
   const allOk = Object.values(deviceStatus).every((v) => v);
   if (allOk) {
-    sendDeviceStatus();
+    sendDeviceStatus(undefined, isInUserFlow);
   }
 }
 
 /**
  * เช็ค Camera (แยกเป็นฟังก์ชันย่อยเพื่อความชัดเจน)
+ * @param isInUserFlow - ถ้า true จะ skip การแจ้งเตือนหน้าจอ
  */
-async function checkCamera(): Promise<void> {
+async function checkCamera(isInUserFlow = false): Promise<void> {
   try {
     const cameraConfig = await getCameraConfig();
     if (!cameraConfig) {
@@ -635,15 +640,23 @@ async function checkCamera(): Promise<void> {
       // สร้าง Promise เพื่อรอผลจาก renderer
       const found = await new Promise<boolean>((resolve) => {
         const timeout = setTimeout(() => {
-          console.warn('⚠️ [Main] Timeout waiting for camera check response');
+          console.warn(
+            `⚠️ [Main] Timeout (10s) waiting for camera check response for "${cameraConfig.label}" - treating as not found`,
+          );
+          // Remove listener when timeout occurs to prevent memory leaks
+          // Use removeListener instead of removeAllListeners to avoid affecting other checks
+          ipcMain.removeListener('camera-availability-result', listener);
           resolve(false);
-        }, 5000);
+        }, 10000); // เพิ่มจาก 5s เป็น 10s เพื่อให้ renderer มีเวลาเพียงพอ
 
-        // ใช้ once เพื่อรับผลเฉพาะจากรอบนี้
-        ipcMain.once('camera-availability-result', (_event, result) => {
+        // ใช้ on แทน once และ remove listener เอง เพื่อป้องกันปัญหา callback หายเมื่อมีการเรียกซ้ำ
+        const listener = (_event: any, result: any) => {
           clearTimeout(timeout);
+          ipcMain.removeListener('camera-availability-result', listener);
           resolve(result.found);
-        });
+        };
+
+        ipcMain.on('camera-availability-result', listener);
 
         // ส่ง event ไปให้ renderer เช็ค
         mainWindow?.webContents.send('check-camera-availability', {
@@ -655,18 +668,19 @@ async function checkCamera(): Promise<void> {
       deviceStatus.camera = found;
 
       if (!found) {
-        console.warn(
-          `⚠️ [Main] Webcam not found: ${cameraConfig.label}`,
-        );
+        console.warn(`⚠️ [Main] Webcam not found: ${cameraConfig.label}`);
         await sendDeviceAlertWithRateLimit(
           'camera',
           cameraConfig.label || 'Webcam',
           [],
         );
-        sendDeviceStatus({
-          deviceType: 'camera',
-          deviceName: cameraConfig.label || 'Webcam',
-        });
+        sendDeviceStatus(
+          {
+            deviceType: 'camera',
+            deviceName: cameraConfig.label || 'Webcam',
+          },
+          isInUserFlow,
+        );
       } else {
         console.log(`✅ [Main] Webcam found: ${cameraConfig.label}`);
       }
@@ -677,9 +691,10 @@ async function checkCamera(): Promise<void> {
 
       // ถ้า SDK ยังไม่ได้ initialize (renderer ยังไม่ได้เรียก canon-v2:initialize)
       // → ข้ามการเช็คไปก่อน ไม่ถือว่าเป็น error
+      // แต่ต้อง track ว่าเคยแจ้งเตือนแล้วหรือยัง เพื่อป้องกันกรณี SDK init ล้มเหลว
       if (!isCanonSdkInitialized()) {
         console.log(
-          'ℹ️ [Main] Canon SDK not yet initialized, skipping camera check',
+          'ℹ️ [Main] Canon SDK not yet initialized, skipping camera check (waiting for renderer to init)',
         );
         deviceStatus.camera = true; // ยังไม่ init = ไม่รู้สถานะ ให้ถือว่า OK ไปก่อน
         return;
@@ -697,10 +712,13 @@ async function checkCamera(): Promise<void> {
           cameraConfig.cameraName || 'Canon Camera',
           [],
         );
-        sendDeviceStatus({
-          deviceType: 'camera',
-          deviceName: cameraConfig.cameraName || 'Canon Camera',
-        });
+        sendDeviceStatus(
+          {
+            deviceType: 'camera',
+            deviceName: cameraConfig.cameraName || 'Canon Camera',
+          },
+          isInUserFlow,
+        );
       } else {
         console.log(
           `✅ [Main] Canon camera connected: ${cameraConfig.cameraName}`,
@@ -714,8 +732,9 @@ async function checkCamera(): Promise<void> {
 
 /**
  * เช็ค Printer (แยกเป็นฟังก์ชันย่อยเพื่อความชัดเจน)
+ * @param isInUserFlow - ถ้า true จะ skip การแจ้งเตือนหน้าจอ
  */
-async function checkPrinter(): Promise<void> {
+async function checkPrinter(isInUserFlow = false): Promise<void> {
   try {
     const printerConfig = await getPrinterConfig();
     if (!printerConfig) {
@@ -793,10 +812,13 @@ async function checkPrinter(): Promise<void> {
       const missingName = !mainFound
         ? printerConfig.main.printerName
         : printerConfig.secondary?.printerName || 'Printer';
-      sendDeviceStatus({
-        deviceType: 'printer',
-        deviceName: missingName,
-      });
+      sendDeviceStatus(
+        {
+          deviceType: 'printer',
+          deviceName: missingName,
+        },
+        isInUserFlow,
+      );
     }
   } catch (error) {
     console.error('❌ [Main] Error checking printer:', error);
@@ -1049,12 +1071,10 @@ let shouldQuit = false; // Flag สำหรับบอกว่าเราต
 let powerSaveBlockerId: number | null = null; // ID สำหรับ powerSaveBlocker
 let currentRoute: string = '/'; // Track current React route
 
-// Rate limiting สำหรับ device alerts (5 นาที)
+// Rate limiting สำหรับ device alerts (5 นาที) - แยกตาม device name
 const ALERT_RATE_LIMIT_MS = 5 * 60 * 1000; // 5 นาที
-const lastDeviceAlertTime: Record<'printer' | 'camera', number> = {
-  printer: 0,
-  camera: 0,
-};
+// ใช้ key เป็น "${deviceType}:${deviceName}" เพื่อแยกแต่ละ device
+const lastDeviceAlertTime: Record<string, number> = {};
 
 /**
  * ส่ง device alert พร้อม rate limiting (5 นาที)
@@ -1068,7 +1088,9 @@ async function sendDeviceAlertWithRateLimit(
   availableDevices: string[],
 ): Promise<boolean> {
   const now = Date.now();
-  const lastAlertTime = lastDeviceAlertTime[deviceType];
+  // สร้าง key เฉพาะสำหรับแต่ละ device เพื่อแยก rate limit
+  const alertKey = `${deviceType}:${deviceName}`;
+  const lastAlertTime = lastDeviceAlertTime[alertKey] || 0;
 
   // Check rate limit (5 minutes)
   if (now - lastAlertTime < ALERT_RATE_LIMIT_MS) {
@@ -1076,13 +1098,13 @@ async function sendDeviceAlertWithRateLimit(
       (ALERT_RATE_LIMIT_MS - (now - lastAlertTime)) / 60000,
     );
     console.log(
-      `⏳ [Main] Device alert for ${deviceType} skipped (rate limited, ${remainingMinutes} min remaining)`,
+      `⏳ [Main] Device alert for ${deviceType} "${deviceName}" skipped (rate limited, ${remainingMinutes} min remaining)`,
     );
     return false;
   }
 
   // Update last alert time
-  lastDeviceAlertTime[deviceType] = now;
+  lastDeviceAlertTime[alertKey] = now;
 
   // Send alert
   try {
@@ -1490,11 +1512,13 @@ app
     console.log('[Main] Route change listener registered');
 
     // ========== CHECK CONFIGURED DEVICES INTERVAL ==========
-    // Check configured devices every 10 seconds (except when on system-maintenance page)
+    // Check configured devices every 10 seconds
+    // เช็ค device อยู่เสมอ แต่ skip การแจ้งเตือนหน้าจอถ้าอยู่ใน user flow
+    // เพื่อไม่ให้รบกวน user ระหว่างใช้งาน
     const deviceCheckInterval = setInterval(async () => {
-      // Skip if on system-maintenance page or in normal user flow
-      const skipRoutes = [
-        '/system-maintenance',
+      // Routes ที่อยู่ใน user flow - skip การแจ้งเตือนหน้าจอ
+      // แต่ยังคงเช็ค device และส่ง Telegram alert อยู่
+      const isInUserFlow = [
         '/select-print',
         '/discount-coupon',
         '/frame-selection',
@@ -1506,14 +1530,18 @@ app
         '/photo-decorate',
         '/photo-filter',
         '/photo-result',
-      ];
-      if (skipRoutes.includes(currentRoute)) {
+      ].includes(currentRoute);
+
+      // Skip ทั้งหมดถ้าอยู่ใน system-maintenance page
+      if (currentRoute === '/system-maintenance') {
         log.debug(`[Main] Skipping device check on ${currentRoute} page`);
         return;
       }
 
       try {
-        await checkConfiguredDevices();
+        // ทำการเช็ค device ทุกครั้ง - ส่ง alert เสมอ
+        // แต่ sendDeviceStatus จะเช็ค currentRoute เองก่อนส่งไปหน้าจอ
+        await checkConfiguredDevices(isInUserFlow);
       } catch (err) {
         log.error('[Main] Error in checkConfiguredDevices interval:', err);
       }
@@ -3234,12 +3262,27 @@ ipcMain.on('webcam-instant-status', async (_event, data) => {
   deviceStatus.camera = found;
 
   if (!found) {
-    await sendDeviceAlertWithRateLimit('camera', configuredLabel || 'Webcam', []);
-    sendDeviceStatus({
-      deviceType: 'camera',
-      deviceName: configuredLabel || 'Webcam',
-    });
+    console.log(
+      `🚨 [Main] Webcam disconnected: ${configuredLabel} - sending alert...`,
+    );
+    const alertSent = await sendDeviceAlertWithRateLimit(
+      'camera',
+      configuredLabel || 'Webcam',
+      [],
+    );
+    console.log(`  → Alert sent: ${alertSent ? 'YES' : 'NO (rate limited)'}`);
+
+    // Instant detection ควรแจ้งเตือนเสมอ เพื่อให้ admin ทราบทันที
+    // ส่ง isInUserFlow=false เพื่อให้แน่ใจว่าต้องการแจ้งเตือนหน้าจอ
+    sendDeviceStatus(
+      {
+        deviceType: 'camera',
+        deviceName: configuredLabel || 'Webcam',
+      },
+      false, // isInUserFlow = false เพราะ instant detection ควรแจ้งเตือน
+    );
   } else {
+    console.log(`✅ [Main] Webcam reconnected: ${configuredLabel}`);
     // Webcam กลับมาแล้ว → ส่ง sendDeviceStatus() เพื่อเช็คว่าทุกอุปกรณ์ OK หรือยัง
     sendDeviceStatus();
   }

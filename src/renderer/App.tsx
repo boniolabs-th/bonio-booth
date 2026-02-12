@@ -303,20 +303,42 @@ function MaintenanceListener() {
 
     // devicechange: ตรวจจับ USB webcam ถอด/เสียบทันที (ไม่ต้องรอ polling 10s)
     const handleDeviceChange = async () => {
+      console.log('🔌 [App] devicechange event triggered');
       try {
         // ดึง config จาก main process เพื่อเช็คว่ามี webcam ที่ตั้งค่าไว้หรือไม่
         const result = await (window as any).electron.ipcRenderer.invoke(
           'get-camera-config',
         );
-        if (!result?.success || !result.config || result.config.type !== 'webcam') return;
+        console.log('[App] Camera config result:', result);
+
+        if (!result?.success) {
+          console.warn(
+            '[App] Camera config not successful, skipping device check',
+          );
+          return;
+        }
+        if (!result.config) {
+          console.log('[App] No camera config found, skipping device check');
+          return;
+        }
+        if (result.config.type !== 'webcam') {
+          console.log('[App] Camera type is not webcam, skipping device check');
+          return;
+        }
 
         const cameraConfig = result.config;
         const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(
-          (d) => d.kind === 'videoinput',
+        const videoDevices = devices.filter((d) => d.kind === 'videoinput');
+        console.log(
+          '[App] Available video devices:',
+          videoDevices.map((d) => ({ deviceId: d.deviceId, label: d.label })),
         );
+
         const found = videoDevices.some(
           (d) => d.deviceId === cameraConfig.deviceId,
+        );
+        console.log(
+          `[App] Configured webcam "${cameraConfig.label}" ${found ? 'found' : 'NOT found'}`,
         );
 
         // แจ้ง main process ทันทีผ่าน event เฉพาะ (แยกจาก polling result)
@@ -328,6 +350,7 @@ function MaintenanceListener() {
             configuredLabel: cameraConfig.label,
           },
         );
+        console.log('[App] Sent webcam-instant-status to main process');
       } catch (err) {
         console.error('[App] devicechange handler error:', err);
       }
