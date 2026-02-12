@@ -692,11 +692,22 @@ async function checkCamera(): Promise<void> {
         console.warn(
           `⚠️ [Main] Canon camera not connected: ${cameraConfig.cameraName}`,
         );
+        // ส่งแจ้งเตือน
         await sendDeviceAlertWithRateLimit(
           'camera',
-          cameraConfig.cameraName || 'Canon Camera',
+          cameraConfig.cameraName,
           [],
         );
+
+        // ส่ง event ไปที่ renderer
+        if (mainWindow) {
+          mainWindow.webContents.send('device-not-found', {
+            deviceType: 'camera',
+            deviceName: cameraConfig.cameraName,
+          });
+        }
+
+        // อัพเดท deviceStatus สำหรับ sendDeviceStatus system
         sendDeviceStatus({
           deviceType: 'camera',
           deviceName: cameraConfig.cameraName || 'Canon Camera',
@@ -705,6 +716,9 @@ async function checkCamera(): Promise<void> {
         console.log(
           `✅ [Main] Canon camera connected: ${cameraConfig.cameraName}`,
         );
+        if (mainWindow) {
+          mainWindow.webContents.send('device-found');
+        }
       }
     }
   } catch (error) {
@@ -734,13 +748,30 @@ async function checkPrinter(): Promise<void> {
     const printerNames = printers.map((p) => p.name);
     console.log('🖨️ [Main] Available printers:', printerNames);
 
-    // ฟังก์ชันเช็คว่า printer มีอยู่และไม่ offline
+    // ฟังก์ชันเช็คว่า printer มีอยู่และไม่ offline/error
+    // Windows Printer Status Flags:
+    //   PRINTER_STATUS_ERROR          = 0x00000002 (2)
+    //   PRINTER_STATUS_OFFLINE        = 0x00000080 (128)
+    //   PRINTER_STATUS_NOT_AVAILABLE  = 0x00001000 (4096)
+    //   PRINTER_STATUS_PAUSED         = 0x00000001 (1) — ไม่นับว่า unavailable
+    const PRINTER_UNAVAILABLE_FLAGS =
+      0x00000002 | // ERROR
+      0x00000080 | // OFFLINE
+      0x00001000;  // NOT_AVAILABLE
+
     const isPrinterAvailable = (targetName: string): boolean => {
-      return printers.some((p) => {
-        if (p.name !== targetName) return false;
-        const isOffline = !!(p.status & 0x00000400) || p.status === 1024;
-        return !isOffline;
-      });
+      const printer = printers.find((p) => p.name === targetName);
+      if (!printer) {
+        console.warn(
+          `⚠️ [Main] Printer "${targetName}" not found in system printer list`,
+        );
+        return false;
+      }
+      const isUnavailable = !!(printer.status & PRINTER_UNAVAILABLE_FLAGS);
+      console.log(
+        `🖨️ [Main] Printer "${targetName}" status: ${printer.status} (0x${printer.status.toString(16)}) → ${isUnavailable ? 'UNAVAILABLE' : 'OK'}`,
+      );
+      return !isUnavailable;
     };
 
     // เช็ค Main printer
