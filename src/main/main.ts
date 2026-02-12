@@ -721,7 +721,7 @@ async function checkCamera(): Promise<void> {
 /**
  * เช็คสถานะ Printer ผ่าน PowerShell (Windows only)
  * @param printerName - ชื่อ printer ที่ต้องการตรวจสอบ
- * @returns Promise<{ available: boolean; status?: string; details?: string }>
+ * @returns Promise<{ available: boolean; status?: string; details?: string; fallback?: boolean }>
  *
  * PrinterStatus codes:
  * 1 = Other, 2 = Unknown, 3 = Idle, 4 = Printing, 5 = Warmup
@@ -729,9 +729,9 @@ async function checkCamera(): Promise<void> {
  */
 async function getPrinterStatusViaPowerShell(
   printerName: string,
-): Promise<{ available: boolean; status?: string; details?: string }> {
+): Promise<{ available: boolean; status?: string; details?: string; fallback?: boolean }> {
   if (process.platform !== 'win32') {
-    return { available: false }; // ไม่ใช่ Windows ให้ fallback ไปวิธีเดิม
+    return { available: false, fallback: true }; // ไม่ใช่ Windows ให้ fallback
   }
 
   try {
@@ -770,10 +770,9 @@ async function getPrinterStatusViaPowerShell(
     };
   } catch (error) {
     console.warn(
-      `⚠️ [Main] PowerShell check failed for ${printerName}:`,
-      (error as Error).message,
+      `⚠️ [Main] PowerShell check failed for '${printerName}': ${(error as Error).message}`,
     );
-    return { available: false };
+    return { available: false, fallback: true }; // Indicate fallback needed
   }
 }
 
@@ -799,13 +798,30 @@ async function checkPrinter(): Promise<void> {
     const printerNames = printers.map((p) => p.name);
     console.log('🖨️ [Main] Available printers:', printerNames);
 
-    // ฟังก์ชันเช็คว่า printer พร้อมใช้งาน (ใช้ PowerShell บน Windows)
+    // ฟังก์ชันเช็คว่า printer พร้อมใช้งาน (ใช้ PowerShell บน Windows, fallback ไป Electron API)
     const isPrinterAvailable = async (
       targetName: string,
     ): Promise<boolean> => {
       // ใช้ PowerShell เช็คสถานะแบบละเอียด (Windows)
       if (process.platform === 'win32') {
         const result = await getPrinterStatusViaPowerShell(targetName);
+
+        // ถ้า PowerShell fail ให้ fallback ไปใช้ Electron API
+        if (result.fallback) {
+          console.log(
+            `  └─ PowerShell failed, using Electron API fallback`,
+          );
+          const found = printers.some((p) => {
+            if (p.name !== targetName) return false;
+            const isOffline = !!(p.status & 0x00000400) || p.status === 1024;
+            return !isOffline;
+          });
+          console.log(
+            `  └─ Status: ${found ? 'Available (Electron API)' : 'Not found/Offline'}`,
+          );
+          return found;
+        }
+
         if (result.status) {
           console.log(
             `  └─ Status: ${result.status}${result.details ? ` (${result.details})` : ''}`,

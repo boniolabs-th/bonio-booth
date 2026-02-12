@@ -63,7 +63,7 @@ export default function SystemMaintenance() {
 
   return (
     <div className="get-maintenance-container">
-      {!isMaintenanceMode && <BackButton onBackClick={handleBack} />}
+      {isMaintenanceMode && <BackButton onBackClick={handleBack} />}
 
       <div className="maintenance-content">
         <div className="maintenance-illustration">
