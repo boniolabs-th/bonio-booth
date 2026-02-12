@@ -628,51 +628,52 @@ async function checkCamera(): Promise<void> {
       return;
     }
 
-    if (cameraConfig.type === 'webcam') {
-      console.log(
-        `📷 [Main] Checking webcam: ${cameraConfig.label} (${cameraConfig.deviceId})`,
-      );
+    // if (cameraConfig.type === 'webcam') {
+    //   console.log(
+    //     `📷 [Main] Checking webcam: ${cameraConfig.label} (${cameraConfig.deviceId})`,
+    //   );
 
-      // สร้าง Promise เพื่อรอผลจาก renderer
-      const found = await new Promise<boolean>((resolve) => {
-        const timeout = setTimeout(() => {
-          console.warn('⚠️ [Main] Timeout waiting for camera check response');
-          resolve(false);
-        }, 5000);
+    //   // สร้าง Promise เพื่อรอผลจาก renderer
+    //   const found = await new Promise<boolean>((resolve) => {
+    //     const timeout = setTimeout(() => {
+    //       console.warn('⚠️ [Main] Timeout waiting for camera check response');
+    //       resolve(false);
+    //     }, 5000);
 
-        // ใช้ once เพื่อรับผลเฉพาะจากรอบนี้
-        ipcMain.once('camera-availability-result', (_event, result) => {
-          clearTimeout(timeout);
-          resolve(result.found);
-        });
+    //     // ใช้ once เพื่อรับผลเฉพาะจากรอบนี้
+    //     ipcMain.once('camera-availability-result', (_event, result) => {
+    //       clearTimeout(timeout);
+    //       resolve(result.found);
+    //     });
 
-        // ส่ง event ไปให้ renderer เช็ค
-        mainWindow?.webContents.send('check-camera-availability', {
-          configuredDeviceId: cameraConfig.deviceId,
-          configuredLabel: cameraConfig.label,
-        });
-      });
+    //     // ส่ง event ไปให้ renderer เช็ค
+    //     mainWindow?.webContents.send('check-camera-availability', {
+    //       configuredDeviceId: cameraConfig.deviceId,
+    //       configuredLabel: cameraConfig.label,
+    //     });
+    //   });
 
-      deviceStatus.camera = found;
+    //   deviceStatus.camera = found;
 
-      if (!found) {
-        console.warn(`⚠️ [Main] Webcam not found: ${cameraConfig.label}`);
-        await sendDeviceAlertWithRateLimit(
-          'camera',
-          cameraConfig.label || 'Webcam',
-          [],
-        );
-        sendDeviceStatus({
-          deviceType: 'camera',
-          deviceName: cameraConfig.label || 'Webcam',
-        });
-      } else {
-        if (mainWindow) {
-          mainWindow.webContents.send('device-found');
-        }
-        console.log(`✅ [Main] Webcam found: ${cameraConfig.label}`);
-      }
-    } else if (cameraConfig.type === 'canon') {
+    //   if (!found) {
+    //     console.warn(`⚠️ [Main] Webcam not found: ${cameraConfig.label}`);
+    //     await sendDeviceAlertWithRateLimit(
+    //       'camera',
+    //       cameraConfig.label || 'Webcam',
+    //       [],
+    //     );
+    //     sendDeviceStatus({
+    //       deviceType: 'camera',
+    //       deviceName: cameraConfig.label || 'Webcam',
+    //     });
+    //   } else {
+    //     if (mainWindow) {
+    //       mainWindow.webContents.send('device-found');
+    //     }
+    //     console.log(`✅ [Main] Webcam found: ${cameraConfig.label}`);
+    //   }
+    // } else
+    if (cameraConfig.type === 'canon') {
       console.log(
         `📷 [Main] Checking Canon camera: ${cameraConfig.cameraName}`,
       );

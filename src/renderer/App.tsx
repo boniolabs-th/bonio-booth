@@ -308,13 +308,16 @@ function MaintenanceListener() {
         const result = await (window as any).electron.ipcRenderer.invoke(
           'get-camera-config',
         );
-        if (!result?.success || !result.config || result.config.type !== 'webcam') return;
+        if (
+          !result?.success ||
+          !result.config ||
+          result.config.type !== 'webcam'
+        )
+          return;
 
         const cameraConfig = result.config;
         const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(
-          (d) => d.kind === 'videoinput',
-        );
+        const videoDevices = devices.filter((d) => d.kind === 'videoinput');
         const found = videoDevices.some(
           (d) => d.deviceId === cameraConfig.deviceId,
         );
