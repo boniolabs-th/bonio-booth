@@ -637,7 +637,7 @@ async function checkCamera(): Promise<void> {
         const timeout = setTimeout(() => {
           console.warn('⚠️ [Main] Timeout waiting for camera check response');
           resolve(false);
-        }, 5000);
+        }, 6000);
 
         // ใช้ once เพื่อรับผลเฉพาะจากรอบนี้
         ipcMain.once('camera-availability-result', (_event, result) => {
@@ -1067,30 +1067,18 @@ async function sendDeviceAlertWithRateLimit(
   deviceName: string,
   availableDevices: string[],
 ): Promise<boolean> {
-  const now = Date.now();
-  const lastAlertTime = lastDeviceAlertTime[deviceType];
+  // นำ Logic การเช็ค ALERT_RATE_LIMIT_MS ออกทั้งหมด เพื่อให้ทำงานทันที
 
-  // Check rate limit (5 minutes)
-  if (now - lastAlertTime < ALERT_RATE_LIMIT_MS) {
-    const remainingMinutes = Math.ceil(
-      (ALERT_RATE_LIMIT_MS - (now - lastAlertTime)) / 60000,
-    );
-    console.log(
-      `⏳ [Main] Device alert for ${deviceType} skipped (rate limited, ${remainingMinutes} min remaining)`,
-    );
-    return false;
-  }
-
-  // Update last alert time
-  lastDeviceAlertTime[deviceType] = now;
-
-  // Send alert
   try {
     await machineService.sendDeviceAlert(
       deviceType,
       deviceName,
       availableDevices,
     );
+
+    // อัปเดตเวลาไว้เผื่อต้องการใช้ในการแสดงผล log อื่นๆ (ถ้าไม่ใช้ลบออกได้ครับ)
+    lastDeviceAlertTime[deviceType] = Date.now();
+
     return true;
   } catch (err) {
     console.error(`❌ [Main] Failed to send ${deviceType} alert:`, err);
