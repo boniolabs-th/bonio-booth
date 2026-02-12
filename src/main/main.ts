@@ -628,52 +628,51 @@ async function checkCamera(): Promise<void> {
       return;
     }
 
-    // if (cameraConfig.type === 'webcam') {
-    //   console.log(
-    //     `📷 [Main] Checking webcam: ${cameraConfig.label} (${cameraConfig.deviceId})`,
-    //   );
+    if (cameraConfig.type === 'webcam') {
+      console.log(
+        `📷 [Main] Checking webcam: ${cameraConfig.label} (${cameraConfig.deviceId})`,
+      );
 
-    //   // สร้าง Promise เพื่อรอผลจาก renderer
-    //   const found = await new Promise<boolean>((resolve) => {
-    //     const timeout = setTimeout(() => {
-    //       console.warn('⚠️ [Main] Timeout waiting for camera check response');
-    //       resolve(false);
-    //     }, 5000);
+      // สร้าง Promise เพื่อรอผลจาก renderer
+      const found = await new Promise<boolean>((resolve) => {
+        const timeout = setTimeout(() => {
+          console.warn('⚠️ [Main] Timeout waiting for camera check response');
+          resolve(false);
+        }, 5000);
 
-    //     // ใช้ once เพื่อรับผลเฉพาะจากรอบนี้
-    //     ipcMain.once('camera-availability-result', (_event, result) => {
-    //       clearTimeout(timeout);
-    //       resolve(result.found);
-    //     });
+        // ใช้ once เพื่อรับผลเฉพาะจากรอบนี้
+        ipcMain.once('camera-availability-result', (_event, result) => {
+          clearTimeout(timeout);
+          resolve(result.found);
+        });
 
-    //     // ส่ง event ไปให้ renderer เช็ค
-    //     mainWindow?.webContents.send('check-camera-availability', {
-    //       configuredDeviceId: cameraConfig.deviceId,
-    //       configuredLabel: cameraConfig.label,
-    //     });
-    //   });
+        // ส่ง event ไปให้ renderer เช็ค
+        mainWindow?.webContents.send('check-camera-availability', {
+          configuredDeviceId: cameraConfig.deviceId,
+          configuredLabel: cameraConfig.label,
+        });
+      });
 
-    //   deviceStatus.camera = found;
+      deviceStatus.camera = found;
 
-    //   if (!found) {
-    //     console.warn(`⚠️ [Main] Webcam not found: ${cameraConfig.label}`);
-    //     await sendDeviceAlertWithRateLimit(
-    //       'camera',
-    //       cameraConfig.label || 'Webcam',
-    //       [],
-    //     );
-    //     sendDeviceStatus({
-    //       deviceType: 'camera',
-    //       deviceName: cameraConfig.label || 'Webcam',
-    //     });
-    //   } else {
-    //     if (mainWindow) {
-    //       mainWindow.webContents.send('device-found');
-    //     }
-    //     console.log(`✅ [Main] Webcam found: ${cameraConfig.label}`);
-    //   }
-    // } else
-    if (cameraConfig.type === 'canon') {
+      if (!found) {
+        console.warn(`⚠️ [Main] Webcam not found: ${cameraConfig.label}`);
+        await sendDeviceAlertWithRateLimit(
+          'camera',
+          cameraConfig.label || 'Webcam',
+          [],
+        );
+        sendDeviceStatus({
+          deviceType: 'camera',
+          deviceName: cameraConfig.label || 'Webcam',
+        });
+      } else {
+        if (mainWindow) {
+          mainWindow.webContents.send('device-found');
+        }
+        console.log(`✅ [Main] Webcam found: ${cameraConfig.label}`);
+      }
+    } else if (cameraConfig.type === 'canon') {
       console.log(
         `📷 [Main] Checking Canon camera: ${cameraConfig.cameraName}`,
       );
@@ -719,60 +718,82 @@ async function checkCamera(): Promise<void> {
 }
 
 /**
- * เช็คสถานะ Printer ผ่าน PowerShell (Windows only)
+ * เช็คสถานะ Printer ผ่าน WMIC (Windows Management Instrumentation)
  * @param printerName - ชื่อ printer ที่ต้องการตรวจสอบ
- * @returns Promise<{ available: boolean; status?: string; details?: string; fallback?: boolean }>
+ * @returns Promise<{ available: boolean; status?: string; fallback?: boolean }>
  *
- * PrinterStatus codes:
- * 1 = Other, 2 = Unknown, 3 = Idle, 4 = Printing, 5 = Warmup
- * 6 = Offline (หลุด), 7 = Error (มีปัญหา)
+ * WMIC PrinterStatus codes:
+ * 0 = Idle/Ready, 1 = Paused, 2 = Error, 3 = Pending Deletion
+ * 4 = Paper Jam, 5 = Paper Out, 8 = Offline (หลุด)
  */
-async function getPrinterStatusViaPowerShell(
-  printerName: string,
-): Promise<{ available: boolean; status?: string; details?: string; fallback?: boolean }> {
+async function getPrinterStatusViaWMIC(printerName: string): Promise<{
+  available: boolean;
+  status?: string;
+  fallback?: boolean;
+}> {
   if (process.platform !== 'win32') {
-    return { available: false, fallback: true }; // ไม่ใช่ Windows ให้ fallback
+    return { available: false, fallback: true };
   }
 
   try {
-    // Escape printer name สำหรับ PowerShell
-    const escapedName = printerName.replace(/'/g, "''");
-    const psCommand = `Get-Printer -Name '${escapedName}' -ErrorAction SilentlyContinue | Select-Object Name, PrinterStatus, DriverName | ConvertTo-Json`;
+    // WMIC command เพื่อเช็คสถานะ printer
+    const command = `wmic printer where "name='${printerName.replace(/'/g, "''")}'" get status /value`;
 
-    const { stdout } = await execAsync(`powershell -Command "${psCommand}"`, {
-      timeout: 5000,
+    const { stdout } = await execAsync(command, {
+      timeout: 10000,
+      windowsHide: true,
     });
 
-    if (!stdout || stdout.trim() === '') {
-      return { available: false, status: 'not_found' };
+    // Parse output: Status=0\n\n
+    const match = stdout.match(/Status=(\d+)/);
+    if (!match) {
+      console.warn(`⚠️ [Main] WMIC output parse failed: "${stdout.trim()}"`);
+      return { available: false, fallback: true };
     }
 
-    const result = JSON.parse(stdout);
-    const status = result.PrinterStatus;
+    const status = parseInt(match[1], 10);
 
-    // PrinterStatus: 3 = Idle (พร้อม), 4 = Printing (กำลังพิมพ์)
-    const isAvailable = status === 3 || status === 4;
+    // Status 0 = Idle/Ready, อื่นๆ ถือว่าไม่พร้อม
+    const isAvailable = status === 0;
 
     const statusMap: Record<number, string> = {
-      1: 'Other',
-      2: 'Unknown',
-      3: 'Idle',
-      4: 'Printing',
-      5: 'Warmup',
-      6: 'Offline',
-      7: 'Error',
+      0: 'Ready',
+      1: 'Paused',
+      2: 'Error',
+      3: 'Pending Deletion',
+      4: 'Paper Jam',
+      5: 'Paper Out',
+      6: 'Manual Feed',
+      7: 'Paper Problem',
+      8: 'Offline',
+      9: 'IO Active',
+      10: 'Busy',
+      11: 'Printing',
+      12: 'Output Bin Full',
+      13: 'Not Available',
+      14: 'Waiting',
+      15: 'Processing',
+      16: 'Initialization',
+      17: 'Warmup',
+      18: 'Toner Low',
+      19: 'No Toner',
+      20: 'Page Punt',
+      21: 'User Intervention',
+      22: 'Out of Memory',
+      23: 'Door Open',
+      24: 'Server Unknown',
+      25: 'Power Save',
     };
 
     return {
       available: isAvailable,
       status: statusMap[status] || `Unknown(${status})`,
-      details: result.DriverName,
     };
   } catch (error) {
     console.warn(
-      `⚠️ [Main] PowerShell check failed for '${printerName}': ${(error as Error).message}`,
+      `⚠️ [Main] WMIC check failed for '${printerName}': ${(error as Error).message}`,
     );
-    return { available: false, fallback: true }; // Indicate fallback needed
+    return { available: false, fallback: true };
   }
 }
 
@@ -799,18 +820,14 @@ async function checkPrinter(): Promise<void> {
     console.log('🖨️ [Main] Available printers:', printerNames);
 
     // ฟังก์ชันเช็คว่า printer พร้อมใช้งาน (ใช้ PowerShell บน Windows, fallback ไป Electron API)
-    const isPrinterAvailable = async (
-      targetName: string,
-    ): Promise<boolean> => {
+    const isPrinterAvailable = async (targetName: string): Promise<boolean> => {
       // ใช้ PowerShell เช็คสถานะแบบละเอียด (Windows)
       if (process.platform === 'win32') {
-        const result = await getPrinterStatusViaPowerShell(targetName);
+        const result = await getPrinterStatusViaWMIC(targetName);
 
         // ถ้า PowerShell fail ให้ fallback ไปใช้ Electron API
         if (result.fallback) {
-          console.log(
-            `  └─ PowerShell failed, using Electron API fallback`,
-          );
+          console.log(`  └─ PowerShell failed, using Electron API fallback`);
           const found = printers.some((p) => {
             if (p.name !== targetName) return false;
             const isOffline = !!(p.status & 0x00000400) || p.status === 1024;
@@ -822,11 +839,11 @@ async function checkPrinter(): Promise<void> {
           return found;
         }
 
-        if (result.status) {
-          console.log(
-            `  └─ Status: ${result.status}${result.details ? ` (${result.details})` : ''}`,
-          );
-        }
+        // if (result.status) {
+        //   console.log(
+        //     `  └─ Status: ${result.status}${result.details ? ` (${result.details})` : ''}`,
+        //   );
+        // }
         return result.available;
       }
 
@@ -839,9 +856,7 @@ async function checkPrinter(): Promise<void> {
     };
 
     // เช็ค Main printer
-    const mainFound = await isPrinterAvailable(
-      printerConfig.main.printerName,
-    );
+    const mainFound = await isPrinterAvailable(printerConfig.main.printerName);
     let allPrintersOk = mainFound;
 
     if (!mainFound) {
@@ -3349,7 +3364,9 @@ ipcMain.on('webcam-instant-status', async (_event, data) => {
     });
   } else {
     // Webcam กลับมาแล้ว → ส่ง sendDeviceStatus() เพื่อเช็คว่าทุกอุปกรณ์ OK หรือยัง
-    sendDeviceStatus();
+    if (mainWindow) {
+      mainWindow.webContents.send('device-found');
+    }
   }
 });
 
