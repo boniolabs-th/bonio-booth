@@ -718,6 +718,65 @@ async function checkCamera(): Promise<void> {
 }
 
 /**
+ * เช็คสถานะ Printer ผ่าน PowerShell (Windows only)
+ * @param printerName - ชื่อ printer ที่ต้องการตรวจสอบ
+ * @returns Promise<{ available: boolean; status?: string; details?: string }>
+ *
+ * PrinterStatus codes:
+ * 1 = Other, 2 = Unknown, 3 = Idle, 4 = Printing, 5 = Warmup
+ * 6 = Offline (หลุด), 7 = Error (มีปัญหา)
+ */
+async function getPrinterStatusViaPowerShell(
+  printerName: string,
+): Promise<{ available: boolean; status?: string; details?: string }> {
+  if (process.platform !== 'win32') {
+    return { available: false }; // ไม่ใช่ Windows ให้ fallback ไปวิธีเดิม
+  }
+
+  try {
+    // Escape printer name สำหรับ PowerShell
+    const escapedName = printerName.replace(/'/g, "''");
+    const psCommand = `Get-Printer -Name '${escapedName}' -ErrorAction SilentlyContinue | Select-Object Name, PrinterStatus, DriverName | ConvertTo-Json`;
+
+    const { stdout } = await execAsync(`powershell -Command "${psCommand}"`, {
+      timeout: 5000,
+    });
+
+    if (!stdout || stdout.trim() === '') {
+      return { available: false, status: 'not_found' };
+    }
+
+    const result = JSON.parse(stdout);
+    const status = result.PrinterStatus;
+
+    // PrinterStatus: 3 = Idle (พร้อม), 4 = Printing (กำลังพิมพ์)
+    const isAvailable = status === 3 || status === 4;
+
+    const statusMap: Record<number, string> = {
+      1: 'Other',
+      2: 'Unknown',
+      3: 'Idle',
+      4: 'Printing',
+      5: 'Warmup',
+      6: 'Offline',
+      7: 'Error',
+    };
+
+    return {
+      available: isAvailable,
+      status: statusMap[status] || `Unknown(${status})`,
+      details: result.DriverName,
+    };
+  } catch (error) {
+    console.warn(
+      `⚠️ [Main] PowerShell check failed for ${printerName}:`,
+      (error as Error).message,
+    );
+    return { available: false };
+  }
+}
+
+/**
  * เช็ค Printer (แยกเป็นฟังก์ชันย่อยเพื่อความชัดเจน)
  */
 async function checkPrinter(): Promise<void> {
@@ -734,13 +793,27 @@ async function checkPrinter(): Promise<void> {
       return;
     }
 
-    // ดึงรายการ printers จากระบบ
+    // ดึงรายการ printers จากระบบ (fallback list)
     const printers = await mainWindow.webContents.getPrintersAsync();
     const printerNames = printers.map((p) => p.name);
     console.log('🖨️ [Main] Available printers:', printerNames);
 
-    // ฟังก์ชันเช็คว่า printer มีอยู่และไม่ offline
-    const isPrinterAvailable = (targetName: string): boolean => {
+    // ฟังก์ชันเช็คว่า printer พร้อมใช้งาน (ใช้ PowerShell บน Windows)
+    const isPrinterAvailable = async (
+      targetName: string,
+    ): Promise<boolean> => {
+      // ใช้ PowerShell เช็คสถานะแบบละเอียด (Windows)
+      if (process.platform === 'win32') {
+        const result = await getPrinterStatusViaPowerShell(targetName);
+        if (result.status) {
+          console.log(
+            `  └─ Status: ${result.status}${result.details ? ` (${result.details})` : ''}`,
+          );
+        }
+        return result.available;
+      }
+
+      // Fallback สำหรับ non-Windows: ใช้ Electron API
       return printers.some((p) => {
         if (p.name !== targetName) return false;
         const isOffline = !!(p.status & 0x00000400) || p.status === 1024;
@@ -749,12 +822,14 @@ async function checkPrinter(): Promise<void> {
     };
 
     // เช็ค Main printer
-    const mainFound = isPrinterAvailable(printerConfig.main.printerName);
+    const mainFound = await isPrinterAvailable(
+      printerConfig.main.printerName,
+    );
     let allPrintersOk = mainFound;
 
     if (!mainFound) {
       console.warn(
-        `⚠️ [Main] Main printer not found: ${printerConfig.main.printerName}`,
+        `⚠️ [Main] Main printer not available: ${printerConfig.main.printerName}`,
       );
       await sendDeviceAlertWithRateLimit(
         'printer',
@@ -763,20 +838,20 @@ async function checkPrinter(): Promise<void> {
       );
     } else {
       console.log(
-        `✅ [Main] Main printer found: ${printerConfig.main.printerName}`,
+        `✅ [Main] Main printer available: ${printerConfig.main.printerName}`,
       );
     }
 
     // เช็ค Secondary printer (ถ้ามี)
     if (printerConfig.secondary) {
-      const secondaryFound = isPrinterAvailable(
+      const secondaryFound = await isPrinterAvailable(
         printerConfig.secondary.printerName,
       );
 
       if (!secondaryFound) {
         allPrintersOk = false;
         console.warn(
-          `⚠️ [Main] Secondary printer not found: ${printerConfig.secondary.printerName}`,
+          `⚠️ [Main] Secondary printer not available: ${printerConfig.secondary.printerName}`,
         );
         await sendDeviceAlertWithRateLimit(
           'printer',
@@ -785,7 +860,7 @@ async function checkPrinter(): Promise<void> {
         );
       } else {
         console.log(
-          `✅ [Main] Secondary printer found: ${printerConfig.secondary.printerName}`,
+          `✅ [Main] Secondary printer available: ${printerConfig.secondary.printerName}`,
         );
       }
     }
