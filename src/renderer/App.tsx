@@ -257,21 +257,40 @@ function MaintenanceListener() {
     const unsubscribeDeviceNotFound = (window as any).electron.ipcRenderer.on(
       'device-not-found',
       (data: { deviceType: 'camera' | 'printer'; deviceName: string }) => {
-        navigate('/system-maintenance', {
-          state: {
-            maintenance: true,
-            deviceNotFound: true,
-            deviceType: data.deviceType,
-            deviceName: data.deviceName,
-          },
-        });
+        const currentPath = location.pathname;
+        // Don't interrupt normal user flow (photo capture, payment, etc.)
+        const isInNormalFlow = [
+          '/select-print',
+          '/discount-coupon',
+          '/frame-selection',
+          '/payment',
+          '/payment-qr',
+          '/photo-prepare',
+          '/main-shooting',
+          '/photo-confirmation',
+          '/photo-decorate',
+          '/photo-filter',
+          '/photo-result',
+        ].includes(currentPath);
+
+        if (!isInNormalFlow && currentPath !== '/system-maintenance') {
+          navigate('/system-maintenance', {
+            state: {
+              maintenance: true,
+              deviceNotFound: true,
+              deviceType: data.deviceType,
+              deviceName: data.deviceName,
+            },
+          });
+        }
       },
     );
-    const unsubscribeDeviceFound = (window as any).electron.ipcRenderer.on(
-      'device-found',
+    // all-devices-found: ส่งเมื่อทุกอุปกรณ์ OK (camera + printer ทั้งหมด)
+    // ใช้แทน device-found เดิมที่ส่งแยกต่ออุปกรณ์ ป้องกันปัญหา device-found จาก printer ยกเลิก device-not-found จาก camera
+    const unsubscribeAllDevicesFound = (window as any).electron.ipcRenderer.on(
+      'all-devices-found',
       () => {
         // Navigate to home only if we're in maintenance or out-of-paper pages
-        // Don't interrupt normal user flow
         const currentPath = location.pathname;
         if (
           currentPath === '/system-maintenance' ||
@@ -281,6 +300,39 @@ function MaintenanceListener() {
         }
       },
     );
+
+    // devicechange: ตรวจจับ USB webcam ถอด/เสียบทันที (ไม่ต้องรอ polling 10s)
+    const handleDeviceChange = async () => {
+      try {
+        // ดึง config จาก main process เพื่อเช็คว่ามี webcam ที่ตั้งค่าไว้หรือไม่
+        const result = await (window as any).electron.ipcRenderer.invoke(
+          'get-camera-config',
+        );
+        if (!result?.success || !result.config || result.config.type !== 'webcam') return;
+
+        const cameraConfig = result.config;
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(
+          (d) => d.kind === 'videoinput',
+        );
+        const found = videoDevices.some(
+          (d) => d.deviceId === cameraConfig.deviceId,
+        );
+
+        // แจ้ง main process ทันทีผ่าน event เฉพาะ (แยกจาก polling result)
+        (window as any).electron.ipcRenderer.sendMessage(
+          'webcam-instant-status',
+          {
+            found,
+            configuredDeviceId: cameraConfig.deviceId,
+            configuredLabel: cameraConfig.label,
+          },
+        );
+      } catch (err) {
+        console.error('[App] devicechange handler error:', err);
+      }
+    };
+    navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
 
     return () => {
       unsubscribe();
@@ -293,7 +345,11 @@ function MaintenanceListener() {
       unsubscribeSse502();
       unsubscribeCameraCheck();
       unsubscribeDeviceNotFound();
-      unsubscribeDeviceFound();
+      unsubscribeAllDevicesFound();
+      navigator.mediaDevices.removeEventListener(
+        'devicechange',
+        handleDeviceChange,
+      );
     };
   }, [navigate, location.pathname]);
 

@@ -110,9 +110,12 @@ import {
   registerCanonCameraIpcHandlers,
   terminateCanonSdk,
   setMainWindow as setCanonMainWindow,
-  isCameraConnected as isCanonCameraConnected,
 } from './services/canonCameraService';
-import { registerCanonCameraV2IpcHandlers } from './services/canonCameraServiceV2';
+import {
+  registerCanonCameraV2IpcHandlers,
+  isCameraConnected as isCanonCameraConnected,
+  isCanonSdkInitialized,
+} from './services/canonCameraServiceV2';
 import {
   getPrinterConfig,
   savePrinterConfig,
@@ -544,6 +547,41 @@ async function initializeApp() {
 }
 
 /**
+ * สถานะอุปกรณ์ที่ track แยกต่อชิ้น
+ * ใช้เพื่อป้องกันไม่ให้ device-found จากอุปกรณ์ตัวหนึ่งยกเลิก device-not-found ตัวอื่น
+ */
+const deviceStatus: Record<string, boolean> = {
+  camera: true,
+  printer: true,
+};
+
+/**
+ * ส่งสถานะอุปกรณ์รวมไปให้ renderer ตัดสินใจว่าจะไปหน้า maintenance หรือไม่
+ * - ถ้ามีอุปกรณ์ตัวใดตัวหนึ่งหาย → ส่ง device-not-found พร้อมข้อมูล
+ * - ถ้าทุกอุปกรณ์ OK → ส่ง all-devices-found
+ */
+function sendDeviceStatus(failedDevice?: {
+  deviceType: string;
+  deviceName: string;
+}): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  const allOk = Object.values(deviceStatus).every((v) => v);
+
+  if (allOk) {
+    // ทุกอุปกรณ์ OK → ส่ง all-devices-found เพื่อให้ออกจาก maintenance ได้
+    mainWindow.webContents.send('all-devices-found');
+    console.log('✅ [Main] All devices OK');
+  } else if (failedDevice) {
+    // มีอุปกรณ์ขาดหาย → ส่ง device-not-found
+    mainWindow.webContents.send('device-not-found', failedDevice);
+    console.log(
+      `❌ [Main] Device not found: ${failedDevice.deviceType} - ${failedDevice.deviceName}`,
+    );
+  }
+}
+
+/**
  * ตรวจสอบว่า device (camera/printer) ที่เคยตั้งค่าไว้ยังมีอยู่หรือไม่
  * ถ้าไม่พบจะส่งแจ้งเตือนไปยัง Telegram ผ่าน API
  */
@@ -557,15 +595,10 @@ async function checkConfiguredDevices(): Promise<void> {
   }
 
   // รอให้ renderer โหลดเสร็จจริงๆ
-  if (!mainWindow.webContents.isLoading()) {
-    console.log('✅ [Main] Renderer ready, proceeding with device check');
-  } else {
+  if (mainWindow.webContents.isLoading()) {
     console.log('⏳ [Main] Waiting for renderer to finish loading...');
     await new Promise<void>((resolve) => {
-      const handler = () => {
-        resolve();
-      };
-      mainWindow!.webContents.once('did-finish-load' as any, handler);
+      mainWindow!.webContents.once('did-finish-load' as any, () => resolve());
     });
   }
 
@@ -574,6 +607,12 @@ async function checkConfiguredDevices(): Promise<void> {
 
   // 2. เช็ค Printer
   await checkPrinter();
+
+  // 3. ส่งสถานะรวมสุดท้าย — ถ้าทุกอุปกรณ์ OK ให้ออกจาก maintenance ได้
+  const allOk = Object.values(deviceStatus).every((v) => v);
+  if (allOk) {
+    sendDeviceStatus();
+  }
 }
 
 /**
@@ -581,100 +620,100 @@ async function checkConfiguredDevices(): Promise<void> {
  */
 async function checkCamera(): Promise<void> {
   try {
-    console.log('ℹ️ [Main] Checking camera config...');
-
     const cameraConfig = await getCameraConfig();
     if (!cameraConfig) {
-      console.log('ℹ️ [Main] No camera config found');
-      await sendDeviceAlertWithRateLimit('camera', 'Camera config found', []);
-
-      if (mainWindow) {
-        mainWindow.webContents.send('device-not-found', {
-          deviceType: 'camera',
-          deviceName: 'Camera config found',
-        });
-      }
+      console.log('ℹ️ [Main] No camera config found, skipping camera check');
+      // ไม่มี config = ยังไม่ได้ตั้งค่า ไม่ต้อง alert
+      deviceStatus.camera = true;
       return;
     }
 
     if (cameraConfig.type === 'webcam') {
       console.log(
-        `📷 [Main] Webcam config found: ${cameraConfig.label} (${cameraConfig.deviceId})`,
+        `📷 [Main] Checking webcam: ${cameraConfig.label} (${cameraConfig.deviceId})`,
       );
 
       // สร้าง Promise เพื่อรอผลจาก renderer
-      const checkPromise = new Promise<boolean>((resolve) => {
-        // ตั้ง timeout กรณี renderer ไม่ตอบกลับ
+      const found = await new Promise<boolean>((resolve) => {
         const timeout = setTimeout(() => {
           console.warn('⚠️ [Main] Timeout waiting for camera check response');
           resolve(false);
         }, 5000);
 
-        // รอรับผลจาก renderer
-        ipcMain.once('camera-availability-result', (event, result) => {
+        // ใช้ once เพื่อรับผลเฉพาะจากรอบนี้
+        ipcMain.once('camera-availability-result', (_event, result) => {
           clearTimeout(timeout);
           resolve(result.found);
         });
-      });
 
-      // ส่ง event ไปให้ renderer เช็ค
-      if (mainWindow) {
-        mainWindow.webContents.send('check-camera-availability', {
+        // ส่ง event ไปให้ renderer เช็ค
+        mainWindow?.webContents.send('check-camera-availability', {
           configuredDeviceId: cameraConfig.deviceId,
           configuredLabel: cameraConfig.label,
         });
-      }
+      });
 
-      // รอผล
-      const found = await checkPromise;
+      deviceStatus.camera = found;
 
-      if (found && mainWindow) {
-        mainWindow.webContents.send('device-found');
+      if (!found) {
+        console.warn(`⚠️ [Main] Webcam not found: ${cameraConfig.label}`);
+        await sendDeviceAlertWithRateLimit(
+          'camera',
+          cameraConfig.label || 'Webcam',
+          [],
+        );
+        sendDeviceStatus({
+          deviceType: 'camera',
+          deviceName: cameraConfig.label || 'Webcam',
+        });
+      } else {
+        if (mainWindow) {
+          mainWindow.webContents.send('device-found');
+        }
+        console.log(`✅ [Main] Webcam found: ${cameraConfig.label}`);
       }
-      console.log(
-        `📷 [Main] Webcam check result: ${found ? 'Found' : 'Not found'}`,
-      );
     } else if (cameraConfig.type === 'canon') {
       console.log(
-        `📷 [Main] Canon camera config found: ${cameraConfig.cameraName}`,
+        `📷 [Main] Checking Canon camera: ${cameraConfig.cameraName}`,
       );
 
-      // รอให้ Canon SDK พร้อม (ถ้าจำเป็น)
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // ถ้า SDK ยังไม่ได้ initialize (renderer ยังไม่ได้เรียก canon-v2:initialize)
+      // → ข้ามการเช็คไปก่อน ไม่ถือว่าเป็น error
+      if (!isCanonSdkInitialized()) {
+        console.log(
+          'ℹ️ [Main] Canon SDK not yet initialized, skipping camera check',
+        );
+        deviceStatus.camera = true; // ยังไม่ init = ไม่รู้สถานะ ให้ถือว่า OK ไปก่อน
+        return;
+      }
 
       const isConnected = isCanonCameraConnected();
+      deviceStatus.camera = isConnected;
 
       if (!isConnected) {
         console.warn(
           `⚠️ [Main] Canon camera not connected: ${cameraConfig.cameraName}`,
         );
-
-        // ส่งแจ้งเตือน
         await sendDeviceAlertWithRateLimit(
           'camera',
-          cameraConfig.cameraName,
+          cameraConfig.cameraName || 'Canon Camera',
           [],
         );
-
-        // ส่ง event ไปที่ renderer
-        if (mainWindow) {
-          mainWindow.webContents.send('device-not-found', {
-            deviceType: 'camera',
-            deviceName: cameraConfig.cameraName,
-          });
-        }
+        sendDeviceStatus({
+          deviceType: 'camera',
+          deviceName: cameraConfig.cameraName || 'Canon Camera',
+        });
       } else {
         if (mainWindow) {
           mainWindow.webContents.send('device-found');
         }
-
         console.log(
           `✅ [Main] Canon camera connected: ${cameraConfig.cameraName}`,
         );
       }
     }
   } catch (error) {
-    console.error('❌ [Main] Error checking camera config:', error);
+    console.error('❌ [Main] Error checking camera:', error);
   }
 }
 
@@ -683,76 +722,46 @@ async function checkCamera(): Promise<void> {
  */
 async function checkPrinter(): Promise<void> {
   try {
-    console.log('ℹ️ [Main] Checking printer config...');
-
-    let isConnected = false;
-
     const printerConfig = await getPrinterConfig();
     if (!printerConfig) {
-      console.log('ℹ️ [Main] No printer config found');
-      await sendDeviceAlertWithRateLimit('printer', 'Printer config found', []);
-
-      if (mainWindow) {
-        mainWindow.webContents.send('device-not-found', {
-          deviceType: 'printer',
-          deviceName: 'Printer config found',
-        });
-      }
+      console.log('ℹ️ [Main] No printer config found, skipping printer check');
+      deviceStatus.printer = true;
       return;
     }
 
-    if (!mainWindow) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
       console.warn('⚠️ [Main] Main window not available for printer check');
       return;
     }
 
-    console.log(
-      `🖨️ [Main] Printer config found - Main: ${printerConfig.main.printerName}`,
-    );
-    if (printerConfig.secondary) {
-      console.log(
-        `🖨️ [Main] Secondary printer: ${printerConfig.secondary.printerName}`,
-      );
-    }
-
-    // ดึงรายการ printers
+    // ดึงรายการ printers จากระบบ
     const printers = await mainWindow.webContents.getPrintersAsync();
     const printerNames = printers.map((p) => p.name);
     console.log('🖨️ [Main] Available printers:', printerNames);
 
+    // ฟังก์ชันเช็คว่า printer มีอยู่และไม่ offline
+    const isPrinterAvailable = (targetName: string): boolean => {
+      return printers.some((p) => {
+        if (p.name !== targetName) return false;
+        const isOffline = !!(p.status & 0x00000400) || p.status === 1024;
+        return !isOffline;
+      });
+    };
+
     // เช็ค Main printer
-    const mainPrinterFound = printers.some((p) => {
-      // 1. เช็คชื่อก่อน
-      if (p.name !== printerConfig.main.printerName) return false;
+    const mainFound = isPrinterAvailable(printerConfig.main.printerName);
+    let allPrintersOk = mainFound;
 
-      // 2. เช็คสถานะ (0 คือสถานะพื้นฐานที่แปลว่าพร้อม)
-      // แต่เราจะดักจับค่า Offline ทั่วไปไว้ด้วย
-      const isReady = p.status === 0;
-      const isOffline = p.status & 0x00000400 || p.status === 1024; // เช็ค Bitmask ของ Offline
-
-      return isReady || !isOffline;
-    });
-    if (!mainPrinterFound) {
+    if (!mainFound) {
       console.warn(
         `⚠️ [Main] Main printer not found: ${printerConfig.main.printerName}`,
       );
-
       await sendDeviceAlertWithRateLimit(
         'printer',
         `Main: ${printerConfig.main.printerName}`,
         printerNames,
       );
-
-      if (mainWindow) {
-        mainWindow.webContents.send('device-not-found', {
-          deviceType: 'printer',
-          deviceName: `Main: ${printerConfig.main.printerName}`,
-        });
-      }
-
-      isConnected = false;
     } else {
-      isConnected = true;
       console.log(
         `✅ [Main] Main printer found: ${printerConfig.main.printerName}`,
       );
@@ -760,49 +769,46 @@ async function checkPrinter(): Promise<void> {
 
     // เช็ค Secondary printer (ถ้ามี)
     if (printerConfig.secondary) {
-      const secondaryPrinterFound = printers.some((p) => {
-        // 1. เช็คชื่อก่อน
-        if (p.name !== printerConfig.secondary!.printerName) return false;
+      const secondaryFound = isPrinterAvailable(
+        printerConfig.secondary.printerName,
+      );
 
-        // 2. เช็คสถานะ (0 คือสถานะพื้นฐานที่แปลว่าพร้อม)
-        // แต่เราจะดักจับค่า Offline ทั่วไปไว้ด้วย
-        const isReady = p.status === 0;
-        const isOffline = p.status & 0x00000400 || p.status === 1024; // เช็ค Bitmask ของ Offline
-
-        return isReady || !isOffline;
-      });
-
-      if (!secondaryPrinterFound) {
+      if (!secondaryFound) {
+        allPrintersOk = false;
         console.warn(
           `⚠️ [Main] Secondary printer not found: ${printerConfig.secondary.printerName}`,
         );
-
         await sendDeviceAlertWithRateLimit(
           'printer',
           `Secondary: ${printerConfig.secondary.printerName}`,
           printerNames,
         );
-
-        if (mainWindow) {
-          mainWindow.webContents.send('device-not-found', {
-            deviceType: 'printer',
-            deviceName: `Secondary: ${printerConfig.secondary.printerName}`,
-          });
-        }
-        isConnected = false;
       } else {
-        isConnected = true;
         console.log(
           `✅ [Main] Secondary printer found: ${printerConfig.secondary.printerName}`,
         );
       }
     }
 
-    if (isConnected && mainWindow) {
-      mainWindow.webContents.send('device-found');
+    // อัพเดทสถานะ printer — ต้อง OK ทั้ง main และ secondary (ถ้ามี)
+    deviceStatus.printer = allPrintersOk;
+
+    if (!allPrintersOk) {
+      // หา printer ตัวที่หายไปเพื่อแสดงชื่อ
+      const missingName = !mainFound
+        ? printerConfig.main.printerName
+        : printerConfig.secondary?.printerName || 'Printer';
+      sendDeviceStatus({
+        deviceType: 'printer',
+        deviceName: missingName,
+      });
+    } else {
+      if (mainWindow) {
+        mainWindow.webContents.send('device-found');
+      }
     }
   } catch (error) {
-    console.error('❌ [Main] Error checking printer config:', error);
+    console.error('❌ [Main] Error checking printer:', error);
   }
 }
 
@@ -1498,9 +1504,23 @@ app
     // ========== CHECK CONFIGURED DEVICES INTERVAL ==========
     // Check configured devices every 10 seconds (except when on system-maintenance page)
     const deviceCheckInterval = setInterval(async () => {
-      // Skip if on system-maintenance page
-      if (currentRoute === '/system-maintenance') {
-        log.debug('[Main] Skipping device check on system-maintenance page');
+      // Skip if on system-maintenance page or in normal user flow
+      const skipRoutes = [
+        '/system-maintenance',
+        '/select-print',
+        '/discount-coupon',
+        '/frame-selection',
+        '/payment',
+        '/payment-qr',
+        '/photo-prepare',
+        '/main-shooting',
+        '/photo-confirmation',
+        '/photo-decorate',
+        '/photo-filter',
+        '/photo-result',
+      ];
+      if (skipRoutes.includes(currentRoute)) {
+        log.debug(`[Main] Skipping device check on ${currentRoute} page`);
         return;
       }
 
@@ -3210,45 +3230,36 @@ ipcMain.handle('get-camera-config', async () => {
   }
 });
 
-// Handler สำหรับรับผลการเช็ค camera availability จาก renderer
-ipcMain.on(
-  'camera-availability-result',
-  async (
-    event,
-    result: {
-      found: boolean;
-      configuredDeviceId: string;
-      configuredLabel: string;
-      availableDevices: string[];
-    },
-  ) => {
-    if (!result.found) {
-      console.warn(
-        `⚠️ [Main] Configured camera not found: ${result.configuredLabel} (${result.configuredDeviceId})`,
-      );
-      // ส่งแจ้งเตือน
-      sendDeviceAlertWithRateLimit(
-        'camera',
-        result.configuredLabel,
-        result.availableDevices,
-      ).catch((err) =>
-        console.error('❌ [Main] Failed to send camera alert:', err),
-      );
+// NOTE: camera-availability-result is now handled via ipcMain.once inside checkCamera()
+// Persistent listener removed to prevent duplicate event handling
 
-      // ส่ง event ไปที่ renderer เพื่อแสดงหน้า maintenance
-      if (mainWindow) {
-        mainWindow.webContents.send('device-not-found', {
-          deviceType: 'camera',
-          deviceName: result.configuredLabel,
-        });
-      }
-    } else {
-      console.log(
-        `✅ [Main] Configured camera found: ${result.configuredLabel}`,
-      );
-    }
-  },
-);
+/**
+ * webcam-instant-status: รับผลจาก renderer เมื่อ USB device เปลี่ยน (devicechange event)
+ * ใช้สำหรับ instant detection ไม่ต้องรอ polling 10 วินาที
+ */
+ipcMain.on('webcam-instant-status', async (_event, data) => {
+  const { found, configuredLabel } = data;
+  console.log(
+    `⚡ [Main] Instant webcam status: ${found ? 'found' : 'NOT found'} - ${configuredLabel}`,
+  );
+
+  deviceStatus.camera = found;
+
+  if (!found) {
+    await sendDeviceAlertWithRateLimit(
+      'camera',
+      configuredLabel || 'Webcam',
+      [],
+    );
+    sendDeviceStatus({
+      deviceType: 'camera',
+      deviceName: configuredLabel || 'Webcam',
+    });
+  } else {
+    // Webcam กลับมาแล้ว → ส่ง sendDeviceStatus() เพื่อเช็คว่าทุกอุปกรณ์ OK หรือยัง
+    sendDeviceStatus();
+  }
+});
 
 ipcMain.handle('save-camera-config', async (event, config: CameraConfig) => {
   try {

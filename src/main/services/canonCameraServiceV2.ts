@@ -260,6 +260,14 @@ export function isCameraConnected(): boolean {
   return sdk?.isCameraConnected() ?? false;
 }
 
+/**
+ * ตรวจสอบว่า Canon SDK ถูก initialize แล้วหรือยัง
+ * ใช้เพื่อแยกกรณี "SDK ยังไม่ได้ init" ออกจาก "กล้องถูกถอด"
+ */
+export function isCanonSdkInitialized(): boolean {
+  return isInitialized && sdk !== null;
+}
+
 // =============================================================================
 // Event Polling
 // =============================================================================
