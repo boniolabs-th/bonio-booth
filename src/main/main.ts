@@ -727,6 +727,83 @@ async function checkCamera(): Promise<void> {
 }
 
 /**
+ * เช็ค USB devices สำหรับ printer detection
+ * รองรับ Windows, macOS, Linux
+ */
+async function checkUSBPrinterConnection(
+  printerName: string,
+): Promise<{ connected: boolean; details?: string }> {
+  const platform = process.platform;
+
+  try {
+    if (platform === 'win32') {
+      // Windows: ใช้ WMI เพื่อเช็ค USB printer
+      const command = `powershell -NoProfile -Command "Get-WmiObject Win32_Printer | Where-Object {$_.Name -like '*${printerName.replace(/'/g, "''")}*'} | Select-Object Name, PortName, Status | Format-List"`;
+      const { stdout } = await execAsync(command, { timeout: 5000 });
+
+      // เช็คว่ามี printer นี้และเชื่อมต่อผ่าน USB (port ที่ขึ้นต้นด้วย USB001, USB002, etc.)
+      const hasPrinter = stdout.toLowerCase().includes(printerName.toLowerCase());
+      const hasUSBPort =
+        /USB\d+/i.test(stdout) || /Dot4/i.test(stdout); // Dot4 port ก็ใช้กับ printer บางรุ่น
+
+      return {
+        connected: hasPrinter && hasUSBPort,
+        details: hasUSBPort ? 'USB/DOT4 port detected' : 'Not on USB port',
+      };
+    }
+
+    if (platform === 'darwin') {
+      // macOS: ใช้ ioreg เพื่อเช็ค USB printer devices
+      const command =
+        'ioreg -p IOUSB -l -w 0 | grep -i "Printer\\|DNP\\|Citizen\\|Epson\\|Canon"';
+      const { stdout } = await execAsync(command, { timeout: 5000 });
+
+      // เช็คว่ามี USB printer เชื่อมต่ออยู่
+      const hasUSBPrinter = stdout.length > 0;
+
+      // พยายาม match ชื่อ printer จาก USB device
+      const printerMatch = stdout.match(
+        new RegExp(printerName, 'i'),
+      ) ||
+        stdout.match(/DNP/i) ||
+        stdout.match(/Citizen/i) ||
+        stdout.match(/DS.RX1/i);
+
+      return {
+        connected: hasUSBPrinter && !!printerMatch,
+        details: printerMatch ? 'USB device detected' : 'No matching USB device',
+      };
+    }
+
+    if (platform === 'linux') {
+      // Linux: เช็ค USB devices สำหรับ printer
+      const command = 'lsusb | grep -i "print\\|DNP\\|Citizen\\|Epson\\|Canon"';
+      const { stdout } = await execAsync(command, { timeout: 5000 });
+
+      const hasUSBPrinter = stdout.length > 0;
+      const printerMatch =
+        stdout.match(new RegExp(printerName, 'i')) ||
+        stdout.match(/DNP/i) ||
+        stdout.match(/Citizen/i) ||
+        stdout.match(/DS.RX1/i);
+
+      return {
+        connected: hasUSBPrinter && !!printerMatch,
+        details: printerMatch ? 'USB device detected' : 'No matching USB device',
+      };
+    }
+
+    return { connected: false, details: 'Unsupported platform' };
+  } catch (error) {
+    console.warn(`⚠️ [Main] USB check failed for ${printerName}:`, error);
+    return {
+      connected: false,
+      details: 'USB check failed - falling back to system check',
+    };
+  }
+}
+
+/**
  * เช็ค Printer (แยกเป็นฟังก์ชันย่อยเพื่อความชัดเจน)
  */
 async function checkPrinter(): Promise<void> {
@@ -778,7 +855,35 @@ async function checkPrinter(): Promise<void> {
     const mainFound = isPrinterAvailable(printerConfig.main.printerName);
     let allPrintersOk = mainFound;
 
-    if (!mainFound) {
+    // ถ้าเจอ printer ในระบบ ให้เช็คต่อว่าเชื่อมต่อ USB หรือไม่
+    if (mainFound) {
+      console.log(
+        `🔌 [Main] Checking USB connection for: ${printerConfig.main.printerName}`,
+      );
+      const usbCheck = await checkUSBPrinterConnection(
+        printerConfig.main.printerName,
+      );
+      console.log(
+        `🔌 [Main] USB check result: ${usbCheck.connected} (${usbCheck.details})`,
+      );
+
+      // ถ้าไม่ได้เชื่อมต่อ USB ให้แจ้งเตือน
+      if (!usbCheck.connected) {
+        allPrintersOk = false;
+        console.warn(
+          `⚠️ [Main] Main printer found but USB not connected: ${printerConfig.main.printerName}`,
+        );
+        await sendDeviceAlertWithRateLimit(
+          'printer',
+          `Main: ${printerConfig.main.printerName} (USB not connected)`,
+          [`USB: ${usbCheck.details}`],
+        );
+      } else {
+        console.log(
+          `✅ [Main] Main printer OK (system + USB): ${printerConfig.main.printerName}`,
+        );
+      }
+    } else {
       console.warn(
         `⚠️ [Main] Main printer not found: ${printerConfig.main.printerName}`,
       );
@@ -786,10 +891,6 @@ async function checkPrinter(): Promise<void> {
         'printer',
         `Main: ${printerConfig.main.printerName}`,
         printerNames,
-      );
-    } else {
-      console.log(
-        `✅ [Main] Main printer found: ${printerConfig.main.printerName}`,
       );
     }
 
@@ -810,9 +911,29 @@ async function checkPrinter(): Promise<void> {
           printerNames,
         );
       } else {
+        // เช็ค USB connection สำหรับ secondary printer
         console.log(
-          `✅ [Main] Secondary printer found: ${printerConfig.secondary.printerName}`,
+          `🔌 [Main] Checking USB connection for: ${printerConfig.secondary.printerName}`,
         );
+        const usbCheck = await checkUSBPrinterConnection(
+          printerConfig.secondary.printerName,
+        );
+
+        if (!usbCheck.connected) {
+          allPrintersOk = false;
+          console.warn(
+            `⚠️ [Main] Secondary printer found but USB not connected: ${printerConfig.secondary.printerName}`,
+          );
+          await sendDeviceAlertWithRateLimit(
+            'printer',
+            `Secondary: ${printerConfig.secondary.printerName} (USB not connected)`,
+            [`USB: ${usbCheck.details}`],
+          );
+        } else {
+          console.log(
+            `✅ [Main] Secondary printer OK (system + USB): ${printerConfig.secondary.printerName}`,
+          );
+        }
       }
     }
 
