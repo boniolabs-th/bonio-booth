@@ -726,7 +726,7 @@ async function checkCamera(): Promise<void> {
  * 0 = Idle/Ready, 1 = Paused, 2 = Error, 3 = Pending Deletion
  * 4 = Paper Jam, 5 = Paper Out, 8 = Offline (หลุด)
  */
-async function getPrinterStatusViaWMIC(printerName: string): Promise<{
+async function getPrinterStatusViaPowerShell(printerName: string): Promise<{
   available: boolean;
   status?: string;
   fallback?: boolean;
@@ -736,63 +736,48 @@ async function getPrinterStatusViaWMIC(printerName: string): Promise<{
   }
 
   try {
-    // WMIC command เพื่อเช็คสถานะ printer
-    const command = `wmic printer where "name='${printerName.replace(/'/g, "''")}'" get status /value`;
+    // ใช้ PowerShell ดึง PrinterStatus และ WorkOffline status
+    // PrinterStatus: 3 คือ Idle (พร้อมใช้งาน), WorkOffline: False คือเชื่อมต่ออยู่
+    const command = `powershell -Command "Get-Printer -Name '${printerName.replace(/'/g, "''")}' | Select-Object PrinterStatus, WorkOffline | ConvertTo-Json"`;
 
     const { stdout } = await execAsync(command, {
-      timeout: 10000,
+      timeout: 5000,
       windowsHide: true,
     });
 
-    // Parse output: Status=0\n\n
-    const match = stdout.match(/Status=(\d+)/);
-    if (!match) {
-      console.warn(`⚠️ [Main] WMIC output parse failed: "${stdout.trim()}"`);
-      return { available: false, fallback: true };
+    if (!stdout.trim()) {
+      return { available: false, fallback: false }; // หาเครื่องพิมพ์ไม่เจอ
     }
 
-    const status = parseInt(match[1], 10);
+    const result = JSON.parse(stdout);
 
-    // Status 0 = Idle/Ready, อื่นๆ ถือว่าไม่พร้อม
-    const isAvailable = status === 0;
+    // Logic การตัดสินว่า Available:
+    // 1. PrinterStatus ต้องเป็น 3 (Idle) หรือ 1 (Other/Active)
+    // 2. WorkOffline ต้องเป็น false
+    const isIdle = result.PrinterStatus === 3 || result.PrinterStatus === 1;
+    const isOnline = result.WorkOffline === false;
 
     const statusMap: Record<number, string> = {
-      0: 'Ready',
-      1: 'Paused',
-      2: 'Error',
-      3: 'Pending Deletion',
-      4: 'Paper Jam',
-      5: 'Paper Out',
-      6: 'Manual Feed',
-      7: 'Paper Problem',
-      8: 'Offline',
-      9: 'IO Active',
-      10: 'Busy',
-      11: 'Printing',
-      12: 'Output Bin Full',
-      13: 'Not Available',
-      14: 'Waiting',
-      15: 'Processing',
-      16: 'Initialization',
-      17: 'Warmup',
-      18: 'Toner Low',
-      19: 'No Toner',
-      20: 'Page Punt',
-      21: 'User Intervention',
-      22: 'Out of Memory',
-      23: 'Door Open',
-      24: 'Server Unknown',
-      25: 'Power Save',
+      1: 'Other',
+      2: 'Unknown',
+      3: 'Idle',
+      4: 'Printing',
+      5: 'Warmup',
+      6: 'Stopped',
+      7: 'Offline',
+      8: 'Paused',
+      9: 'Error',
     };
 
     return {
-      available: isAvailable,
-      status: statusMap[status] || `Unknown(${status})`,
+      available: isIdle && isOnline,
+      status: isOnline ? statusMap[result.PrinterStatus] : 'Offline',
     };
   } catch (error) {
     console.warn(
-      `⚠️ [Main] WMIC check failed for '${printerName}': ${(error as Error).message}`,
+      `⚠️ [Main] PowerShell check failed: ${(error as Error).message}`,
     );
+    // ถ้า error (เช่น หาชื่อ printer ไม่เจอเลย) ให้ส่งเป็นไม่พร้อมใช้งาน
     return { available: false, fallback: true };
   }
 }
@@ -802,120 +787,98 @@ async function getPrinterStatusViaWMIC(printerName: string): Promise<{
  */
 async function checkPrinter(): Promise<void> {
   try {
+    console.log('⏳ [Main] checkPrinter...');
+
     const printerConfig = await getPrinterConfig();
+    console.log('[Main] printerConfig:', printerConfig);
+
     if (!printerConfig) {
-      console.log('ℹ️ [Main] No printer config found, skipping printer check');
-      deviceStatus.printer = true;
-      return;
-    }
-
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      console.warn('⚠️ [Main] Main window not available for printer check');
-      return;
-    }
-
-    // ดึงรายการ printers จากระบบ (fallback list)
-    const printers = await mainWindow.webContents.getPrintersAsync();
-    const printerNames = printers.map((p) => p.name);
-    console.log('🖨️ [Main] Available printers:', printerNames);
-
-    // ฟังก์ชันเช็คว่า printer พร้อมใช้งาน (ใช้ PowerShell บน Windows, fallback ไป Electron API)
-    const isPrinterAvailable = async (targetName: string): Promise<boolean> => {
-      // ใช้ PowerShell เช็คสถานะแบบละเอียด (Windows)
-      if (process.platform === 'win32') {
-        const result = await getPrinterStatusViaWMIC(targetName);
-
-        // ถ้า PowerShell fail ให้ fallback ไปใช้ Electron API
-        if (result.fallback) {
-          console.log(`  └─ PowerShell failed, using Electron API fallback`);
-          const found = printers.some((p) => {
-            if (p.name !== targetName) return false;
-            const isOffline = !!(p.status & 0x00000400) || p.status === 1024;
-            return !isOffline;
-          });
-          console.log(
-            `  └─ Status: ${found ? 'Available (Electron API)' : 'Not found/Offline'}`,
-          );
-          return found;
-        }
-
-        // if (result.status) {
-        //   console.log(
-        //     `  └─ Status: ${result.status}${result.details ? ` (${result.details})` : ''}`,
-        //   );
-        // }
-        return result.available;
-      }
-
-      // Fallback สำหรับ non-Windows: ใช้ Electron API
-      return printers.some((p) => {
-        if (p.name !== targetName) return false;
-        const isOffline = !!(p.status & 0x00000400) || p.status === 1024;
-        return !isOffline;
-      });
-    };
-
-    // เช็ค Main printer
-    const mainFound = await isPrinterAvailable(printerConfig.main.printerName);
-    let allPrintersOk = mainFound;
-
-    if (!mainFound) {
-      console.warn(
-        `⚠️ [Main] Main printer not available: ${printerConfig.main.printerName}`,
-      );
-      await sendDeviceAlertWithRateLimit(
-        'printer',
-        `Main: ${printerConfig.main.printerName}`,
-        printerNames,
-      );
-    } else {
-      console.log(
-        `✅ [Main] Main printer available: ${printerConfig.main.printerName}`,
-      );
-    }
-
-    // เช็ค Secondary printer (ถ้ามี)
-    if (printerConfig.secondary) {
-      const secondaryFound = await isPrinterAvailable(
-        printerConfig.secondary.printerName,
-      );
-
-      if (!secondaryFound) {
-        allPrintersOk = false;
-        console.warn(
-          `⚠️ [Main] Secondary printer not available: ${printerConfig.secondary.printerName}`,
-        );
-        await sendDeviceAlertWithRateLimit(
-          'printer',
-          `Secondary: ${printerConfig.secondary.printerName}`,
-          printerNames,
-        );
-      } else {
-        console.log(
-          `✅ [Main] Secondary printer available: ${printerConfig.secondary.printerName}`,
-        );
-      }
-    }
-
-    // อัพเดทสถานะ printer — ต้อง OK ทั้ง main และ secondary (ถ้ามี)
-    deviceStatus.printer = allPrintersOk;
-
-    if (!allPrintersOk) {
-      // หา printer ตัวที่หายไปเพื่อแสดงชื่อ
-      const missingName = !mainFound
-        ? printerConfig.main.printerName
-        : printerConfig.secondary?.printerName || 'Printer';
+      deviceStatus.printer = false;
+      await sendDeviceAlertWithRateLimit('printer', 'Config not found', []);
       sendDeviceStatus({
         deviceType: 'printer',
-        deviceName: missingName,
+        deviceName: 'Config not found',
       });
-    } else {
-      if (mainWindow) {
-        mainWindow.webContents.send('device-found');
+
+      return;
+    }
+
+    // ดึงรายการ Printer ทั้งหมดที่ OS มองเห็น ณ วินาทีนี้
+    const systemPrinters = await mainWindow!.webContents.getPrintersAsync();
+    console.log(
+      '📋 All System Printers:',
+      systemPrinters.map((p) => `"${p.name}"`),
+    );
+
+    const checkSinglePrinter = async (targetName: string) => {
+      // ค้นหา printer ใน list
+      const printerInList = systemPrinters.find((p) => p.name === targetName);
+
+      if (!printerInList) {
+        console.warn(
+          `❌ [Main] ${targetName} is physically disconnected (Not in list)`,
+        );
+        return false;
+      } else {
+        console.log(
+          `📋 [Debug] Printer: ${printerInList.name}, Raw Status: ${printerInList.status}`,
+        );
+      }
+
+      // ถ้าเจอชื่อใน List ให้เช็ค Status Bit (0x400 คือ Offline)
+      const isOffline =
+        !!(printerInList.status & 0x00000400) || // Windows: Offline bit
+        printerInList.status === 1024 || // Windows: Offline decimal
+        printerInList.status === 5; // macOS: Paused / Disabled
+
+      if (isOffline) {
+        console.warn(`❌ [Main] ${targetName} is Offline`);
+        return false;
+      }
+
+      // ถ้าเป็น Windows ให้เช็คสถานะเชิงลึกด้วย PowerShell (ดักจับ WorkOffline และ Status อื่นๆ)
+      if (process.platform === 'win32') {
+        const psResult = await getPrinterStatusViaPowerShell(targetName);
+        // ถ้า PowerShell ทำงานสำเร็จ ให้ใช้ค่าที่ได้จาก PowerShell เลย
+        if (!psResult.fallback) {
+          if (!psResult.available) {
+            console.warn(
+              `❌ [Main] ${targetName} status is not ready: ${psResult.status}`,
+            );
+          }
+          return psResult.available;
+        }
+      }
+
+      return true; // ถ้าผ่านมาถึงนี่ได้ถือว่า OK
+    };
+
+    const mainOk = await checkSinglePrinter(printerConfig.main.printerName);
+    const secondaryOk = printerConfig.secondary
+      ? await checkSinglePrinter(printerConfig.secondary.printerName)
+      : true;
+
+    const allOk = mainOk && secondaryOk;
+
+    // แจ้งเตือนเมื่อสถานะเปลี่ยนเท่านั้น (ป้องกันการส่งแจ้งเตือนซ้ำทุก 10 วิ)
+    if (allOk !== deviceStatus.printer) {
+      deviceStatus.printer = allOk;
+      if (!allOk) {
+        const missing = !mainOk
+          ? printerConfig.main.printerName
+          : printerConfig.secondary?.printerName || 'Unknown';
+        await sendDeviceAlertWithRateLimit(
+          'printer',
+          missing,
+          systemPrinters.map((p) => p.name),
+        );
+        sendDeviceStatus({ deviceType: 'printer', deviceName: missing });
+      } else {
+        sendDeviceStatus(); // กลับมาเป็นปกติ
       }
     }
   } catch (error) {
-    console.error('❌ [Main] Error checking printer:', error);
+    console.error('❌ Error in checkPrinter:', error);
   }
 }
 
@@ -1593,6 +1556,17 @@ app
   .then(() => {
     log.info('[Main] App ready - starting initialization');
 
+    // const testConfig = {
+    //   main: {
+    //     printerName: "_127_0_0_1",
+    //     displayName: "Test Printer Mac",
+    //     paperSize: "6x4" as const,
+    //     canCut: false
+    //   }
+    // };
+
+    // savePrinterConfig(testConfig);
+
     sseClient.on('connected', (_, data) => {
       console.log('✅ SSE Connected:', data);
       if (mainWindow) {
@@ -1602,48 +1576,90 @@ app
 
     // ========== LISTEN TO ROUTE CHANGES ==========
     ipcMain.on('route-changed', (_event, route: string) => {
-      console.log('[Main] Route changed to:', route);
       log.info('[Main] Route changed to:', route);
       currentRoute = route;
     });
     console.log('[Main] Route change listener registered');
 
-    // ========== CHECK CONFIGURED DEVICES INTERVAL ==========
-    // Check configured devices every 10 seconds (except when on system-maintenance page)
-    const deviceCheckInterval = setInterval(async () => {
-      // Skip if on system-maintenance page or in normal user flow
-      const skipRoutes = [
-        '/system-maintenance',
-        '/select-print',
-        '/discount-coupon',
-        '/frame-selection',
-        '/payment',
-        '/payment-qr',
-        '/photo-prepare',
-        '/main-shooting',
-        '/photo-confirmation',
-        '/photo-decorate',
-        '/photo-filter',
-        '/photo-result',
-      ];
-      if (skipRoutes.includes(currentRoute)) {
-        log.debug(`[Main] Skipping device check on ${currentRoute} page`);
-        return;
-      }
+    // ========== SMART DEVICE CHECK LOGIC ==========
+    let deviceCheckTimeout: NodeJS.Timeout | null = null;
+    let isChecking = false;
+
+    async function runSmartDeviceCheck(): Promise<void> {
+      if (isChecking) return;
+      isChecking = true;
 
       try {
-        await checkConfiguredDevices();
+        // 1. แยกกลุ่มหน้าตามความสำคัญ (Logic การข้าม)
+        const criticalRoutes = ['/photo-prepare', '/main-shooting'];
+
+        // หน้าที่ควรข้ามการเช็คเพื่อป้องกันอาการ Lag
+        if (criticalRoutes.includes(currentRoute)) {
+          log.debug(
+            `[Main] On critical page ${currentRoute}, skipping device check`,
+          );
+        } else {
+          await checkConfiguredDevices();
+        }
+
+        // 2. กำหนดความเร็ว (Delay) สำหรับแต่ละ Path ให้ครบตามลิสต์
+        let nextCheckDelay = 10000; // Default: 10 วินาที
+
+        switch (currentRoute) {
+          case '/system-maintenance':
+            nextCheckDelay = 5000; // หน้าช่าง: 5 วินาที
+            break;
+
+          case '/photo-prepare':
+            nextCheckDelay = 3000;
+            break;
+
+          case '/payment':
+          case '/payment-qr':
+          case '/select-print':
+            nextCheckDelay = 5000; // หน้าสำคัญที่ต้องชัวร์เรื่องเครื่องพิมพ์: 5 วินาที
+            break;
+
+          case '/discount-coupon':
+          case '/frame-selection':
+          case '/photo-confirmation':
+          case '/photo-decorate':
+          case '/photo-filter':
+            nextCheckDelay = 10000; // หน้าเลือกของ/แต่งรูป: 10 วินาที (มาตรฐาน)
+            break;
+
+          case '/main-shooting':
+          case '/photo-result':
+            nextCheckDelay = 30000; // หน้าที่กำลังถ่าย: รอนานหน่อยค่อยเช็คใหม่ (ลดภาระเครื่อง)
+            break;
+
+          default:
+            nextCheckDelay = 10000; // หน้า Welcome หรืออื่นๆ: 10 วินาที
+        }
+
+        // ล้างค่าเก่าและตั้งรอบถัดไป
+        if (deviceCheckTimeout) clearTimeout(deviceCheckTimeout);
+        deviceCheckTimeout = setTimeout(() => {
+          runSmartDeviceCheck();
+        }, nextCheckDelay);
       } catch (err) {
-        log.error('[Main] Error in checkConfiguredDevices interval:', err);
+        log.error('[Main] Error in SmartDeviceCheck:', err);
+        deviceCheckTimeout = setTimeout(() => runSmartDeviceCheck(), 10000);
+      } finally {
+        isChecking = false;
       }
-    }, 10000); // 10 seconds
+    }
 
-    // Store interval ID for cleanup
+    // เริ่มรันครั้งแรก
+    runSmartDeviceCheck();
+
+    // ========== CLEANUP ON QUIT ==========
     app.on('before-quit', () => {
-      clearInterval(deviceCheckInterval);
+      if (deviceCheckTimeout) {
+        clearTimeout(deviceCheckTimeout);
+      }
       sseClient.updateMachineInfo({ status: 'offline' });
-
-      log.info('[Main] Device check interval cleared');
+      log.info('[Main] Smart device check timeout cleared');
     });
 
     // ========== POWER SAVE BLOCKER ==========
