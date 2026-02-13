@@ -303,8 +303,12 @@ function MaintenanceListener() {
 
     // devicechange: ตรวจจับ USB webcam ถอด/เสียบทันที (ไม่ต้องรอ polling 10s)
     const handleDeviceChange = async () => {
+      // รอสักครู่เพื่อให้ OS/Browser อัปเดตรายชื่ออุปกรณ์ให้เรียบร้อย
+      await new Promise((resolve) => {
+        setTimeout(resolve, 1000);
+      });
+
       try {
-        // ดึง config จาก main process เพื่อเช็คว่ามี webcam ที่ตั้งค่าไว้หรือไม่
         const result = await (window as any).electron.ipcRenderer.invoke(
           'get-camera-config',
         );
@@ -318,11 +322,13 @@ function MaintenanceListener() {
         const cameraConfig = result.config;
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter((d) => d.kind === 'videoinput');
+
         const found = videoDevices.some(
           (d) => d.deviceId === cameraConfig.deviceId,
         );
 
-        // แจ้ง main process ทันทีผ่าน event เฉพาะ (แยกจาก polling result)
+        console.log(`[App] Device check: ${found ? 'Found' : 'Not Found'}`);
+
         (window as any).electron.ipcRenderer.sendMessage(
           'webcam-instant-status',
           {

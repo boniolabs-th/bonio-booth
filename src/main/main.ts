@@ -3346,25 +3346,34 @@ ipcMain.handle('get-camera-config', async () => {
  */
 ipcMain.on('webcam-instant-status', async (_event, data) => {
   const { found, configuredLabel } = data;
-  console.log(
-    `⚡ [Main] Instant webcam status: ${found ? 'found' : 'NOT found'} - ${configuredLabel}`,
-  );
+  const previousStatus = deviceStatus.camera; // สมมติว่าเริ่มต้นเป็น true
 
-  const previousStatus = deviceStatus.camera;
+  // อัปเดตสถานะปัจจุบัน
   deviceStatus.camera = found;
 
-  // แจ้งเตือนเฉพาะเมื่อสถานะเปลี่ยน (false → true หรือ true → false)
-  if (!found && previousStatus !== found) {
-    // กล้องหาย → แจ้งเตือน
-    await sendDeviceAlertWithRateLimit('camera', configuredLabel || 'Webcam', []);
+  console.log(
+    `⚡ [Main] Status Change: ${previousStatus} -> ${found} (${configuredLabel})`,
+  );
+
+  // เคส 1: กล้องหาย (จากเคยมีอยู่ true กลายเป็นไม่มี false)
+  if (previousStatus === true && found === false) {
+    console.log('❌ Camera Lost - Sending Alert');
+    await sendDeviceAlertWithRateLimit(
+      'camera',
+      configuredLabel || 'Webcam',
+      [],
+    );
     sendDeviceStatus({
       deviceType: 'camera',
       deviceName: configuredLabel || 'Webcam',
     });
-  } else if (found && previousStatus !== found) {
-    // กล้องกลับมา → ส่ง status เพื่อเช็คว่าทุกอุปกรณ์ OK หรือยัง
-    sendDeviceStatus();
   }
+  // เคส 2: กล้องกลับมา (จากเคยไม่มี false กลายเป็นมี true)
+  else if (previousStatus === false && found === true) {
+    console.log('✅ Camera Recovered - Clear Alert');
+    sendDeviceStatus(); // ส่ง status เพื่อบอกว่าทุกอย่าง OK แล้ว
+  }
+  // เคสอื่นๆ (เช่น false -> false หรือ true -> true) ไม่ต้องทำอะไร
 });
 
 ipcMain.handle('save-camera-config', async (event, config: CameraConfig) => {
