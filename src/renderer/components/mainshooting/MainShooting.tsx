@@ -285,15 +285,18 @@ export default function MainShooting() {
           );
         }
 
-        // ถ้ามี config แต่ไม่พบกล้องที่ตั้งค่าไว้ ให้ใช้กล้องตัวสุดท้าย
+        // ถ้ามี config แต่ไม่พบกล้องที่ตั้งค่าไว้ → ไม่ switch ไปตัวอื่น แจ้ง error ทันที
         if (
           finalDeviceId &&
           !videoDevices.find((d) => d.deviceId === finalDeviceId)
         ) {
-          console.warn(
-            '⚠️ [Webcam] Configured camera not found, using last camera',
+          const configLabel = configToUse?.type === 'webcam' ? (configToUse as any).label : 'Unknown';
+          console.error(
+            `❌ [Webcam] Configured camera disconnected: ${configLabel} (${finalDeviceId})`,
           );
-          finalDeviceId = videoDevices[videoDevices.length - 1].deviceId;
+          throw new Error(
+            `กล้อง "${configLabel}" ขาดการเชื่อมต่อ กรุณาตรวจสอบสาย USB และเสียบกล้องใหม่`,
+          );
         }
 
         // ถ้าไม่มี config ให้ใช้กล้องตัวสุดท้าย (มักเป็น external camera)

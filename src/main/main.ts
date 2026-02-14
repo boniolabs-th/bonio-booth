@@ -1907,14 +1907,35 @@ ipcMain.on('print-photo', async (event, printConfig) => {
         selectedPrinter: printerName,
         selectedCanCut: activePrinter.canCut,
       });
+
+      // เช็คว่า printer ที่เลือกยังเชื่อมต่ออยู่หรือไม่ — ถ้าหายไปไม่ fallback ไปตัวอื่น
+      if (mainWindow) {
+        const systemPrinters = await mainWindow.webContents.getPrintersAsync();
+        const printerStillConnected = systemPrinters.some(
+          (p) => p.name === printerName,
+        );
+        if (!printerStillConnected) {
+          log.error(
+            `🖨️ [Print] Configured printer disconnected: ${printerName}`,
+          );
+          isPrinting = false;
+          event.reply('print-response', {
+            success: false,
+            error: `เครื่องปริ้น "${printerName}" ขาดการเชื่อมต่อ กรุณาตรวจสอบสาย USB และเสียบเครื่องปริ้นใหม่`,
+          });
+          return;
+        }
+      }
     } else if (mainWindow) {
-      // 2. ถ้าไม่มี config ให้หา QW410 จากรายการ printers
-      const printers = await mainWindow.webContents.getPrintersAsync();
-      const target = printers.find((p) =>
-        p.name.toLowerCase().includes('qw410'),
-      );
-      if (target) printerName = target.name;
-      log.info('🖨️ [Print] Using auto-detected printer:', printerName);
+      // 2. ถ้าไม่มี config → ไม่ auto-detect แจ้ง error กลับ
+      log.warn('🖨️ [Print] No printer config found, cannot print');
+      isPrinting = false;
+      event.reply('print-response', {
+        success: false,
+        error:
+          'ไม่พบการตั้งค่าเครื่องปริ้น กรุณาตั้งค่าเครื่องปริ้นก่อนใช้งาน',
+      });
+      return;
     }
 
     // พิมพ์หลายครั้งตาม copies

@@ -55,6 +55,10 @@ export default function CameraConfigModal({
     null,
   );
 
+  // Disconnect warning state
+  const [webcamDisconnected, setWebcamDisconnected] = useState(false);
+  const [canonDisconnected, setCanonDisconnected] = useState(false);
+
   // Common state
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -92,6 +96,21 @@ export default function CameraConfigModal({
       if (configResult?.success && configResult.config) {
         setCurrentWebcamConfig(configResult.config);
         setSelectedWebcamId(configResult.config.deviceId);
+
+        // เช็คว่ากล้อง webcam ที่ตั้งค่าไว้ยังเชื่อมต่ออยู่หรือไม่
+        if (configResult.config.type === 'webcam') {
+          const configuredFound = videoDevices.some(
+            (d) => d.deviceId === configResult.config.deviceId
+          );
+          if (!configuredFound) {
+            setWebcamDisconnected(true);
+            console.warn(
+              `⚠️ [CameraConfig] Configured webcam disconnected: ${configResult.config.label}`,
+            );
+          } else {
+            setWebcamDisconnected(false);
+          }
+        }
       } else if (videoDevices.length > 0) {
         setSelectedWebcamId(videoDevices[videoDevices.length - 1].deviceId);
       }
@@ -205,6 +224,20 @@ export default function CameraConfigModal({
       setCanonConnected(false);
       setCanonSessionOpen(false);
       setCanonBatteryLevel(null);
+
+      // เช็คว่ามี saved config เป็น Canon แต่ไม่เจอกล้อง → แสดง warning disconnect
+      // @ts-ignore
+      const savedConfigResult = await window.electron?.payment?.getCameraConfig();
+      if (savedConfigResult?.success && savedConfigResult.config?.type === 'canon') {
+        if (!cameras || cameras.length === 0) {
+          setCanonDisconnected(true);
+          console.warn(
+            `⚠️ [CameraConfig] Configured Canon camera disconnected: ${savedConfigResult.config.cameraName}`,
+          );
+        } else {
+          setCanonDisconnected(false);
+        }
+      }
 
       // 4) ถ้าเจอกล้องและมี saved config → ลอง auto-reconnect
       if (cameras && cameras.length > 0) {
@@ -541,13 +574,24 @@ export default function CameraConfigModal({
                     ))}
                   </select>
 
-                  {webcams.length === 0 && !webcamError && (
+                  {webcamDisconnected && currentWebcamConfig && (
+                    <div className="camera-config-warning" style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: '12px 16px', marginTop: 8 }}>
+                      <p style={{ margin: 0, fontWeight: 600, color: '#856404' }}>
+                        ⚠️ กล้อง "{currentWebcamConfig.label}" ขาดการเชื่อมต่อ
+                      </p>
+                      <p style={{ margin: '4px 0 0', fontSize: '0.9em', color: '#856404' }}>
+                        กรุณาตรวจสอบสาย USB และเสียบกล้องใหม่ หรือเลือกกล้องตัวอื่น
+                      </p>
+                    </div>
+                  )}
+
+                {webcams.length === 0 && !webcamError && !webcamDisconnected && (
                     <p className="camera-config-warning">
                       ไม่พบ Webcam ที่เชื่อมต่ออยู่
                     </p>
                   )}
 
-                  {currentWebcamConfig && (
+                  {currentWebcamConfig && !webcamDisconnected && (
                     <p className="camera-config-current">
                       กล้องปัจจุบัน:{' '}
                       <strong>{currentWebcamConfig.label}</strong>
@@ -660,7 +704,18 @@ export default function CameraConfigModal({
                     ))}
                   </select>
 
-                  {canonCameras.length === 0 && !canonError && (
+                  {canonDisconnected && (
+                    <div className="camera-config-warning" style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: '12px 16px', marginTop: 8 }}>
+                      <p style={{ margin: 0, fontWeight: 600, color: '#856404' }}>
+                        ⚠️ กล้อง Canon ที่ตั้งค่าไว้ขาดการเชื่อมต่อ
+                      </p>
+                      <p style={{ margin: '4px 0 0', fontSize: '0.9em', color: '#856404' }}>
+                        กรุณาตรวจสอบสาย USB ว่าเสียบอยู่ และเปิดกล้องแล้ว
+                      </p>
+                    </div>
+                  )}
+
+                  {canonCameras.length === 0 && !canonError && !canonDisconnected && (
                     <p className="camera-config-warning">
                       ไม่พบกล้อง Canon ที่เชื่อมต่อผ่าน USB
                       <br />

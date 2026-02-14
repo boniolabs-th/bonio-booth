@@ -55,6 +55,8 @@ export default function PrinterConfigModal({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [mainPrinterDisconnected, setMainPrinterDisconnected] = useState(false);
+  const [secondaryPrinterDisconnected, setSecondaryPrinterDisconnected] = useState(false);
 
   // โหลดรายการเครื่องปริ้นและ config ปัจจุบัน
   const loadPrinters = useCallback(async () => {
@@ -87,11 +89,37 @@ export default function PrinterConfigModal({
           setMainPaperSize(config.main.paperSize || '6x4');
           setMainCanCut(config.main.canCut ?? true);
 
+          // เช็คว่า main printer ที่ตั้งค่าไว้ยังอยู่หรือไม่
+          const mainFound = printerList.some(
+            (p) => p.name === config.main.printerName
+          );
+          if (!mainFound) {
+            setMainPrinterDisconnected(true);
+            console.warn(
+              `⚠️ [PrinterConfig] Main printer disconnected: ${config.main.printerName}`,
+            );
+          } else {
+            setMainPrinterDisconnected(false);
+          }
+
           // Secondary printer
           if (config.secondary) {
             setSecondaryPrinterName(config.secondary.printerName);
             setSecondaryPaperSize(config.secondary.paperSize || '6x4');
             setSecondaryCanCut(config.secondary.canCut ?? true);
+
+            // เช็คว่า secondary printer ยังอยู่หรือไม่
+            const secondaryFound = printerList.some(
+              (p) => p.name === config.secondary!.printerName
+            );
+            if (!secondaryFound) {
+              setSecondaryPrinterDisconnected(true);
+              console.warn(
+                `⚠️ [PrinterConfig] Secondary printer disconnected: ${config.secondary.printerName}`,
+              );
+            } else {
+              setSecondaryPrinterDisconnected(false);
+            }
           }
         } else if (printerList.length > 0) {
           // ถ้าไม่มี config ให้เลือก default printer หรือตัวที่มี qw410 ในชื่อ
@@ -282,6 +310,17 @@ export default function PrinterConfigModal({
                     </span>
                   </div>
                 </div>
+
+                {mainPrinterDisconnected && currentConfig && (
+                  <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: '12px 16px', marginTop: 8 }}>
+                    <p style={{ margin: 0, fontWeight: 600, color: '#856404' }}>
+                      ⚠️ เครื่องปริ้นหลัก "{currentConfig.main.displayName || currentConfig.main.printerName}" ขาดการเชื่อมต่อ
+                    </p>
+                    <p style={{ margin: '4px 0 0', fontSize: '0.9em', color: '#856404' }}>
+                      กรุณาตรวจสอบสาย USB และเสียบเครื่องปริ้นใหม่ หรือเลือกเครื่องปริ้นตัวอื่น
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -353,6 +392,17 @@ export default function PrinterConfigModal({
                   <p className="printer-config-hint" style={{ paddingLeft: 0 }}>
                     💡 เลือกเครื่องปริ้นรองเพื่อใช้เป็นเครื่องสำรอง
                   </p>
+                )}
+
+                {secondaryPrinterDisconnected && currentConfig?.secondary && (
+                  <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: '12px 16px', marginTop: 8 }}>
+                    <p style={{ margin: 0, fontWeight: 600, color: '#856404' }}>
+                      ⚠️ เครื่องปริ้นรอง "{currentConfig.secondary.displayName || currentConfig.secondary.printerName}" ขาดการเชื่อมต่อ
+                    </p>
+                    <p style={{ margin: '4px 0 0', fontSize: '0.9em', color: '#856404' }}>
+                      กรุณาตรวจสอบสาย USB และเสียบเครื่องปริ้นใหม่ หรือเลือกเครื่องปริ้นตัวอื่น
+                    </p>
+                  </div>
                 )}
               </div>
             )}
