@@ -457,9 +457,29 @@ async function initializeApp() {
 
 
 
+// แจ้งเตือน device (กล้อง/เครื่องปริ้น) ไป backend — ใช้ครั้งแรกต่อ session + rate limit ตอนไม่พบ
+let hasSentStartupDeviceReport = false;
+const deviceAlertLastSent: Record<string, number> = {};
+const DEVICE_ALERT_RATE_LIMIT_MS = 2 * 1000; // 2 วินาที ต่อ device type
+
+function sendDeviceAlertToBackendIfAllowed(
+  deviceType: 'camera' | 'printer',
+  deviceName: string,
+  availableDevices?: string[],
+): void {
+  if (deviceName === 'No camera config' || deviceName === 'No printer config') return;
+  const key = deviceType;
+  if (Date.now() - (deviceAlertLastSent[key] || 0) < DEVICE_ALERT_RATE_LIMIT_MS) return;
+  deviceAlertLastSent[key] = Date.now();
+  machineService
+    .sendDeviceAlert(deviceType, deviceName, availableDevices)
+    .catch((err) => console.warn('⚠️ [Main] sendDeviceAlert failed:', err));
+}
+
 /**
  * ตรวจสอบว่า device (camera/printer) ที่เคยตั้งค่าไว้ยังมีอยู่หรือไม่
- * ถ้าไม่พบจะส่งแจ้งเตือนไปยัง Telegram ผ่าน API
+ * ถ้าไม่พบจะส่งแจ้งเตือนไปยัง Telegram (device-alert, rate limit 2 วินาที ต่อ type)
+ * ครั้งแรกที่เช็คหลังเปิดเครื่องจะส่ง device-status-report (เปิดเครื่องแล้ว – สถานะอุปกรณ์)
  */
 async function checkConfiguredDevices(): Promise<void> {
   console.log('🔍 [Main] Checking configured devices...');
@@ -483,18 +503,32 @@ async function checkConfiguredDevices(): Promise<void> {
     });
   }
 
+  // 1. เช็ค Camera (คืนค่าสถานะสำหรับรายงาน)
+  const cameraStatus = await checkCamera();
 
-  // 1. เช็ค Camera
-  await checkCamera();
+  // 2. เช็ค Printer (คืนค่าสถานะสำหรับรายงาน)
+  const printerStatus = await checkPrinter();
 
-  // 2. เช็ค Printer
-  await checkPrinter();
+  // 3. ครั้งแรกหลังเปิดเครื่อง: ส่งรายงานสถานะไป backend → Telegram
+  if (!hasSentStartupDeviceReport && cameraStatus && printerStatus) {
+    hasSentStartupDeviceReport = true;
+    machineService
+      .sendDeviceStatusReport({
+        isStartup: true,
+        camera: cameraStatus,
+        printer: printerStatus,
+      })
+      .catch((err) => console.warn('⚠️ [Main] sendDeviceStatusReport failed:', err));
+  }
 }
 
+/** สถานะกล้องสำหรับรายงาน backend */
+type CameraStatusResult = { configured: boolean; found: boolean; deviceName?: string };
+
 /**
- * เช็ค Camera (แยกเป็นฟังก์ชันย่อยเพื่อความชัดเจน)
+ * เช็ค Camera — คืนค่าสถานะสำหรับ device-status-report และยิง device-alert (rate limit) เมื่อไม่พบ
  */
-async function checkCamera(): Promise<void> {
+async function checkCamera(): Promise<CameraStatusResult | null> {
   try {
     console.log('ℹ️ [Main] Checking camera config...');
 
@@ -507,28 +541,25 @@ async function checkCamera(): Promise<void> {
           deviceName: 'No camera config',
         });
       }
-      return;
+      return { configured: false, found: false, deviceName: 'No camera config' };
     }
+
+    const deviceName = cameraConfig.type === 'webcam' ? cameraConfig.label : cameraConfig.cameraName;
 
     if (cameraConfig.type === 'webcam') {
       console.log(`📷 [Main] Webcam config found: ${cameraConfig.label} (${cameraConfig.deviceId})`);
 
-      // สร้าง Promise เพื่อรอผลจาก renderer
       const checkPromise = new Promise<boolean>((resolve) => {
-        // ตั้ง timeout กรณี renderer ไม่ตอบกลับ
         const timeout = setTimeout(() => {
           console.warn('⚠️ [Main] Timeout waiting for camera check response');
           resolve(false);
         }, 5000);
-
-        // รอรับผลจาก renderer
         ipcMain.once('camera-availability-result', (event, result) => {
           clearTimeout(timeout);
           resolve(result.found);
         });
       });
 
-      // ส่ง event ไปให้ renderer เช็ค
       if (mainWindow) {
         mainWindow.webContents.send('check-camera-availability', {
           configuredDeviceId: cameraConfig.deviceId,
@@ -536,23 +567,27 @@ async function checkCamera(): Promise<void> {
         });
       }
 
-      // รอผล
       const found = await checkPromise;
 
       if (found && mainWindow) {
-        mainWindow.webContents.send('device-status', {
-          deviceType: 'camera',
-          status: 'found',
-        });
+        mainWindow.webContents.send('device-status', { deviceType: 'camera', status: 'found' });
+      } else {
+        if (mainWindow) {
+          mainWindow.webContents.send('device-not-found', {
+            deviceType: 'camera',
+            deviceName: cameraConfig.label,
+          });
+        }
+        sendDeviceAlertToBackendIfAllowed('camera', cameraConfig.label);
       }
       console.log(`📷 [Main] Webcam check result: ${found ? 'Found' : 'Not found'}`);
+      return { configured: true, found, deviceName: cameraConfig.label };
+    }
 
-    } else if (cameraConfig.type === 'canon') {
+    if (cameraConfig.type === 'canon') {
       console.log(`📷 [Main] Canon camera config found: ${cameraConfig.cameraName}`);
 
-      // รอให้ Canon SDK พร้อม (ถ้าจำเป็น)
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       const isConnected = isCanonCameraConnected();
 
       if (!isConnected) {
@@ -563,18 +598,20 @@ async function checkCamera(): Promise<void> {
             deviceName: cameraConfig.cameraName,
           });
         }
-      } else {
-        if (mainWindow) {
-          mainWindow.webContents.send('device-status', {
-            deviceType: 'camera',
-            status: 'found',
-          });
-        }
-        console.log(`✅ [Main] Canon camera connected: ${cameraConfig.cameraName}`);
+        sendDeviceAlertToBackendIfAllowed('camera', cameraConfig.cameraName);
+        return { configured: true, found: false, deviceName: cameraConfig.cameraName };
       }
+      if (mainWindow) {
+        mainWindow.webContents.send('device-status', { deviceType: 'camera', status: 'found' });
+      }
+      console.log(`✅ [Main] Canon camera connected: ${cameraConfig.cameraName}`);
+      return { configured: true, found: true, deviceName: cameraConfig.cameraName };
     }
+
+    return { configured: true, found: false, deviceName };
   } catch (error) {
     console.error('❌ [Main] Error checking camera config:', error);
+    return null;
   }
 }
 
@@ -601,17 +638,20 @@ async function getWindowsPrinterHasSignal(printerName: string): Promise<boolean>
   }
 }
 
+/** สถานะเครื่องปริ้นสำหรับรายงาน backend */
+type PrinterStatusResult = {
+  configured: boolean;
+  found: boolean;
+  deviceDetail?: string;
+  availablePrinterNames?: string[];
+};
+
 /**
- * เช็ค Printer
- * - ตอนเดิมที่ยิง NOTI ไปหลังบ้าน: ใช้แค่ getPrintersAsync() แล้วดูว่า "ชื่อที่ตั้งค่า" อยู่ในรายการหรือไม่
- *   บน Windows เครื่องที่ถอดปลั๊กยังโผล่ในรายการ + Electron คืน status=0 เสมอ จึงต้องเช็คเพิ่มด้วย WMI
- * - กล้อง: main ส่ง check-camera-availability ไป renderer → renderer เช็ค enumerateDevices แล้วส่ง camera-availability-result กลับมา
+ * เช็ค Printer — คืนค่าสถานะสำหรับ device-status-report และยิง device-alert (rate limit) เมื่อไม่พบ
  */
-async function checkPrinter(): Promise<void> {
+async function checkPrinter(): Promise<PrinterStatusResult | null> {
   try {
     console.log('ℹ️ [Main] Checking printer config...');
-
-    let isConnected = false;
 
     const printerConfig = await getPrinterConfig();
     if (!printerConfig) {
@@ -622,12 +662,12 @@ async function checkPrinter(): Promise<void> {
           deviceName: 'No printer config',
         });
       }
-      return;
+      return { configured: false, found: false, deviceDetail: 'No printer config' };
     }
 
     if (!mainWindow) {
       console.warn('⚠️ [Main] Main window not available for printer check');
-      return;
+      return null;
     }
 
     console.log(`🖨️ [Main] Printer config found - Main: ${printerConfig.main.printerName}`);
@@ -638,6 +678,9 @@ async function checkPrinter(): Promise<void> {
     const printers = await mainWindow.webContents.getPrintersAsync();
     const printerNames = printers.map((p: any) => p.name);
     console.log('🖨️ [Main] Printers (from Electron):', printerNames);
+
+    let isConnected = false;
+    let deviceDetail = `Main: ${printerConfig.main.printerName}`;
 
     const mainInList = printers.some((p: any) => p.name === printerConfig.main.printerName);
     const mainHasSignal =
@@ -656,11 +699,16 @@ async function checkPrinter(): Promise<void> {
           deviceName: `Main: ${printerConfig.main.printerName}`,
         });
       }
-      isConnected = false;
-    } else {
-      isConnected = true;
-      console.log(`✅ [Main] Main printer has signal: ${printerConfig.main.printerName}`);
+      sendDeviceAlertToBackendIfAllowed('printer', `Main: ${printerConfig.main.printerName}`, printerNames);
+      return {
+        configured: true,
+        found: false,
+        deviceDetail: `Main: ${printerConfig.main.printerName}`,
+        availablePrinterNames: printerNames,
+      };
     }
+
+    isConnected = true;
 
     if (printerConfig.secondary) {
       const secInList = printers.some((p: any) => p.name === printerConfig.secondary!.printerName);
@@ -681,21 +729,33 @@ async function checkPrinter(): Promise<void> {
             deviceName: `Secondary: ${printerConfig.secondary.printerName}`,
           });
         }
-        isConnected = false;
-      } else {
-        isConnected = true;
-        console.log(`✅ [Main] Secondary printer has signal: ${printerConfig.secondary.printerName}`);
+        sendDeviceAlertToBackendIfAllowed(
+          'printer',
+          `Secondary: ${printerConfig.secondary.printerName}`,
+          printerNames,
+        );
+        return {
+          configured: true,
+          found: false,
+          deviceDetail: `Secondary: ${printerConfig.secondary.printerName}`,
+          availablePrinterNames: printerNames,
+        };
       }
+      deviceDetail = `Main: ${printerConfig.main.printerName}, Secondary: ${printerConfig.secondary.printerName}`;
     }
 
-    if (isConnected && mainWindow) {
-      mainWindow.webContents.send('device-status', {
-        deviceType: 'printer',
-        status: 'found',
-      });
+    if (mainWindow) {
+      mainWindow.webContents.send('device-status', { deviceType: 'printer', status: 'found' });
     }
+    return {
+      configured: true,
+      found: true,
+      deviceDetail,
+      availablePrinterNames: printerNames,
+    };
   } catch (error) {
     console.error('❌ [Main] Error checking printer config:', error);
+    return null;
   }
 }
 
@@ -2801,6 +2861,7 @@ ipcMain.on('camera-availability-result', async (event, result: {
         deviceName: result.configuredLabel,
       });
     }
+    sendDeviceAlertToBackendIfAllowed('camera', result.configuredLabel, result.availableDevices);
   } else {
     console.log(`✅ [Main] Configured camera found: ${result.configuredLabel}`);
   }

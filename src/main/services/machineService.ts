@@ -1495,6 +1495,40 @@ export class MachineService {
       };
     }
   }
+
+  /**
+   * ส่งรายงานสถานะกล้องและเครื่องปริ้นไป backend (แจ้ง Telegram ตอนเปิดเครื่องหรืออัปเดตสถานะ)
+   */
+  async sendDeviceStatusReport(payload: {
+    isStartup: boolean;
+    camera: { configured: boolean; found: boolean; deviceName?: string };
+    printer: {
+      configured: boolean;
+      found: boolean;
+      deviceDetail?: string;
+      availablePrinterNames?: string[];
+    };
+  }): Promise<{ success: boolean; message: string; notificationSent: boolean }> {
+    try {
+      const result = await this.makeRequest<{
+        success: boolean;
+        message: string;
+        notificationSent: boolean;
+      }>('/api/machines-public/device-status-report', 'POST', payload);
+
+      console.log(
+        `✅ [MachineService] Device status report sent (isStartup: ${payload.isStartup})`,
+      );
+      return result;
+    } catch (error) {
+      console.error('❌ [MachineService] Send device status report failed:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        notificationSent: false,
+      };
+    }
+  }
 }
 
 // ==================== Default Instance ====================
