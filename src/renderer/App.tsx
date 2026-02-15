@@ -236,9 +236,22 @@ function MaintenanceListener() {
             (device) => device.kind === 'videoinput',
           );
 
-          const found = videoDevices.some(
+          const inList = videoDevices.some(
             (d) => d.deviceId === data.configuredDeviceId,
           );
+
+          // ต้องทั้งอยู่ในรายการ และเปิด stream ได้จริง (เหมือนในหน้าตั้งค่ากล้อง)
+          let found = inList;
+          if (inList) {
+            try {
+              const stream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: data.configuredDeviceId } },
+              });
+              stream.getTracks().forEach((t) => t.stop());
+            } catch {
+              found = false;
+            }
+          }
 
           (window as any).electron.ipcRenderer.sendMessage(
             'camera-availability-result',

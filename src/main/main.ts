@@ -2891,6 +2891,37 @@ ipcMain.on('camera-availability-result', async (event, result: {
   }
 });
 
+// หน้าตั้งค่ากล้องแจ้งว่าเข้าถึงกล้องไม่ได้ → อัปเดตสถานะให้กล่องดำแสดงไม่เชื่อมต่อ
+ipcMain.on('camera-access-failed', async () => {
+  try {
+    const config = await getCameraConfig();
+    if (!config) {
+      if (mainWindow) {
+        mainWindow.webContents.send('device-not-found', {
+          deviceType: 'camera',
+          deviceName: 'Webcam',
+        });
+      }
+      return;
+    }
+    const deviceName =
+      config.type === 'webcam' ? config.label : config.cameraName;
+    if (mainWindow) {
+      mainWindow.webContents.send('device-not-found', {
+        deviceType: 'camera',
+        deviceName,
+      });
+    }
+  } catch {
+    if (mainWindow) {
+      mainWindow.webContents.send('device-not-found', {
+        deviceType: 'camera',
+        deviceName: 'Webcam',
+      });
+    }
+  }
+});
+
 ipcMain.handle('save-camera-config', async (event, config: CameraConfig) => {
   try {
     const success = await saveCameraConfig(config);
