@@ -329,8 +329,8 @@ async function initializeApp() {
     sseClient.connect();
 
     // ตรวจสอบ devices ที่ตั้งค่าไว้ (camera/printer) หลังจาก init สำเร็จ
-    // เช็คซ้ำทุก 30 วินาที เพื่ออัปเดตกล่องสถานะเมื่อถอด/เสียบเครื่องปริ้นหรือกล้อง
-    const DEVICE_CHECK_INTERVAL_MS = 30 * 1000;
+    // เช็คซ้ำทุก 5 วินาที เพื่ออัปเดตกล่องสถานะเมื่อถอด/เสียบเครื่องปริ้นหรือกล้อง
+    const DEVICE_CHECK_INTERVAL_MS = 5 * 1000;
     if (mainWindow && !mainWindow.isDestroyed()) {
       const runCheck = async () => {
         try {
@@ -2880,6 +2880,12 @@ ipcMain.handle('get-printer-config', async () => {
 ipcMain.handle('save-printer-config', async (event, config: PrinterConfig) => {
   try {
     const success = await savePrinterConfig(config);
+    if (success && mainWindow && !mainWindow.isDestroyed()) {
+      // เช็คเครื่องปริ้นที่เพิ่งสลับไปทันที (มีสัญญาณหรือไม่) แล้วอัปเดตกล่องสถานะ
+      checkPrinter().catch((err) =>
+        console.warn('⚠️ [Main] checkPrinter after save failed:', err)
+      );
+    }
     return { success };
   } catch (error) {
     console.error('Error in save-printer-config handler:', error);
