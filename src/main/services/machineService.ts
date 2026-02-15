@@ -683,6 +683,23 @@ export class MachineService {
   }
 
   /**
+   * แจ้ง backend ว่ากำลังจะปิด (shutdown/ปิดแอป) เพื่อให้ mark offline + ส่ง Telegram ทันที
+   * เรียกก่อน sseClient.destroy() และ shutdown เพื่อให้แจ้งเตือนได้แม้ process ถูก kill เร็ว
+   */
+  async notifyGoingOffline(): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await this.makeRequest<{ success: boolean; message?: string }>(
+        '/api/machines-public/notify-going-offline',
+        'POST',
+      );
+      return response;
+    } catch (error) {
+      console.error('❌ [MachineService] Notify going offline failed:', error);
+      return { success: false, message: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
    * 7. POST /api/machines-public/paper-level
    * อัพเดท paper level ของ machine
    */

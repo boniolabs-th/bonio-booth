@@ -2845,12 +2845,13 @@ ipcMain.handle('get-resources-path', () => {
 });
 
 // Handler สำหรับปิดแอป (ต้องผ่าน password verification แล้ว)
-ipcMain.on('quit-app', () => {
-  // ตั้ง flag เพื่อบอกว่าเราต้องการปิดแอปจริงๆ
+ipcMain.on('quit-app', async () => {
   shouldQuit = true;
-  // ปิด window (จะไม่ถูก preventDefault เพราะ shouldQuit = true)
+  // แจ้ง backend ก่อน (mark offline + ส่ง Telegram) แล้วค่อยตัด SSE
+  await machineService.notifyGoingOffline().catch((err) => {
+    console.warn('[Main] Notify going offline failed:', err);
+  });
   sseClient.destroy();
-
   if (mainWindow) {
     mainWindow.close();
   }

@@ -5,8 +5,8 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-// import sseClient, { MachineEventType, ShutdownScheduledPayload, ShutdownImmediatePayload } from './sseClient';
 import sseClient, { MachineEventType } from './sseClient';
+import machineService from './machineService';
 
 const execAsync = promisify(exec);
 
@@ -373,12 +373,18 @@ export class ShutdownManager {
     this.callbacks.onShutdownStarting?.();
 
     try {
-      // ตัด SSE ก่อน เพื่อให้ backend รับรู้และส่ง noti "เครื่องออฟไลน์" ได้
+      // แจ้ง backend ก่อน (mark offline + ส่ง Telegram ทันที) — ไม่พึ่ง connection หลุด จึงแจ้งได้แม้ process ถูก kill เร็ว
+      console.log('📴 [ShutdownManager] Notifying backend (going offline)...');
+      await machineService.notifyGoingOffline().catch((err) => {
+        console.error('⚠️ [ShutdownManager] Notify going offline failed (continuing):', err);
+      });
+
+      // ตัด SSE
       console.log('🔌 [ShutdownManager] Disconnecting SSE before shutdown...');
       await sseClient.destroy();
 
-      // รอให้ backend รับ connection close + mark offline + ส่ง Telegram ก่อนปิดเครื่อง
-      console.log(`⏳ [ShutdownManager] Waiting ${POST_DESTROY_DELAY_SECONDS}s for backend to process...`);
+      // รอให้ TCP close ไปถึง backend (สำรอง)
+      console.log(`⏳ [ShutdownManager] Waiting ${POST_DESTROY_DELAY_SECONDS}s before shutdown...`);
       await new Promise((resolve) => setTimeout(resolve, POST_DESTROY_DELAY_SECONDS * 1000));
 
       const platform = process.platform;
