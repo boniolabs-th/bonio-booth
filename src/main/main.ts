@@ -1438,6 +1438,21 @@ app
   .catch(console.log);
 
   app.on('before-quit', async (event) => {
+    // แจ้ง backend ทันทีเมื่อจะปิด (รวมกรณี shutdown จาก OS / ปิดเครื่อง) — รอไม่เกิน 6 วินาที
+    const notifyTimeoutMs = 6000;
+    await Promise.race([
+      machineService.notifyGoingOffline(),
+      new Promise<void>((_, reject) => setTimeout(() => reject(new Error('timeout')), notifyTimeoutMs)),
+    ]).catch((err) => {
+      console.warn('[Main] Notify going offline (before-quit):', err?.message ?? err);
+    });
+    try {
+      sseClient.destroy();
+      log.info('[Main] SSE Client disconnected (before-quit)');
+    } catch (e) {
+      log.warn('[Main] SSE destroy in before-quit:', e);
+    }
+
     const pendingCount = await backgroundUploadService.getPendingCount();
 
     if (pendingCount > 0) {

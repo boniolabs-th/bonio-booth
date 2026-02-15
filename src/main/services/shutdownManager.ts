@@ -373,10 +373,18 @@ export class ShutdownManager {
     this.callbacks.onShutdownStarting?.();
 
     try {
-      // แจ้ง backend ก่อน (mark offline + ส่ง Telegram ทันที) — ไม่พึ่ง connection หลุด จึงแจ้งได้แม้ process ถูก kill เร็ว
+      // แจ้ง backend ก่อน (mark offline + ส่ง Telegram ทันที) — รอไม่เกิน 8 วินาที แล้วค่อยทำขั้นตอนถัดไป
+      const notifyTimeoutMs = 8000;
       console.log('📴 [ShutdownManager] Notifying backend (going offline)...');
-      await machineService.notifyGoingOffline().catch((err) => {
-        console.error('⚠️ [ShutdownManager] Notify going offline failed (continuing):', err);
+      await Promise.race([
+        machineService.notifyGoingOffline(),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('notify timeout')), notifyTimeoutMs),
+        ),
+      ]).then((res) => {
+        if (res?.success) console.log('✅ [ShutdownManager] Backend notified (going offline)');
+      }).catch((err) => {
+        console.error('⚠️ [ShutdownManager] Notify going offline failed (continuing):', err?.message ?? err);
       });
 
       // ตัด SSE
