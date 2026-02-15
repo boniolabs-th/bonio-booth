@@ -457,10 +457,13 @@ async function initializeApp() {
 
 
 
-// แจ้งเตือน device (กล้อง/เครื่องปริ้น) ไป backend — ใช้ครั้งแรกต่อ session + rate limit ตอนไม่พบ
+// แจ้งเตือน device (กล้อง/เครื่องปริ้น) ไป backend — ครั้งแรกต่อ session + แจ้งแบบ toggle (เฉพาะเมื่อสถานะเปลี่ยน)
 let hasSentStartupDeviceReport = false;
-const deviceAlertLastSent: Record<string, number> = {};
-const DEVICE_ALERT_RATE_LIMIT_MS = 2 * 1000; // 2 วินาที ต่อ device type
+/** สถานะล่าสุดที่รู้ของแต่ละ device — แจ้ง "ไม่พบ" เฉพาะเมื่อเปลี่ยนจาก found → not_found; หลังกลับมาเชื่อมต่อ (found) ถึงจะแจ้ง "ไม่พบ" ได้อีก */
+const lastDeviceState: Record<'camera' | 'printer', 'found' | 'not_found'> = {
+  camera: 'found',
+  printer: 'found',
+};
 
 function sendDeviceAlertToBackendIfAllowed(
   deviceType: 'camera' | 'printer',
@@ -468,17 +471,22 @@ function sendDeviceAlertToBackendIfAllowed(
   availableDevices?: string[],
 ): void {
   if (deviceName === 'No camera config' || deviceName === 'No printer config') return;
-  const key = deviceType;
-  if (Date.now() - (deviceAlertLastSent[key] || 0) < DEVICE_ALERT_RATE_LIMIT_MS) return;
-  deviceAlertLastSent[key] = Date.now();
+  // แจ้งเฉพาะเมื่อเพิ่งเปลี่ยนเป็น not_found (ถ้าแจ้งไปแล้วไม่แจ้งซ้ำจนกว่าจะกลับมาเชื่อมต่อ)
+  if (lastDeviceState[deviceType] === 'not_found') return;
+  lastDeviceState[deviceType] = 'not_found';
   machineService
     .sendDeviceAlert(deviceType, deviceName, availableDevices)
     .catch((err) => console.warn('⚠️ [Main] sendDeviceAlert failed:', err));
 }
 
+function setDeviceStateFound(deviceType: 'camera' | 'printer'): void {
+  lastDeviceState[deviceType] = 'found';
+}
+
 /**
  * ตรวจสอบว่า device (camera/printer) ที่เคยตั้งค่าไว้ยังมีอยู่หรือไม่
- * ถ้าไม่พบจะส่งแจ้งเตือนไปยัง Telegram (device-alert, rate limit 2 วินาที ต่อ type)
+ * ถ้าไม่พบจะส่งแจ้งเตือนไปยัง Telegram (device-alert) แบบ toggle — แจ้งครั้งเดียวเมื่อเปลี่ยนเป็น "ไม่พบ"
+ * จะแจ้งอีกครั้งได้ก็ต่อเมื่อ device กลับมาเชื่อมต่อก่อน แล้วหลุดอีก
  * ครั้งแรกที่เช็คหลังเปิดเครื่องจะส่ง device-status-report (เปิดเครื่องแล้ว – สถานะอุปกรณ์)
  */
 async function checkConfiguredDevices(): Promise<void> {
@@ -509,6 +517,10 @@ async function checkConfiguredDevices(): Promise<void> {
   // 2. เช็ค Printer (คืนค่าสถานะสำหรับรายงาน)
   const printerStatus = await checkPrinter();
 
+  // อัปเดตสถานะ "เชื่อมต่อแล้ว" เพื่อให้รอบถัดไปถ้าหลุดถึงจะแจ้ง noti ได้อีก (toggle)
+  if (cameraStatus?.found) setDeviceStateFound('camera');
+  if (printerStatus?.found) setDeviceStateFound('printer');
+
   // 3. ครั้งแรกหลังเปิดเครื่อง: ส่งรายงานสถานะไป backend → Telegram
   if (!hasSentStartupDeviceReport && cameraStatus && printerStatus) {
     hasSentStartupDeviceReport = true;
@@ -526,7 +538,7 @@ async function checkConfiguredDevices(): Promise<void> {
 type CameraStatusResult = { configured: boolean; found: boolean; deviceName?: string };
 
 /**
- * เช็ค Camera — คืนค่าสถานะสำหรับ device-status-report และยิง device-alert (rate limit) เมื่อไม่พบ
+ * เช็ค Camera — คืนค่าสถานะสำหรับ device-status-report และยิง device-alert (แบบ toggle) เมื่อไม่พบ
  */
 async function checkCamera(): Promise<CameraStatusResult | null> {
   try {
@@ -647,7 +659,7 @@ type PrinterStatusResult = {
 };
 
 /**
- * เช็ค Printer — คืนค่าสถานะสำหรับ device-status-report และยิง device-alert (rate limit) เมื่อไม่พบ
+ * เช็ค Printer — คืนค่าสถานะสำหรับ device-status-report และยิง device-alert (แบบ toggle) เมื่อไม่พบ
  */
 async function checkPrinter(): Promise<PrinterStatusResult | null> {
   try {
@@ -2864,6 +2876,7 @@ ipcMain.on('camera-availability-result', async (event, result: {
     sendDeviceAlertToBackendIfAllowed('camera', result.configuredLabel, result.availableDevices);
   } else {
     console.log(`✅ [Main] Configured camera found: ${result.configuredLabel}`);
+    setDeviceStateFound('camera');
   }
 });
 
