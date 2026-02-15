@@ -554,12 +554,6 @@ export class MachineService {
         isClosedAppReadyValue: isClosedAppReady,
       });
 
-      await sseClient.updateMachineInfo({
-        status: 'online',
-      });
-      console.log(
-        '⚠️ [MachineService] ⚠️⚠️⚠️ IMPORTANT: handleShutdownReady() MUST be called after this! ⚠️⚠️⚠️',
-      );
       return { ...response, isShutdownReady, isClosedAppReady };
     } catch (error) {
       console.error('❌ [MachineService] Init failed:', error);

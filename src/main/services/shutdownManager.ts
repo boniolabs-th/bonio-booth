@@ -31,7 +31,7 @@ export interface ShutdownManagerCallbacks {
 
 // ค่า default
 const DEFAULT_COUNTDOWN_MINUTES = 2;
-const SHUTDOWN_NOTIFY_SECONDS = 5; // แจ้ง backend 5 วินาทีก่อน shutdown
+const SHUTDOWN_DELAY_SECONDS = 2; // รอให้ SSE disconnect ก่อน shutdown OS
 
 export class ShutdownManager {
   private state: ShutdownState = {
@@ -44,7 +44,6 @@ export class ShutdownManager {
   private countdownTimer: NodeJS.Timeout | null = null;
   private callbacks: ShutdownManagerCallbacks = {};
   private isInTransaction: boolean = false;
-  private hasNotifiedBackend: boolean = false;
 
   constructor() {
     console.log('🔧 [ShutdownManager] Initialized');
@@ -122,7 +121,6 @@ export class ShutdownManager {
       reason,
       scheduledAt: new Date(),
     };
-    this.hasNotifiedBackend = false;
 
     // ถ้าอยู่ใน transaction ให้ pause ไว้ก่อน
     if (this.isInTransaction) {
@@ -193,12 +191,6 @@ export class ShutdownManager {
       }
       this.callbacks.onCountdownUpdate?.(this.state);
 
-      // แจ้ง backend 5 วินาทีก่อน shutdown
-      if (this.state.remainingSeconds === SHUTDOWN_NOTIFY_SECONDS && !this.hasNotifiedBackend) {
-        console.log('📤 [ShutdownManager] Notifying backend: shutdown ready');
-        this.notifyShutdownReady();
-      }
-
       // เวลาหมด - shutdown
       if (this.state.remainingSeconds <= 0) {
         console.log('⏰ [ShutdownManager] Countdown finished, executing shutdown');
@@ -229,7 +221,6 @@ export class ShutdownManager {
       remainingSeconds: 0,
       totalSeconds: 0,
     };
-    this.hasNotifiedBackend = false;
 
     const stateAfter = {
       isScheduled: this.state.isScheduled,
@@ -269,7 +260,6 @@ export class ShutdownManager {
 
     // Reset เป็น totalSeconds ใหม่ (ไม่ใช่ 10 นาที แต่ใช้ totalSeconds ที่ตั้งไว้)
     this.state.remainingSeconds = this.state.totalSeconds;
-    this.hasNotifiedBackend = false;
 
     console.log('👆 [ShutdownManager] After reset:', {
       remainingSeconds: this.state.remainingSeconds,
@@ -313,7 +303,6 @@ export class ShutdownManager {
       this.state.isPaused = false;
       this.state.remainingSeconds = DEFAULT_COUNTDOWN_MINUTES * 60;
       this.state.totalSeconds = DEFAULT_COUNTDOWN_MINUTES * 60;
-      this.hasNotifiedBackend = false;
       this.clearCountdownTimer();
       this.startCountdownTimer();
       this.callbacks.onCountdownUpdate?.(this.state);
@@ -357,7 +346,6 @@ export class ShutdownManager {
       this.state.isPaused = false;
       this.state.remainingSeconds = DEFAULT_COUNTDOWN_MINUTES * 60;
       this.state.totalSeconds = DEFAULT_COUNTDOWN_MINUTES * 60;
-      this.hasNotifiedBackend = false;
 
       console.log('▶️ [ShutdownManager] Starting countdown timer after transaction ended');
       this.startCountdownTimer();
@@ -365,23 +353,6 @@ export class ShutdownManager {
       console.log('✅ [ShutdownManager] Countdown resumed after transaction');
     } else {
       console.log('ℹ️ [ShutdownManager] No scheduled shutdown, nothing to resume');
-    }
-  }
-
-  /**
-   * แจ้ง backend ว่าพร้อม shutdown
-   */
-  private async notifyShutdownReady(): Promise<void> {
-    if (this.hasNotifiedBackend) return;
-
-    this.hasNotifiedBackend = true;
-    this.callbacks.onShutdownStarting?.();
-
-    try {
-      await sseClient.notifyShutdownReady();
-      console.log('✅ [ShutdownManager] Backend notified successfully');
-    } catch (error) {
-      console.error('❌ [ShutdownManager] Failed to notify backend:', error);
     }
   }
 
@@ -394,22 +365,15 @@ export class ShutdownManager {
       isScheduled: this.state.isScheduled,
       isPaused: this.state.isPaused,
       remainingSeconds: this.state.remainingSeconds,
-      hasNotifiedBackend: this.hasNotifiedBackend,
     };
     this.log('error', '🛑 State', state);
 
     this.clearCountdownTimer();
     this.callbacks.onShutdownStarting?.();
 
-    // แจ้ง backend ก่อน (ถ้ายังไม่ได้แจ้ง)
-    if (!this.hasNotifiedBackend) {
-      console.log('📤 [ShutdownManager] Notifying backend before shutdown...');
-      await this.notifyShutdownReady();
-    }
-
-    // รอ 5 วินาทีให้ backend ปิด smart plug
-    console.log('⏳ [ShutdownManager] Waiting 5 seconds for backend to turn off smart plug...');
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    // รอให้ SSE disconnect ก่อน shutdown OS
+    console.log(`⏳ [ShutdownManager] Waiting ${SHUTDOWN_DELAY_SECONDS}s before shutdown...`);
+    await new Promise((resolve) => setTimeout(resolve, SHUTDOWN_DELAY_SECONDS * 1000));
 
     // Shutdown OS
     try {
