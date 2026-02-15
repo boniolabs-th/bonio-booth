@@ -2,7 +2,7 @@
 /* eslint no-unused-vars: off */
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
-export type Channels = 'ipc-example' | 'print-photo' | 'print-response' | 'theme-loaded' | 'machine-init' | 'navigate-to' | 'show-print-test-password-modal' | 'show-quit-app-password-modal' | 'show-clear-config-password-modal' | 'show-camera-config-modal' | 'show-printer-config-modal' | 'quit-app' | 'sse-connected' | 'sse-disconnected' | 'sse-status-502' | 'shutdown-log' | 'shutdown-countdown-update' | 'shutdown-starting' | 'shutdown-cancelled' | 'shutdown-countdown-reset' | 'app-close-countdown-update' | 'app-close-starting' | 'app-close-cancelled' | 'app-close-countdown-reset' | 'home-page-active' | 'home-page-inactive' | 'check-camera-availability' | 'camera-availability-result' | 'webcam-instant-status' | 'device-not-found' | 'all-devices-found' | 'get-machine-data' | 'native-camera-frame' | 'route-changed';
+export type Channels = 'ipc-example' | 'print-photo' | 'print-response' | 'theme-loaded' | 'machine-init' | 'navigate-to' | 'show-print-test-password-modal' | 'show-quit-app-password-modal' | 'show-clear-config-password-modal' | 'show-camera-config-modal' | 'show-printer-config-modal' | 'quit-app' | 'sse-connected' | 'sse-disconnected' | 'sse-status-502' | 'shutdown-log' | 'shutdown-countdown-update' | 'shutdown-starting' | 'shutdown-cancelled' | 'shutdown-countdown-reset' | 'app-close-countdown-update' | 'app-close-starting' | 'app-close-cancelled' | 'app-close-countdown-reset' | 'home-page-active' | 'home-page-inactive' | 'check-camera-availability' | 'camera-availability-result' | 'webcam-instant-status' | 'device-not-found' | 'device-status' | 'all-devices-found' | 'get-machine-data' | 'native-camera-frame' | 'route-changed';
 
 const electronHandler = {
   ipcRenderer: {
@@ -494,6 +494,17 @@ const electronHandler = {
   // Route tracking for device check
   sendRouteChange: (route: string) => {
     ipcRenderer.send('route-changed', route);
+  },
+
+  /**
+   * [DEV] แสดงหน้า maintenance แบบจำลอง (เมื่อไม่พบ camera หรือ printer)
+   * ใช้สำหรับพัฒนา: เปิด DevTools (F12) แล้วรันใน Console
+   * @example await window.electron.dev.showMaintenance('camera')
+   * @example await window.electron.dev.showMaintenance('printer')
+   */
+  dev: {
+    showMaintenance: (deviceType: 'camera' | 'printer') =>
+      ipcRenderer.invoke('dev:show-maintenance', deviceType),
   },
 };
 
