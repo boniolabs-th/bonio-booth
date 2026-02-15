@@ -54,6 +54,9 @@ export class SseClient {
   private readonly DEFAULT_MAX_BUFFER_SIZE = 1 * 1024 * 1024; // 1MB
   private maxBufferSize: number = this.DEFAULT_MAX_BUFFER_SIZE;
 
+  /** หลัง destroy() แล้ว เรียก destroy() ซ้ำจะไม่ทำอะไร (idempotent) */
+  private isDestroyed: boolean = false;
+
   constructor(options?: { apiBaseUrl?: string; machineId?: string }) {
     this.apiBaseUrl = options?.apiBaseUrl ? options.apiBaseUrl : '';
     this.machineId = options?.machineId
@@ -99,53 +102,6 @@ export class SseClient {
 
   setOnStatus502Callback(callback: () => void): void {
     this.onStatus502Callback = callback;
-  }
-
-  async updateMachineInfo(payload: any): Promise<void> {
-    try {
-      const url = new URL(`${this.apiBaseUrl}/api/machines/${this.machineId}`);
-      const protocol = url.protocol === 'https:' ? https : http;
-
-      console.log('payload updateMachineInfo', payload);
-
-      const postData = JSON.stringify(payload);
-
-      const options: https.RequestOptions = {
-        hostname: url.hostname,
-        port: url.port || (url.protocol === 'https:' ? 443 : 80),
-        path: url.pathname,
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(postData),
-        },
-      };
-
-      await new Promise<void>((resolve, reject) => {
-        const req = protocol.request(options, (res) => {
-          let data = '';
-
-          res.on('data', (chunk) => {
-            data += chunk;
-          });
-
-          res.on('end', () => {
-            console.log('📤 [SseClient] Machine set offline:', data);
-            resolve();
-          });
-        });
-
-        req.on('error', (err) => {
-          console.error('❌ [SseClient] Failed to set offline:', err);
-          reject(err);
-        });
-
-        req.write(postData);
-        req.end();
-      });
-    } catch (error) {
-      console.error('❌ [SseClient] notifyOffline error:', error);
-    }
   }
 
   connect(): void {
@@ -232,7 +188,7 @@ export class SseClient {
         this.isConnectedFlag = true;
         this.reconnectAttempts = 0;
 
-        this.updateMachineInfo({ status: 'online' });
+        // สถานะ online อัปเดตโดย backend ผ่าน cron (MachineStatusCheckerService) เมื่อเห็น SSE connection
 
         // ⭐ เริ่ม heartbeat monitoring
         this.startHeartbeatMonitoring();
@@ -307,7 +263,6 @@ export class SseClient {
       this.request.end();
     } catch (error) {
       console.error('❌ [SseClient] Failed to create connection:', error);
-      // this.updateMachineInfo({ status: 'offline' });
       this.isConnecting = false;
       this.clearConnectionTimeout();
 
@@ -577,77 +532,16 @@ export class SseClient {
     return this.machineId;
   }
 
-  async notifyShutdownReady(): Promise<{ success: boolean; message: string }> {
-    return new Promise((resolve) => {
-      try {
-        const url = new URL(
-          `${this.apiBaseUrl}/api/machines/${this.machineId}/shutdown/ready`,
-        );
-        const protocol = url.protocol === 'https:' ? https : http;
-
-        const postData = JSON.stringify({ machineId: this.machineId });
-
-        const options: https.RequestOptions = {
-          hostname: url.hostname,
-          port: url.port || (url.protocol === 'https:' ? 443 : 80),
-          path: url.pathname,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(postData),
-          },
-        };
-
-        const req = protocol.request(options, (res) => {
-          let data = '';
-
-          res.on('data', (chunk) => {
-            data += chunk;
-          });
-
-          res.on('end', () => {
-            try {
-              const result = JSON.parse(data);
-              console.log(
-                '📤 [SseClient] Shutdown ready notification sent:',
-                result,
-              );
-              resolve(result);
-            } catch {
-              resolve({ success: false, message: 'Failed to parse response' });
-            }
-          });
-        });
-
-        req.on('error', (error) => {
-          console.error(
-            '❌ [SseClient] Failed to notify shutdown ready:',
-            error,
-          );
-          resolve({
-            success: false,
-            message: error.message,
-          });
-        });
-
-        req.write(postData);
-        req.end();
-      } catch (error) {
-        console.error('❌ [SseClient] Failed to notify shutdown ready:', error);
-        resolve({
-          success: false,
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    });
-  }
-
   /**
    * ⭐ Cleanup method - เรียกเมื่อปิดแอป
+   * Idempotent: เรียกซ้ำหลายจุด (close, closed, window-all-closed) ได้โดยปลอดภัย
    */
   async destroy(): Promise<void> {
+    if (this.isDestroyed) {
+      return;
+    }
+    this.isDestroyed = true;
     console.log('🗑️ [SseClient] Destroying instance...');
-    // await this.updateMachineInfo({ status: 'offline' });
     this.disconnect();
     this.eventCallbacks.clear();
     console.log('✅ [SseClient] Instance destroyed');

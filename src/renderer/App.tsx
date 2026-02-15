@@ -81,6 +81,15 @@ function MaintenanceListener() {
     message: '',
   });
 
+  // ✅ Device status log (กล่องดำ แสดงสถานะกล้อง/เครื่องปริ้น)
+  const [deviceLog, setDeviceLog] = useState<{
+    camera: { status: 'unknown' | 'found' | 'not-found'; name?: string };
+    printer: { status: 'unknown' | 'found' | 'not-found'; name?: string };
+  }>({
+    camera: { status: 'unknown' },
+    printer: { status: 'unknown' },
+  });
+
   const showAlert = (
     title: string,
     message: string,
@@ -227,9 +236,22 @@ function MaintenanceListener() {
             (device) => device.kind === 'videoinput',
           );
 
-          const found = videoDevices.some(
+          const inList = videoDevices.some(
             (d) => d.deviceId === data.configuredDeviceId,
           );
+
+          // ต้องทั้งอยู่ในรายการ และเปิด stream ได้จริง (เหมือนในหน้าตั้งค่ากล้อง)
+          let found = inList;
+          if (inList) {
+            try {
+              const stream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: data.configuredDeviceId } },
+              });
+              stream.getTracks().forEach((t) => t.stop());
+            } catch {
+              found = false;
+            }
+          }
 
           (window as any).electron.ipcRenderer.sendMessage(
             'camera-availability-result',
@@ -257,8 +279,14 @@ function MaintenanceListener() {
     const unsubscribeDeviceNotFound = (window as any).electron.ipcRenderer.on(
       'device-not-found',
       (data: { deviceType: 'camera' | 'printer'; deviceName: string }) => {
+        setDeviceLog((prev) => ({
+          ...prev,
+          [data.deviceType]: {
+            status: 'not-found',
+            name: data.deviceName,
+          },
+        }));
         const currentPath = location.pathname;
-        // Don't interrupt normal user flow (photo capture, payment, etc.)
         const isInNormalFlow = [
           '/select-print',
           '/discount-coupon',
@@ -285,12 +313,21 @@ function MaintenanceListener() {
         }
       },
     );
-    // all-devices-found: ส่งเมื่อทุกอุปกรณ์ OK (camera + printer ทั้งหมด)
-    // ใช้แทน device-found เดิมที่ส่งแยกต่ออุปกรณ์ ป้องกันปัญหา device-found จาก printer ยกเลิก device-not-found จาก camera
+
+    const unsubscribeDeviceStatus = (window as any).electron.ipcRenderer.on(
+      'device-status',
+      (data: { deviceType: 'camera' | 'printer'; status: 'found' }) => {
+        if (data.status === 'found') {
+          setDeviceLog((prev) => ({
+            ...prev,
+            [data.deviceType]: { status: 'found' },
+          }));
+        }
+      },
+    );
     const unsubscribeAllDevicesFound = (window as any).electron.ipcRenderer.on(
       'all-devices-found',
       () => {
-        // Navigate to home only if we're in maintenance or out-of-paper pages
         const currentPath = location.pathname;
         if (
           currentPath === '/system-maintenance' ||
@@ -354,6 +391,7 @@ function MaintenanceListener() {
       unsubscribeSse502();
       unsubscribeCameraCheck();
       unsubscribeDeviceNotFound();
+      unsubscribeDeviceStatus();
       unsubscribeAllDevicesFound();
       navigator.mediaDevices.removeEventListener(
         'devicechange',
@@ -361,6 +399,22 @@ function MaintenanceListener() {
       );
     };
   }, [navigate, location.pathname]);
+
+  // เมื่อทั้งกล้องและเครื่องปริ้นเชื่อมต่อแล้ว และอยู่ที่หน้า maintenance/out-of-paper -> กลับหน้าแรก
+  useEffect(() => {
+    if (
+      deviceLog.camera.status === 'found' &&
+      deviceLog.printer.status === 'found'
+    ) {
+      const currentPath = location.pathname;
+      if (
+        currentPath === '/system-maintenance' ||
+        currentPath === '/out-of-paper'
+      ) {
+        navigate('/');
+      }
+    }
+  }, [deviceLog.camera.status, deviceLog.printer.status, location.pathname, navigate]);
 
   // ---------------- PASSWORD HANDLERS ----------------
 
@@ -426,6 +480,32 @@ function MaintenanceListener() {
 
   return (
     <>
+      {/* Device status log - กล่องดำ สีแดงเมื่อไม่พบ / สีเขียวเมื่อเชื่อมต่อ */}
+      <div className="device-status-log">
+        <div
+          className={
+            deviceLog.camera.status === 'found'
+              ? 'device-status-log__line device-status-log__line--found'
+              : deviceLog.camera.status === 'not-found'
+                ? 'device-status-log__line device-status-log__line--not-found'
+                : 'device-status-log__line device-status-log__line--unknown'
+          }
+        >
+          กล้อง: {deviceLog.camera.status === 'found' ? 'เชื่อมต่อแล้ว' : deviceLog.camera.status === 'not-found' ? `ไม่พบ${deviceLog.camera.name ? ` (${deviceLog.camera.name})` : ''}` : '-'}
+        </div>
+        <div
+          className={
+            deviceLog.printer.status === 'found'
+              ? 'device-status-log__line device-status-log__line--found'
+              : deviceLog.printer.status === 'not-found'
+                ? 'device-status-log__line device-status-log__line--not-found'
+                : 'device-status-log__line device-status-log__line--unknown'
+          }
+        >
+          เครื่องปริ้น (ที่ตั้งค่าในระบบ): {deviceLog.printer.status === 'found' ? 'มีสัญญาณ' : deviceLog.printer.status === 'not-found' ? `ไม่มีสัญญาณ${deviceLog.printer.name ? ` (${deviceLog.printer.name})` : ''}` : '-'}
+        </div>
+      </div>
+
       {/* PASSWORD MODALS */}
       <PasswordModal
         isOpen={showPasswordModal}

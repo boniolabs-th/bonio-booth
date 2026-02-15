@@ -4,10 +4,18 @@ import './PrinterConfigModal.css';
 type PaperSize = '2x6' | '6x4';
 type TabType = 'main' | 'secondary';
 
+// Windows: PRINTER_STATUS_OFFLINE = 0x400 (1024) — เครื่องที่ถอดปลั๊กยังอาจโผล่ในรายการ แต่ status จะเป็น offline
+const PRINTER_STATUS_OFFLINE = 0x400;
+function isPrinterAvailable(p: PrinterDevice): boolean {
+  if (p.status === undefined) return true; // ไม่มี status (เช่น macOS) ถือว่าพร้อม
+  return (p.status & PRINTER_STATUS_OFFLINE) === 0;
+}
+
 interface PrinterDevice {
   name: string;
   displayName: string;
   isDefault: boolean;
+  status?: number;
 }
 
 interface SinglePrinterConfig {
@@ -73,6 +81,7 @@ export default function PrinterConfigModal({
             name: p.name,
             displayName: p.displayName || p.name,
             isDefault: p.isDefault || false,
+            status: p.status,
           }),
         );
         setPrinters(printerList);
@@ -89,15 +98,16 @@ export default function PrinterConfigModal({
           setMainPaperSize(config.main.paperSize || '6x4');
           setMainCanCut(config.main.canCut ?? true);
 
-          // เช็คว่า main printer ที่ตั้งค่าไว้ยังอยู่หรือไม่
-          const mainFound = printerList.some(
-            (p) => p.name === config.main.printerName
-          );
-          if (!mainFound) {
+          // เช็คว่า main printer ที่ตั้งค่าไว้ยังอยู่และมีสัญญาณ (ไม่ offline/ถอดปลั๊ก) หรือไม่
+          const mainEntry = printerList.find((p) => p.name === config.main.printerName);
+          const mainConnected = mainEntry && isPrinterAvailable(mainEntry);
+          if (!mainConnected) {
             setMainPrinterDisconnected(true);
-            console.warn(
-              `⚠️ [PrinterConfig] Main printer disconnected: ${config.main.printerName}`,
-            );
+            if (!mainEntry) {
+              console.warn(`⚠️ [PrinterConfig] Main printer not in list: ${config.main.printerName}`);
+            } else {
+              console.warn(`⚠️ [PrinterConfig] Main printer offline/unplugged: ${config.main.printerName}`);
+            }
           } else {
             setMainPrinterDisconnected(false);
           }
@@ -108,15 +118,16 @@ export default function PrinterConfigModal({
             setSecondaryPaperSize(config.secondary.paperSize || '6x4');
             setSecondaryCanCut(config.secondary.canCut ?? true);
 
-            // เช็คว่า secondary printer ยังอยู่หรือไม่
-            const secondaryFound = printerList.some(
-              (p) => p.name === config.secondary!.printerName
-            );
-            if (!secondaryFound) {
+            // เช็คว่า secondary printer ยังอยู่และมีสัญญาณหรือไม่
+            const secondaryEntry = printerList.find((p) => p.name === config.secondary!.printerName);
+            const secondaryConnected = secondaryEntry && isPrinterAvailable(secondaryEntry);
+            if (!secondaryConnected) {
               setSecondaryPrinterDisconnected(true);
-              console.warn(
-                `⚠️ [PrinterConfig] Secondary printer disconnected: ${config.secondary.printerName}`,
-              );
+              if (!secondaryEntry) {
+                console.warn(`⚠️ [PrinterConfig] Secondary printer not in list: ${config.secondary.printerName}`);
+              } else {
+                console.warn(`⚠️ [PrinterConfig] Secondary printer offline/unplugged: ${config.secondary.printerName}`);
+              }
             } else {
               setSecondaryPrinterDisconnected(false);
             }
@@ -264,13 +275,17 @@ export default function PrinterConfigModal({
                     disabled={isSaving}
                   >
                     <option value="">-- เลือกเครื่องปริ้น --</option>
-                    {printers.map((printer) => (
-                      <option key={printer.name} value={printer.name}>
-                        {printer.displayName}
-                        {printer.isDefault ? ' (Default)' : ''}
-                        {currentConfig?.main?.printerName === printer.name ? ' ✓' : ''}
-                      </option>
-                    ))}
+                    {printers.map((printer) => {
+                      const isConfigured = currentConfig?.main?.printerName === printer.name;
+                      const hasSignal = isPrinterAvailable(printer);
+                      return (
+                        <option key={printer.name} value={printer.name}>
+                          {printer.displayName}
+                          {printer.isDefault ? ' (Default)' : ''}
+                          {isConfigured && hasSignal ? ' ✓' : isConfigured && !hasSignal ? ' — ไม่มีสัญญาณ' : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -341,13 +356,17 @@ export default function PrinterConfigModal({
                     <option value="">-- เลือกเครื่องปริ้น --</option>
                     {printers
                       .filter((p) => p.name !== mainPrinterName)
-                      .map((printer) => (
-                        <option key={printer.name} value={printer.name}>
-                          {printer.displayName}
-                          {printer.isDefault ? ' (Default)' : ''}
-                          {currentConfig?.secondary?.printerName === printer.name ? ' ✓' : ''}
-                        </option>
-                      ))}
+                      .map((printer) => {
+                        const isConfigured = currentConfig?.secondary?.printerName === printer.name;
+                        const hasSignal = isPrinterAvailable(printer);
+                        return (
+                          <option key={printer.name} value={printer.name}>
+                            {printer.displayName}
+                            {printer.isDefault ? ' (Default)' : ''}
+                            {isConfigured && hasSignal ? ' ✓' : isConfigured && !hasSignal ? ' — ไม่มีสัญญาณ' : ''}
+                          </option>
+                        );
+                      })}
                   </select>
                 </div>
 

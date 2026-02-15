@@ -554,12 +554,6 @@ export class MachineService {
         isClosedAppReadyValue: isClosedAppReady,
       });
 
-      await sseClient.updateMachineInfo({
-        status: 'online',
-      });
-      console.log(
-        '⚠️ [MachineService] ⚠️⚠️⚠️ IMPORTANT: handleShutdownReady() MUST be called after this! ⚠️⚠️⚠️',
-      );
       return { ...response, isShutdownReady, isClosedAppReady };
     } catch (error) {
       console.error('❌ [MachineService] Init failed:', error);
@@ -1494,6 +1488,68 @@ export class MachineService {
     } catch (error) {
       console.error('❌ [MachineService] Send device alert failed:', error);
       // Don't throw - just log and return failure
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        notificationSent: false,
+      };
+    }
+  }
+
+  /**
+   * ส่งรายงานสถานะกล้องและเครื่องปริ้นไป backend (แจ้ง Telegram ตอนเปิดเครื่องหรืออัปเดตสถานะ)
+   */
+  async sendDeviceStatusReport(payload: {
+    isStartup: boolean;
+    camera: { configured: boolean; found: boolean; deviceName?: string };
+    printer: {
+      configured: boolean;
+      found: boolean;
+      deviceDetail?: string;
+      availablePrinterNames?: string[];
+    };
+  }): Promise<{ success: boolean; message: string; notificationSent: boolean }> {
+    try {
+      const result = await this.makeRequest<{
+        success: boolean;
+        message: string;
+        notificationSent: boolean;
+      }>('/api/machines-public/device-status-report', 'POST', payload);
+
+      console.log(
+        `✅ [MachineService] Device status report sent (isStartup: ${payload.isStartup})`,
+      );
+      return result;
+    } catch (error) {
+      console.error('❌ [MachineService] Send device status report failed:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        notificationSent: false,
+      };
+    }
+  }
+
+  /**
+   * แจ้งเตือนเมื่อ device (กล้อง/เครื่องปริ้น) กลับมาเชื่อมต่อแล้ว
+   */
+  async sendDeviceReconnected(
+    deviceType: 'camera' | 'printer',
+    deviceName?: string,
+  ): Promise<{ success: boolean; message: string; notificationSent: boolean }> {
+    try {
+      const result = await this.makeRequest<{
+        success: boolean;
+        message: string;
+        notificationSent: boolean;
+      }>('/api/machines-public/device-reconnected', 'POST', { deviceType, deviceName });
+
+      console.log(
+        `✅ [MachineService] Device reconnected sent: ${deviceType}${deviceName ? ` (${deviceName})` : ''}`,
+      );
+      return result;
+    } catch (error) {
+      console.error('❌ [MachineService] Send device reconnected failed:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Unknown error',

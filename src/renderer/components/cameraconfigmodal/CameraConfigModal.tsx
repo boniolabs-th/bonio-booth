@@ -104,6 +104,9 @@ export default function CameraConfigModal({
           );
           if (!configuredFound) {
             setWebcamDisconnected(true);
+            (window as any).electron?.ipcRenderer?.sendMessage?.(
+              'camera-access-failed',
+            );
             console.warn(
               `⚠️ [CameraConfig] Configured webcam disconnected: ${configResult.config.label}`,
             );
@@ -123,6 +126,7 @@ export default function CameraConfigModal({
       } else {
         setWebcamError('ไม่สามารถเข้าถึงกล้องได้');
       }
+      (window as any).electron?.ipcRenderer?.sendMessage?.('camera-access-failed');
     }
   }, []);
 
@@ -135,6 +139,7 @@ export default function CameraConfigModal({
       if (!deviceId) return;
 
       try {
+        setWebcamError('');
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { deviceId: { exact: deviceId } },
         });
@@ -144,6 +149,10 @@ export default function CameraConfigModal({
         }
       } catch (err) {
         console.error('Failed to start webcam preview:', err);
+        setWebcamError('ไม่สามารถเข้าถึงกล้องได้');
+        (window as any).electron?.ipcRenderer?.sendMessage?.(
+          'camera-access-failed',
+        );
       }
     },
     [previewStream],

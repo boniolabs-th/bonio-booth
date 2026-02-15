@@ -10,15 +10,7 @@
  */
 
 import path from 'path';
-import {
-  app,
-  BrowserWindow,
-  shell,
-  ipcMain,
-  session,
-  powerSaveBlocker,
-  dialog,
-} from 'electron';
+import { app, BrowserWindow, shell, ipcMain, session, powerSaveBlocker, dialog } from 'electron';
 import { promises as fs } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -75,11 +67,7 @@ import { backgroundUploadService } from './services/backgroundUploadService';
 import sseClient, { MachineEventType } from './services/sseClient';
 import shutdownManager, { ShutdownState } from './services/shutdownManager';
 import appCloseManager, { AppCloseState } from './services/appCloseManager';
-import {
-  getEnvConfig,
-  clearEnvConfigCache,
-  DEFAULT_PORT,
-} from './config/env.config';
+import { getEnvConfig, clearEnvConfigCache, DEFAULT_PORT } from './config/env.config';
 import {
   getMachineConfig,
   saveMachineConfig,
@@ -110,12 +98,9 @@ import {
   registerCanonCameraIpcHandlers,
   terminateCanonSdk,
   setMainWindow as setCanonMainWindow,
-} from './services/canonCameraService';
-import {
-  registerCanonCameraV2IpcHandlers,
   isCameraConnected as isCanonCameraConnected,
-  isCanonSdkInitialized,
-} from './services/canonCameraServiceV2';
+} from './services/canonCameraService';
+import { registerCanonCameraV2IpcHandlers } from './services/canonCameraServiceV2';
 import {
   getPrinterConfig,
   savePrinterConfig,
@@ -135,58 +120,46 @@ class AppUpdater {
 
     // Events
     autoUpdater.on('error', (error) => {
-      dialog.showErrorBox(
-        'Update Error',
-        error == null ? 'unknown' : (error.stack || error).toString(),
-      );
+      dialog.showErrorBox('Update Error', error == null ? "unknown" : (error.stack || error).toString());
     });
 
     autoUpdater.on('update-available', (info) => {
-      dialog
-        .showMessageBox({
-          type: 'info',
-          title: 'Found Updates',
-          message:
-            'New version available: ' +
-            info.version +
-            '.\nDo you want to download it now?',
-          buttons: ['Yes', 'No'],
-        })
-        .then((result) => {
-          if (result.response === 0) {
-            autoUpdater.downloadUpdate();
-          }
-        });
-    });
-
-    autoUpdater.on('update-not-available', (info) => {
       dialog.showMessageBox({
-        title: 'No Updates',
-        message: 'Current version is up-to-date.',
-        buttons: ['OK'],
+        type: 'info',
+        title: 'Found Updates',
+        message: 'New version available: ' + info.version + '.\nDo you want to download it now?',
+        buttons: ['Yes', 'No']
+      }).then((result) => {
+        if (result.response === 0) {
+          autoUpdater.downloadUpdate();
+        }
       });
     });
 
+    autoUpdater.on('update-not-available', (info) => {
+       dialog.showMessageBox({
+        title: 'No Updates',
+        message: 'Current version is up-to-date.',
+        buttons: ['OK']
+       });
+    });
+
     autoUpdater.on('download-progress', (progressObj) => {
-      // Optional: Show progress?
-      // For now, let's just log it. A modal progress bar would be nice but simple dialog is requested.
-      log.info(
-        `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}%`,
-      );
+       // Optional: Show progress?
+       // For now, let's just log it. A modal progress bar would be nice but simple dialog is requested.
+       log.info(`Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}%`);
     });
 
     autoUpdater.on('update-downloaded', (info) => {
-      dialog
-        .showMessageBox({
-          title: 'Install Updates',
-          message: 'Updates downloaded, application will be quit for update...',
-          buttons: ['Update Now', 'Later'],
-        })
-        .then((result) => {
-          if (result.response === 0) {
-            autoUpdater.quitAndInstall();
-          }
-        });
+      dialog.showMessageBox({
+        title: 'Install Updates',
+        message: 'Updates downloaded, application will be quit for update...',
+        buttons: ['Update Now', 'Later']
+      }).then((result) => {
+        if (result.response === 0) {
+          autoUpdater.quitAndInstall();
+        }
+      });
     });
   }
 }
@@ -199,6 +172,7 @@ let isHandlingShutdownReady = false;
  * Helper function สำหรับเช็คและจัดการ isShutdownReady หลังจากเรียก init()
  */
 function handleShutdownReady(initResponse: any): void {
+
   if (isHandlingShutdownReady) {
     console.log('⚠️ [Main] Already handling shutdown ready, skipping');
     return;
@@ -208,18 +182,9 @@ function handleShutdownReady(initResponse: any): void {
 
   try {
     // ส่ง log ไปที่ renderer
-    const sendLog = (
-      level: 'log' | 'warn' | 'error',
-      message: string,
-      data?: any,
-    ) => {
+    const sendLog = (level: 'log' | 'warn' | 'error', message: string, data?: any) => {
       if (mainWindow) {
-        mainWindow.webContents.send('shutdown-log', {
-          level,
-          message,
-          data,
-          timestamp: new Date().toISOString(),
-        });
+        mainWindow.webContents.send('shutdown-log', { level, message, data, timestamp: new Date().toISOString() });
       }
     };
 
@@ -227,47 +192,32 @@ function handleShutdownReady(initResponse: any): void {
     console.log('isClosedAppReady', initResponse?.isClosedAppReady);
 
     // ดึง isShutdownReady โดยเช็คทั้ง undefined, null, false
-    const isShutdownReady =
-      (initResponse as any)?.isShutdownReady ?? initResponse?.isShutdownReady;
-    const isShutdownReadyBool =
-      isShutdownReady === true || isShutdownReady === 'true';
+    const isShutdownReady = (initResponse as any)?.isShutdownReady ?? initResponse?.isShutdownReady;
+    const isShutdownReadyBool = isShutdownReady === true || isShutdownReady === 'true';
 
     // ดึง isClosedAppReady
-    const isClosedAppReady =
-      (initResponse as any)?.isClosedAppReady ?? initResponse?.isClosedAppReady;
-    const isClosedAppReadyBool =
-      isClosedAppReady === true || isClosedAppReady === 'true';
+    const isClosedAppReady = (initResponse as any)?.isClosedAppReady ?? initResponse?.isClosedAppReady;
+    const isClosedAppReadyBool = isClosedAppReady === true || isClosedAppReady === 'true';
 
     // Log ทุกครั้งที่ function ถูกเรียก (สำคัญมาก!)
     console.log('🔍 [Main] ========== HANDLING SHUTDOWN READY ==========');
     console.log('🔍 [Main] isShutdownReady from init (raw):', isShutdownReady);
     console.log('🔍 [Main] isShutdownReady (boolean):', isShutdownReadyBool);
-    console.log(
-      '🔍 [Main] isClosedAppReady from init (raw):',
-      isClosedAppReady,
-    );
+    console.log('🔍 [Main] isClosedAppReady from init (raw):', isClosedAppReady);
     console.log('🔍 [Main] isClosedAppReady (boolean):', isClosedAppReadyBool);
-    console.log(
-      '🔍 [Main] Current shutdown state BEFORE:',
-      shutdownManager.getState(),
-    );
+    console.log('🔍 [Main] Current shutdown state BEFORE:', shutdownManager.getState());
 
     sendLog('warn', '🔍 ========== HANDLING SHUTDOWN READY ==========');
     sendLog('log', '🔍 isShutdownReady & isClosedAppReady', {
       isShutdownReady: { raw: isShutdownReady, boolean: isShutdownReadyBool },
-      isClosedAppReady: {
-        raw: isClosedAppReady,
-        boolean: isClosedAppReadyBool,
-      },
+      isClosedAppReady: { raw: isClosedAppReady, boolean: isClosedAppReadyBool },
       stateBefore: shutdownManager.getState(),
     });
 
     // จัดการ isShutdownReady (shutdown เครื่อง)
     if (isShutdownReadyBool) {
       // ถ้า isShutdownReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
-      console.log(
-        '🛑 [Main] isShutdownReady is TRUE, ensuring countdown is running',
-      );
+      console.log('🛑 [Main] isShutdownReady is TRUE, ensuring countdown is running');
       sendLog('error', '🛑 isShutdownReady = TRUE, starting countdown');
       shutdownManager.ensureCountdown(2, 'manual'); // ใช้ 2 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
       const stateAfter = shutdownManager.getState();
@@ -275,9 +225,7 @@ function handleShutdownReady(initResponse: any): void {
       sendLog('log', '🛑 Countdown started', { stateAfter });
     } else {
       // ถ้า isShutdownReady เป็น false, undefined, หรือ null ให้เคลียร์ shutdown ทันที
-      console.log(
-        '🔄 [Main] isShutdownReady is FALSE/undefined/null, cancelling shutdown immediately',
-      );
+      console.log('🔄 [Main] isShutdownReady is FALSE/undefined/null, cancelling shutdown immediately');
       sendLog('error', '🔄 isShutdownReady = FALSE, cancelling shutdown NOW!');
       shutdownManager.cancelShutdown();
       const stateAfter = shutdownManager.getState();
@@ -288,32 +236,19 @@ function handleShutdownReady(initResponse: any): void {
     // จัดการ isClosedAppReady (ปิดโปรแกรม)
     if (isClosedAppReadyBool) {
       // ถ้า isClosedAppReady เป็น true ให้เริ่ม countdown (แต่ไม่ reset ถ้าเริ่มแล้ว)
-      console.log(
-        '🚪 [Main] isClosedAppReady is TRUE, ensuring app close countdown is running',
-      );
-      sendLog(
-        'error',
-        '🚪 isClosedAppReady = TRUE, starting app close countdown',
-      );
+      console.log('🚪 [Main] isClosedAppReady is TRUE, ensuring app close countdown is running');
+      sendLog('error', '🚪 isClosedAppReady = TRUE, starting app close countdown');
       appCloseManager.ensureCountdown(2); // ใช้ 2 นาทีตาม DEFAULT_COUNTDOWN_MINUTES
       const stateAfter = appCloseManager.getState();
       console.log('🚪 [Main] Current app close state AFTER:', stateAfter);
       sendLog('log', '🚪 App close countdown started', { stateAfter });
     } else {
       // ถ้า isClosedAppReady เป็น false, undefined, หรือ null ให้เคลียร์ app close ทันที
-      console.log(
-        '🔄 [Main] isClosedAppReady is FALSE/undefined/null, cancelling app close immediately',
-      );
-      sendLog(
-        'error',
-        '🔄 isClosedAppReady = FALSE, cancelling app close NOW!',
-      );
+      console.log('🔄 [Main] isClosedAppReady is FALSE/undefined/null, cancelling app close immediately');
+      sendLog('error', '🔄 isClosedAppReady = FALSE, cancelling app close NOW!');
       appCloseManager.cancelAppClose();
       const stateAfter = appCloseManager.getState();
-      console.log(
-        '🔄 [Main] Current app close state AFTER cancel:',
-        stateAfter,
-      );
+      console.log('🔄 [Main] Current app close state AFTER cancel:', stateAfter);
       sendLog('log', '🔄 App close cancelled', { stateAfter });
     }
   } finally {
@@ -333,9 +268,7 @@ async function initializeApp() {
 
     machineId = envConfig.MACHINE_ID;
     const machineIdFromConfig = envConfig.MACHINE_ID;
-    const machinePortFromConfig = envConfig.PORT
-      ? Number(envConfig.PORT)
-      : Number(DEFAULT_PORT);
+    const machinePortFromConfig = envConfig.PORT ? Number(envConfig.PORT) : Number(DEFAULT_PORT);
 
     console.log('🔍 [Main] Config from storage:', {
       machineId: machineIdFromConfig,
@@ -396,39 +329,35 @@ async function initializeApp() {
     sseClient.connect();
 
     // ตรวจสอบ devices ที่ตั้งค่าไว้ (camera/printer) หลังจาก init สำเร็จ
-    // ทำแบบ async เพื่อไม่ให้บล็อกการโหลด app
-    // if (mainWindow && !mainWindow.isDestroyed()) {
-    //   const runCheck = async () => {
-    //     try {
-    //       console.log('🚀 [Main] Running device check after init');
-    //       await checkConfiguredDevices();
-    //     } catch (err) {
-    //       console.error('❌ [Main] Error in checkConfiguredDevices:', err);
-    //     }
-    //   };
+    // เช็คซ้ำทุก 5 วินาที เพื่ออัปเดตกล่องสถานะเมื่อถอด/เสียบเครื่องปริ้นหรือกล้อง
+    const DEVICE_CHECK_INTERVAL_MS = 5 * 1000;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const runCheck = async () => {
+        try {
+          console.log('🚀 [Main] Running device check');
+          await checkConfiguredDevices();
+        } catch (err) {
+          console.error('❌ [Main] Error in checkConfiguredDevices:', err);
+        }
+      };
 
-    //   if (mainWindow.webContents.isLoading()) {
-    //     console.log('⏳ [Main] Renderer still loading, waiting...');
-    //     mainWindow.webContents.once('did-finish-load', runCheck);
-    //   } else {
-    //     console.log('✅ [Main] Renderer already loaded');
-    //     runCheck();
-    //   }
-    // }
+      if (mainWindow.webContents.isLoading()) {
+        console.log('⏳ [Main] Renderer still loading, waiting...');
+        mainWindow.webContents.once('did-finish-load', () => {
+          runCheck();
+          setInterval(runCheck, DEVICE_CHECK_INTERVAL_MS);
+        });
+      } else {
+        console.log('✅ [Main] Renderer already loaded');
+        runCheck();
+        setInterval(runCheck, DEVICE_CHECK_INTERVAL_MS);
+      }
+    }
 
     // Helper function สำหรับส่ง log ไปที่ renderer (DevTools)
-    const sendLogToRenderer = (
-      level: 'log' | 'warn' | 'error',
-      message: string,
-      data?: any,
-    ) => {
+    const sendLogToRenderer = (level: 'log' | 'warn' | 'error', message: string, data?: any) => {
       if (mainWindow) {
-        mainWindow.webContents.send('shutdown-log', {
-          level,
-          message,
-          data,
-          timestamp: new Date().toISOString(),
-        });
+        mainWindow.webContents.send('shutdown-log', { level, message, data, timestamp: new Date().toISOString() });
       }
     };
 
@@ -438,11 +367,7 @@ async function initializeApp() {
         // ส่งสถานะ countdown ไปที่ renderer
         if (mainWindow) {
           mainWindow.webContents.send('shutdown-countdown-update', state);
-          sendLogToRenderer(
-            'log',
-            `⏱️ Shutdown countdown: ${state.remainingSeconds}s / ${state.totalSeconds}s`,
-            state,
-          );
+          sendLogToRenderer('log', `⏱️ Shutdown countdown: ${state.remainingSeconds}s / ${state.totalSeconds}s`, state);
         }
       },
       onShutdownStarting: () => {
@@ -463,10 +388,7 @@ async function initializeApp() {
         // แจ้ง renderer ว่า countdown ถูก reset
         if (mainWindow) {
           mainWindow.webContents.send('shutdown-countdown-reset');
-          sendLogToRenderer(
-            'log',
-            '👆 User activity detected, shutdown countdown reset',
-          );
+          sendLogToRenderer('log', '👆 User activity detected, shutdown countdown reset');
         }
       },
     });
@@ -477,11 +399,7 @@ async function initializeApp() {
         // ส่งสถานะ countdown ไปที่ renderer
         if (mainWindow) {
           mainWindow.webContents.send('app-close-countdown-update', state);
-          sendLogToRenderer(
-            'log',
-            `⏱️ App close countdown: ${state.remainingSeconds}s / ${state.totalSeconds}s`,
-            state,
-          );
+          sendLogToRenderer('log', `⏱️ App close countdown: ${state.remainingSeconds}s / ${state.totalSeconds}s`, state);
         }
       },
       onAppCloseStarting: () => {
@@ -496,14 +414,8 @@ async function initializeApp() {
         // ปิด window (จะไม่ถูก preventDefault เพราะ shouldQuit = true)
         if (mainWindow) {
           console.log('🚪 [Main] Main window exists, closing...');
-          console.log(
-            '🚪 [Main] mainWindow.isDestroyed():',
-            mainWindow.isDestroyed(),
-          );
-          console.log(
-            '🚪 [Main] mainWindow.isVisible():',
-            mainWindow.isVisible(),
-          );
+          console.log('🚪 [Main] mainWindow.isDestroyed():', mainWindow.isDestroyed());
+          console.log('🚪 [Main] mainWindow.isVisible():', mainWindow.isVisible());
           try {
             console.log('🚪 [Main] Executing mainWindow.close()...');
             mainWindow.close();
@@ -526,10 +438,7 @@ async function initializeApp() {
         // แจ้ง renderer ว่า countdown ถูก reset
         if (mainWindow) {
           mainWindow.webContents.send('app-close-countdown-reset');
-          sendLogToRenderer(
-            'log',
-            '👆 User activity detected, app close countdown reset',
-          );
+          sendLogToRenderer('log', '👆 User activity detected, app close countdown reset');
         }
       },
     });
@@ -546,44 +455,50 @@ async function initializeApp() {
   }
 }
 
-/**
- * สถานะอุปกรณ์ที่ track แยกต่อชิ้น
- * ใช้เพื่อป้องกันไม่ให้ device-found จากอุปกรณ์ตัวหนึ่งยกเลิก device-not-found ตัวอื่น
- */
-const deviceStatus: Record<string, boolean> = {
-  camera: true,
-  printer: true,
+
+
+// แจ้งเตือน device (กล้อง/เครื่องปริ้น) ไป backend — ครั้งแรกต่อ session + แจ้งแบบ toggle (เฉพาะเมื่อสถานะเปลี่ยน)
+let hasSentStartupDeviceReport = false;
+/** สถานะล่าสุดที่รู้ของแต่ละ device — แจ้ง "ไม่พบ" เฉพาะเมื่อเปลี่ยนจาก found → not_found; หลังกลับมาเชื่อมต่อ (found) ถึงจะแจ้ง "ไม่พบ" ได้อีก */
+const lastDeviceState: Record<'camera' | 'printer', 'found' | 'not_found'> = {
+  camera: 'found',
+  printer: 'found',
 };
 
+function sendDeviceAlertToBackendIfAllowed(
+  deviceType: 'camera' | 'printer',
+  deviceName: string,
+  availableDevices?: string[],
+): void {
+  if (deviceName === 'No camera config' || deviceName === 'No printer config') return;
+  // แจ้งเฉพาะเมื่อเพิ่งเปลี่ยนเป็น not_found (ถ้าแจ้งไปแล้วไม่แจ้งซ้ำจนกว่าจะกลับมาเชื่อมต่อ)
+  if (lastDeviceState[deviceType] === 'not_found') return;
+  lastDeviceState[deviceType] = 'not_found';
+  machineService
+    .sendDeviceAlert(deviceType, deviceName, availableDevices)
+    .catch((err) => console.warn('⚠️ [Main] sendDeviceAlert failed:', err));
+}
+
 /**
- * ส่งสถานะอุปกรณ์รวมไปให้ renderer ตัดสินใจว่าจะไปหน้า maintenance หรือไม่
- * - ถ้ามีอุปกรณ์ตัวใดตัวหนึ่งหาย → ส่ง device-not-found พร้อมข้อมูล
- * - ถ้าทุกอุปกรณ์ OK → ส่ง all-devices-found
+ * อัปเดตสถานะเป็น "เชื่อมต่อแล้ว" — ถ้าก่อนหน้านี้แจ้ง "ไม่พบ" ไปแล้ว จะยิงแจ้ง "กลับมาเชื่อมต่อแล้ว" ไป Telegram
  */
-function sendDeviceStatus(failedDevice?: {
-  deviceType: string;
-  deviceName: string;
-}): void {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-
-  const allOk = Object.values(deviceStatus).every((v) => v);
-
-  if (allOk) {
-    // ทุกอุปกรณ์ OK → ส่ง all-devices-found เพื่อให้ออกจาก maintenance ได้
-    mainWindow.webContents.send('all-devices-found');
-    console.log('✅ [Main] All devices OK');
-  } else if (failedDevice) {
-    // มีอุปกรณ์ขาดหาย → ส่ง device-not-found
-    mainWindow.webContents.send('device-not-found', failedDevice);
-    console.log(
-      `❌ [Main] Device not found: ${failedDevice.deviceType} - ${failedDevice.deviceName}`,
-    );
+function notifyDeviceReconnectedIfNeeded(
+  deviceType: 'camera' | 'printer',
+  deviceName?: string,
+): void {
+  if (lastDeviceState[deviceType] === 'not_found') {
+    machineService
+      .sendDeviceReconnected(deviceType, deviceName)
+      .catch((err) => console.warn('⚠️ [Main] sendDeviceReconnected failed:', err));
   }
+  lastDeviceState[deviceType] = 'found';
 }
 
 /**
  * ตรวจสอบว่า device (camera/printer) ที่เคยตั้งค่าไว้ยังมีอยู่หรือไม่
- * ถ้าไม่พบจะส่งแจ้งเตือนไปยัง Telegram ผ่าน API
+ * ถ้าไม่พบจะส่งแจ้งเตือนไปยัง Telegram (device-alert) แบบ toggle — แจ้งครั้งเดียวเมื่อเปลี่ยนเป็น "ไม่พบ"
+ * จะแจ้งอีกครั้งได้ก็ต่อเมื่อ device กลับมาเชื่อมต่อก่อน แล้วหลุดอีก
+ * ครั้งแรกที่เช็คหลังเปิดเครื่องจะส่ง device-status-report (เปิดเครื่องแล้ว – สถานะอุปกรณ์)
  */
 async function checkConfiguredDevices(): Promise<void> {
   console.log('🔍 [Main] Checking configured devices...');
@@ -595,290 +510,275 @@ async function checkConfiguredDevices(): Promise<void> {
   }
 
   // รอให้ renderer โหลดเสร็จจริงๆ
-  if (mainWindow.webContents.isLoading()) {
+  if (!mainWindow.webContents.isLoading()) {
+    console.log('✅ [Main] Renderer ready, proceeding with device check');
+  } else {
     console.log('⏳ [Main] Waiting for renderer to finish loading...');
     await new Promise<void>((resolve) => {
-      mainWindow!.webContents.once('did-finish-load' as any, () => resolve());
+      const handler = () => {
+        resolve();
+      };
+      mainWindow!.webContents.once('did-finish-load' as any, handler);
     });
   }
 
-  // 1. เช็ค Camera
-  await checkCamera();
+  // 1. เช็ค Camera (คืนค่าสถานะสำหรับรายงาน)
+  const cameraStatus = await checkCamera();
 
-  // 2. เช็ค Printer
-  await checkPrinter();
+  // 2. เช็ค Printer (คืนค่าสถานะสำหรับรายงาน)
+  const printerStatus = await checkPrinter();
 
-  // 3. ส่งสถานะรวมสุดท้าย — ถ้าทุกอุปกรณ์ OK ให้ออกจาก maintenance ได้
-  const allOk = Object.values(deviceStatus).every((v) => v);
-  if (allOk) {
-    sendDeviceStatus();
+  // อัปเดตสถานะ "เชื่อมต่อแล้ว" — ถ้าก่อนหน้านี้แจ้ง "ไม่พบ" ไปแล้ว จะแจ้ง "กลับมาเชื่อมต่อแล้ว" ไป Telegram
+  if (cameraStatus?.found) notifyDeviceReconnectedIfNeeded('camera', cameraStatus.deviceName);
+  if (printerStatus?.found) notifyDeviceReconnectedIfNeeded('printer', printerStatus.deviceDetail);
+
+  // 3. ครั้งแรกหลังเปิดเครื่อง: ส่งรายงานสถานะไป backend → Telegram
+  if (!hasSentStartupDeviceReport && cameraStatus && printerStatus) {
+    hasSentStartupDeviceReport = true;
+    machineService
+      .sendDeviceStatusReport({
+        isStartup: true,
+        camera: cameraStatus,
+        printer: printerStatus,
+      })
+      .catch((err) => console.warn('⚠️ [Main] sendDeviceStatusReport failed:', err));
   }
 }
 
+/** สถานะกล้องสำหรับรายงาน backend */
+type CameraStatusResult = { configured: boolean; found: boolean; deviceName?: string };
+
 /**
- * เช็ค Camera (แยกเป็นฟังก์ชันย่อยเพื่อความชัดเจน)
+ * เช็ค Camera — คืนค่าสถานะสำหรับ device-status-report และยิง device-alert (แบบ toggle) เมื่อไม่พบ
  */
-async function checkCamera(): Promise<void> {
+async function checkCamera(): Promise<CameraStatusResult | null> {
   try {
+    console.log('ℹ️ [Main] Checking camera config...');
+
     const cameraConfig = await getCameraConfig();
     if (!cameraConfig) {
-      console.log('ℹ️ [Main] No camera config found, skipping camera check');
-      // ไม่มี config = ยังไม่ได้ตั้งค่า ไม่ต้อง alert
-      deviceStatus.camera = true;
-      return;
+      console.log('ℹ️ [Main] No camera config found');
+      if (mainWindow) {
+        mainWindow.webContents.send('device-not-found', {
+          deviceType: 'camera',
+          deviceName: 'No camera config',
+        });
+      }
+      return { configured: false, found: false, deviceName: 'No camera config' };
     }
 
-    if (cameraConfig.type === 'webcam') {
-      console.log(
-        `📷 [Main] Checking webcam: ${cameraConfig.label} (${cameraConfig.deviceId})`,
-      );
+    const deviceName = cameraConfig.type === 'webcam' ? cameraConfig.label : cameraConfig.cameraName;
 
-      // สร้าง Promise เพื่อรอผลจาก renderer
-      const found = await new Promise<boolean>((resolve) => {
+    if (cameraConfig.type === 'webcam') {
+      console.log(`📷 [Main] Webcam config found: ${cameraConfig.label} (${cameraConfig.deviceId})`);
+
+      const checkPromise = new Promise<boolean>((resolve) => {
         const timeout = setTimeout(() => {
           console.warn('⚠️ [Main] Timeout waiting for camera check response');
           resolve(false);
         }, 5000);
-
-        // ใช้ once เพื่อรับผลเฉพาะจากรอบนี้
-        ipcMain.once('camera-availability-result', (_event, result) => {
+        ipcMain.once('camera-availability-result', (event, result) => {
           clearTimeout(timeout);
           resolve(result.found);
         });
+      });
 
-        // ส่ง event ไปให้ renderer เช็ค
-        mainWindow?.webContents.send('check-camera-availability', {
+      if (mainWindow) {
+        mainWindow.webContents.send('check-camera-availability', {
           configuredDeviceId: cameraConfig.deviceId,
           configuredLabel: cameraConfig.label,
         });
-      });
+      }
 
-      deviceStatus.camera = found;
+      const found = await checkPromise;
 
-      if (!found) {
-        console.warn(`⚠️ [Main] Webcam not found: ${cameraConfig.label}`);
-        await sendDeviceAlertWithRateLimit(
-          'camera',
-          cameraConfig.label || 'Webcam',
-          [],
-        );
-        sendDeviceStatus({
-          deviceType: 'camera',
-          deviceName: cameraConfig.label || 'Webcam',
-        });
+      if (found && mainWindow) {
+        mainWindow.webContents.send('device-status', { deviceType: 'camera', status: 'found' });
       } else {
         if (mainWindow) {
-          mainWindow.webContents.send('device-found');
+          mainWindow.webContents.send('device-not-found', {
+            deviceType: 'camera',
+            deviceName: cameraConfig.label,
+          });
         }
-        console.log(`✅ [Main] Webcam found: ${cameraConfig.label}`);
+        sendDeviceAlertToBackendIfAllowed('camera', cameraConfig.label);
       }
-    } else if (cameraConfig.type === 'canon') {
-      console.log(
-        `📷 [Main] Checking Canon camera: ${cameraConfig.cameraName}`,
-      );
+      console.log(`📷 [Main] Webcam check result: ${found ? 'Found' : 'Not found'}`);
+      return { configured: true, found, deviceName: cameraConfig.label };
+    }
 
-      // ถ้า SDK ยังไม่ได้ initialize (renderer ยังไม่ได้เรียก canon-v2:initialize)
-      // → ข้ามการเช็คไปก่อน ไม่ถือว่าเป็น error
-      if (!isCanonSdkInitialized()) {
-        console.log(
-          'ℹ️ [Main] Canon SDK not yet initialized, skipping camera check',
-        );
-        deviceStatus.camera = true; // ยังไม่ init = ไม่รู้สถานะ ให้ถือว่า OK ไปก่อน
-        return;
-      }
+    if (cameraConfig.type === 'canon') {
+      console.log(`📷 [Main] Canon camera config found: ${cameraConfig.cameraName}`);
 
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       const isConnected = isCanonCameraConnected();
-      deviceStatus.camera = isConnected;
 
       if (!isConnected) {
-        console.warn(
-          `⚠️ [Main] Canon camera not connected: ${cameraConfig.cameraName}`,
-        );
-        await sendDeviceAlertWithRateLimit(
-          'camera',
-          cameraConfig.cameraName || 'Canon Camera',
-          [],
-        );
-        sendDeviceStatus({
-          deviceType: 'camera',
-          deviceName: cameraConfig.cameraName || 'Canon Camera',
-        });
-      } else {
+        console.warn(`⚠️ [Main] Canon camera not connected: ${cameraConfig.cameraName}`);
         if (mainWindow) {
-          mainWindow.webContents.send('device-found');
+          mainWindow.webContents.send('device-not-found', {
+            deviceType: 'camera',
+            deviceName: cameraConfig.cameraName,
+          });
         }
-        console.log(
-          `✅ [Main] Canon camera connected: ${cameraConfig.cameraName}`,
-        );
+        sendDeviceAlertToBackendIfAllowed('camera', cameraConfig.cameraName);
+        return { configured: true, found: false, deviceName: cameraConfig.cameraName };
       }
+      if (mainWindow) {
+        mainWindow.webContents.send('device-status', { deviceType: 'camera', status: 'found' });
+      }
+      console.log(`✅ [Main] Canon camera connected: ${cameraConfig.cameraName}`);
+      return { configured: true, found: true, deviceName: cameraConfig.cameraName };
     }
+
+    return { configured: true, found: false, deviceName };
   } catch (error) {
-    console.error('❌ [Main] Error checking camera:', error);
+    console.error('❌ [Main] Error checking camera config:', error);
+    return null;
   }
 }
 
 /**
- * เช็คสถานะ Printer ผ่าน WMIC (Windows Management Instrumentation)
- * @param printerName - ชื่อ printer ที่ต้องการตรวจสอบ
- * @returns Promise<{ available: boolean; status?: string; fallback?: boolean }>
- *
- * WMIC PrinterStatus codes:
- * 0 = Idle/Ready, 1 = Paused, 2 = Error, 3 = Pending Deletion
- * 4 = Paper Jam, 5 = Paper Out, 8 = Offline (หลุด)
+ * บน Windows: เช็คสถานะเครื่องปริ้นจริงผ่าน WMI (Win32_Printer)
+ * เพราะ Electron getPrintersAsync() บน Windows มีบั๊ก — คืน status เป็น 0 เสมอ
+ * ใช้ WorkOffline และ Availability (8 = Off Line) เป็นตัวตัดสิน
  */
-async function getPrinterStatusViaPowerShell(printerName: string): Promise<{
-  available: boolean;
-  status?: string;
-  fallback?: boolean;
-}> {
-  if (process.platform !== 'win32') {
-    return { available: false, fallback: true };
-  }
-
+async function getWindowsPrinterHasSignal(printerName: string): Promise<boolean> {
+  if (process.platform !== 'win32') return true;
+  const oneLiner =
+    '$p=Get-CimInstance Win32_Printer -EA 0|Where-Object{$_.Name -eq $env:TMP_PRINTER_CHECK};if(-not $p){exit 1};if($p.WorkOffline -eq $true){exit 2};if($p.Availability -eq 8){exit 3};exit 0';
   try {
-    // ใช้ PowerShell ดึง PrinterStatus และ WorkOffline status
-    // PrinterStatus: 3 คือ Idle (พร้อมใช้งาน), WorkOffline: False คือเชื่อมต่ออยู่
-    const command = `powershell -Command "Get-Printer -Name '${printerName.replace(/'/g, "''")}' | Select-Object PrinterStatus, WorkOffline | ConvertTo-Json"`;
-
-    const { stdout } = await execAsync(command, {
-      timeout: 5000,
-      windowsHide: true,
+    await execAsync('powershell -NoProfile -ExecutionPolicy Bypass -Command ' + JSON.stringify(oneLiner), {
+      env: { ...process.env, TMP_PRINTER_CHECK: printerName },
+      timeout: 10000,
     });
-
-    if (!stdout.trim()) {
-      return { available: false, fallback: false }; // หาเครื่องพิมพ์ไม่เจอ
-    }
-
-    const result = JSON.parse(stdout);
-
-    // Logic การตัดสินว่า Available:
-    // 1. PrinterStatus ต้องเป็น 3 (Idle) หรือ 1 (Other/Active)
-    // 2. WorkOffline ต้องเป็น false
-    const isIdle = result.PrinterStatus === 3 || result.PrinterStatus === 1;
-    const isOnline = result.WorkOffline === false;
-
-    const statusMap: Record<number, string> = {
-      1: 'Other',
-      2: 'Unknown',
-      3: 'Idle',
-      4: 'Printing',
-      5: 'Warmup',
-      6: 'Stopped',
-      7: 'Offline',
-      8: 'Paused',
-      9: 'Error',
-    };
-
-    return {
-      available: isIdle && isOnline,
-      status: isOnline ? statusMap[result.PrinterStatus] : 'Offline',
-    };
-  } catch (error) {
-    console.warn(
-      `⚠️ [Main] PowerShell check failed: ${(error as Error).message}`,
-    );
-    // ถ้า error (เช่น หาชื่อ printer ไม่เจอเลย) ให้ส่งเป็นไม่พร้อมใช้งาน
-    return { available: false, fallback: true };
+    return true;
+  } catch (err: any) {
+    const code = err?.code ?? err?.status;
+    if (code === 1 || code === 2 || code === 3) return false;
+    console.warn('⚠️ [Main] Windows printer WMI check failed, assuming available:', err?.message);
+    return true;
   }
 }
 
+/** สถานะเครื่องปริ้นสำหรับรายงาน backend */
+type PrinterStatusResult = {
+  configured: boolean;
+  found: boolean;
+  deviceDetail?: string;
+  availablePrinterNames?: string[];
+};
+
 /**
- * เช็ค Printer (แยกเป็นฟังก์ชันย่อยเพื่อความชัดเจน)
+ * เช็ค Printer — คืนค่าสถานะสำหรับ device-status-report และยิง device-alert (แบบ toggle) เมื่อไม่พบ
  */
-async function checkPrinter(): Promise<void> {
+async function checkPrinter(): Promise<PrinterStatusResult | null> {
   try {
-    console.log('⏳ [Main] checkPrinter...');
+    console.log('ℹ️ [Main] Checking printer config...');
 
     const printerConfig = await getPrinterConfig();
-    console.log('[Main] printerConfig:', printerConfig);
-
     if (!printerConfig) {
-      deviceStatus.printer = false;
-      await sendDeviceAlertWithRateLimit('printer', 'Config not found', []);
-      sendDeviceStatus({
-        deviceType: 'printer',
-        deviceName: 'Config not found',
-      });
-
-      return;
+      console.log('ℹ️ [Main] No printer config found');
+      if (mainWindow) {
+        mainWindow.webContents.send('device-not-found', {
+          deviceType: 'printer',
+          deviceName: 'No printer config',
+        });
+      }
+      return { configured: false, found: false, deviceDetail: 'No printer config' };
     }
 
-    // ดึงรายการ Printer ทั้งหมดที่ OS มองเห็น ณ วินาทีนี้
-    const systemPrinters = await mainWindow!.webContents.getPrintersAsync();
-    console.log(
-      '📋 All System Printers:',
-      systemPrinters.map((p) => `"${p.name}"`),
-    );
+    if (!mainWindow) {
+      console.warn('⚠️ [Main] Main window not available for printer check');
+      return null;
+    }
 
-    const checkSinglePrinter = async (targetName: string) => {
-      // ค้นหา printer ใน list
-      const printerInList = systemPrinters.find((p) => p.name === targetName);
+    console.log(`🖨️ [Main] Printer config found - Main: ${printerConfig.main.printerName}`);
+    if (printerConfig.secondary) {
+      console.log(`🖨️ [Main] Secondary printer: ${printerConfig.secondary.printerName}`);
+    }
 
-      if (!printerInList) {
-        console.warn(
-          `❌ [Main] ${targetName} is physically disconnected (Not in list)`,
-        );
-        return false;
+    const printers = await mainWindow.webContents.getPrintersAsync();
+    const printerNames = printers.map((p: any) => p.name);
+    console.log('🖨️ [Main] Printers (from Electron):', printerNames);
+
+    let isConnected = false;
+    let deviceDetail = `Main: ${printerConfig.main.printerName}`;
+
+    const mainInList = printers.some((p: any) => p.name === printerConfig.main.printerName);
+    const mainHasSignal =
+      mainInList &&
+      (process.platform !== 'win32' || (await getWindowsPrinterHasSignal(printerConfig.main.printerName)));
+
+    if (!mainHasSignal) {
+      if (!mainInList) {
+        console.warn(`⚠️ [Main] Main printer not in list: ${printerConfig.main.printerName}`);
       } else {
-        console.log(
-          `📋 [Debug] Printer: ${printerInList.name}, Raw Status: ${printerInList.status}`,
-        );
+        console.warn(`⚠️ [Main] Main printer no signal (offline/unplugged): ${printerConfig.main.printerName}`);
       }
-
-      // ถ้าเจอชื่อใน List ให้เช็ค Status Bit (0x400 คือ Offline)
-      const isOffline =
-        !!(printerInList.status & 0x00000400) || // Windows: Offline bit
-        printerInList.status === 1024 || // Windows: Offline decimal
-        printerInList.status === 5; // macOS: Paused / Disabled
-
-      if (isOffline) {
-        console.warn(`❌ [Main] ${targetName} is Offline`);
-        return false;
+      if (mainWindow) {
+        mainWindow.webContents.send('device-not-found', {
+          deviceType: 'printer',
+          deviceName: `Main: ${printerConfig.main.printerName}`,
+        });
       }
+      sendDeviceAlertToBackendIfAllowed('printer', `Main: ${printerConfig.main.printerName}`, printerNames);
+      return {
+        configured: true,
+        found: false,
+        deviceDetail: `Main: ${printerConfig.main.printerName}`,
+        availablePrinterNames: printerNames,
+      };
+    }
 
-      // ถ้าเป็น Windows ให้เช็คสถานะเชิงลึกด้วย PowerShell (ดักจับ WorkOffline และ Status อื่นๆ)
-      if (process.platform === 'win32') {
-        const psResult = await getPrinterStatusViaPowerShell(targetName);
-        // ถ้า PowerShell ทำงานสำเร็จ ให้ใช้ค่าที่ได้จาก PowerShell เลย
-        if (!psResult.fallback) {
-          if (!psResult.available) {
-            console.warn(
-              `❌ [Main] ${targetName} status is not ready: ${psResult.status}`,
-            );
-          }
-          return psResult.available;
+    isConnected = true;
+
+    if (printerConfig.secondary) {
+      const secInList = printers.some((p: any) => p.name === printerConfig.secondary!.printerName);
+      const secHasSignal =
+        secInList &&
+        (process.platform !== 'win32' ||
+          (await getWindowsPrinterHasSignal(printerConfig.secondary!.printerName)));
+
+      if (!secHasSignal) {
+        if (!secInList) {
+          console.warn(`⚠️ [Main] Secondary printer not in list: ${printerConfig.secondary.printerName}`);
+        } else {
+          console.warn(`⚠️ [Main] Secondary printer no signal: ${printerConfig.secondary.printerName}`);
         }
-      }
-
-      return true; // ถ้าผ่านมาถึงนี่ได้ถือว่า OK
-    };
-
-    const mainOk = await checkSinglePrinter(printerConfig.main.printerName);
-    const secondaryOk = printerConfig.secondary
-      ? await checkSinglePrinter(printerConfig.secondary.printerName)
-      : true;
-
-    const allOk = mainOk && secondaryOk;
-
-    // แจ้งเตือนเมื่อสถานะเปลี่ยนเท่านั้น (ป้องกันการส่งแจ้งเตือนซ้ำทุก 10 วิ)
-    if (allOk !== deviceStatus.printer) {
-      deviceStatus.printer = allOk;
-      if (!allOk) {
-        const missing = !mainOk
-          ? printerConfig.main.printerName
-          : printerConfig.secondary?.printerName || 'Unknown';
-        await sendDeviceAlertWithRateLimit(
+        if (mainWindow) {
+          mainWindow.webContents.send('device-not-found', {
+            deviceType: 'printer',
+            deviceName: `Secondary: ${printerConfig.secondary.printerName}`,
+          });
+        }
+        sendDeviceAlertToBackendIfAllowed(
           'printer',
-          missing,
-          systemPrinters.map((p) => p.name),
+          `Secondary: ${printerConfig.secondary.printerName}`,
+          printerNames,
         );
-        sendDeviceStatus({ deviceType: 'printer', deviceName: missing });
-      } else {
-        sendDeviceStatus(); // กลับมาเป็นปกติ
+        return {
+          configured: true,
+          found: false,
+          deviceDetail: `Secondary: ${printerConfig.secondary.printerName}`,
+          availablePrinterNames: printerNames,
+        };
       }
+      deviceDetail = `Main: ${printerConfig.main.printerName}, Secondary: ${printerConfig.secondary.printerName}`;
     }
+
+    if (mainWindow) {
+      mainWindow.webContents.send('device-status', { deviceType: 'printer', status: 'found' });
+    }
+    return {
+      configured: true,
+      found: true,
+      deviceDetail,
+      availablePrinterNames: printerNames,
+    };
   } catch (error) {
-    console.error('❌ Error in checkPrinter:', error);
+    console.error('❌ [Main] Error checking printer config:', error);
+    return null;
   }
 }
 
@@ -887,9 +787,7 @@ async function checkPrinter(): Promise<void> {
  * @param base64 - Base64 data URL ของรูปภาพ
  * @returns Promise<{ width: number; height: number }>
  */
-async function getImageDimensions(
-  base64: string,
-): Promise<{ width: number; height: number }> {
+async function getImageDimensions(base64: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
     // ถอด base64 data ออกมา
     const matches = base64.match(/^data:image\/(\w+);base64,(.+)$/);
@@ -938,8 +836,9 @@ async function generateImageWithPadding(
   orientation: 'portrait' | 'landscape' = 'portrait',
   horizontal: number = 0,
   vertical: number = 0,
-  scale: number = 100,
+  scale: number = 100
 ): Promise<Buffer> {
+
   try {
     // แปลง base64 เป็น buffer
     const base64Data = base64.replace(/^data:image\/\w+;base64,/, '');
@@ -952,14 +851,12 @@ async function generateImageWithPadding(
 
     // โหลด paper position config จากไฟล์
     const paperPositionConfig = await getPaperPositionConfig();
-    const typeTransform =
-      paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
+    const typeTransform = paperPositionConfig.type === 1 ? 'landscape' : 'portrait';
 
     // ดึง scale จาก config ตาม orientation (ถ้าไม่มีใน config ให้ใช้ค่าจาก parameter หรือ default 100)
-    const configScale =
-      orientation === 'landscape'
-        ? (paperPositionConfig.landscapeScale ?? scale ?? 100)
-        : (paperPositionConfig.portraitScale ?? scale ?? 100);
+    const configScale = orientation === 'landscape'
+      ? (paperPositionConfig.landscapeScale ?? scale ?? 100)
+      : (paperPositionConfig.portraitScale ?? scale ?? 100);
 
     // ตรวจสอบว่าต้องหมุนภาพหรือไม่
     const willRotate = orientation !== typeTransform;
@@ -979,7 +876,7 @@ async function generateImageWithPadding(
     const scaledContentWidth = Math.round(originalWidth * scaleValue);
     const scaledContentHeight = Math.round(originalHeight * scaleValue);
 
-    console.log('🖼️ [generateImageWithPadding] Scale calculation:', {
+    console.log('🖼️ [generateImageWithPadding] Scale calculation:', { 
       configScale: `${configScale}%`,
       scaleValue,
       original: `${originalWidth}x${originalHeight}`,
@@ -999,27 +896,15 @@ async function generateImageWithPadding(
       });
 
       // 2. คำนวณ padding เพื่อให้ content อยู่ตรงกลาง + offset
-      const extraPaddingH = Math.round(
-        (originalWidth - scaledContentWidth) / 2,
-      );
-      const extraPaddingV = Math.round(
-        (originalHeight - scaledContentHeight) / 2,
-      );
+      const extraPaddingH = Math.round((originalWidth - scaledContentWidth) / 2);
+      const extraPaddingV = Math.round((originalHeight - scaledContentHeight) / 2);
 
       // รวม offset จาก user กับ centering padding
-      const paddingLeft = Math.round(
-        Math.max(0, extraPaddingH + effectiveHorizontal),
-      );
-      const paddingRight = Math.round(
-        Math.max(0, extraPaddingH - effectiveHorizontal),
-      );
+      const paddingLeft = Math.round(Math.max(0, extraPaddingH + effectiveHorizontal));
+      const paddingRight = Math.round(Math.max(0, extraPaddingH - effectiveHorizontal));
       // สลับ vertical เพื่อให้ + = ลง, - = ขึ้น
-      const paddingTop = Math.round(
-        Math.max(0, extraPaddingV + effectiveVertical),
-      );
-      const paddingBottom = Math.round(
-        Math.max(0, extraPaddingV - effectiveVertical),
-      );
+      const paddingTop = Math.round(Math.max(0, extraPaddingV + effectiveVertical));
+      const paddingBottom = Math.round(Math.max(0, extraPaddingV - effectiveVertical));
 
       // 3. เพิ่ม padding รอบภาพด้วยพื้นหลังขาว
       image = image.extend({
@@ -1035,6 +920,7 @@ async function generateImageWithPadding(
         offset: `H=${effectiveHorizontal}, V=${effectiveVertical}`,
         finalPadding: `L=${paddingLeft}, R=${paddingRight}, T=${paddingTop}, B=${paddingBottom}`,
       });
+
     } else if (scaleValue > 1) {
       // ======= ZOOM IN (scale > 100%) =======
       // 1. ขยาย content ขึ้น
@@ -1045,22 +931,12 @@ async function generateImageWithPadding(
 
       // 2. คำนวณจุดเริ่มต้น crop (crop ตรงกลาง + offset)
       // สลับ vertical เพื่อให้ + = ลง, - = ขึ้น
-      const cropStartX = Math.round(
-        (scaledContentWidth - originalWidth) / 2 - effectiveHorizontal,
-      );
-      const cropStartY = Math.round(
-        (scaledContentHeight - originalHeight) / 2 - effectiveVertical,
-      );
+      const cropStartX = Math.round(((scaledContentWidth - originalWidth) / 2) - effectiveHorizontal);
+      const cropStartY = Math.round(((scaledContentHeight - originalHeight) / 2) - effectiveVertical);
 
       // Clamp ให้ไม่เกินขอบ
-      const finalCropX = Math.max(
-        0,
-        Math.min(scaledContentWidth - originalWidth, cropStartX),
-      );
-      const finalCropY = Math.max(
-        0,
-        Math.min(scaledContentHeight - originalHeight, cropStartY),
-      );
+      const finalCropX = Math.max(0, Math.min(scaledContentWidth - originalWidth, cropStartX));
+      const finalCropY = Math.max(0, Math.min(scaledContentHeight - originalHeight, cropStartY));
 
       // 3. Crop กลับมาเป็นขนาดเดิม
       image = image.extract({
@@ -1076,6 +952,7 @@ async function generateImageWithPadding(
         finalCrop: `X=${finalCropX}, Y=${finalCropY}`,
         outputSize: `${originalWidth}x${originalHeight}`,
       });
+
     } else {
       // ======= NO SCALE (scale = 100%) =======
       // เพิ่ม padding เฉพาะถ้ามี offset
@@ -1085,12 +962,7 @@ async function generateImageWithPadding(
       const paddingTop = Math.round(Math.max(0, effectiveVertical));
       const paddingBottom = Math.round(Math.max(0, -effectiveVertical));
 
-      if (
-        paddingLeft > 0 ||
-        paddingRight > 0 ||
-        paddingTop > 0 ||
-        paddingBottom > 0
-      ) {
+      if (paddingLeft > 0 || paddingRight > 0 || paddingTop > 0 || paddingBottom > 0) {
         image = image.extend({
           top: paddingTop,
           bottom: paddingBottom,
@@ -1117,79 +989,22 @@ async function generateImageWithPadding(
     const outputMetadata = await sharp(outputBuffer).metadata();
     console.log('🖼️ [generateImageWithPadding] Final output:', outputMetadata);
     return outputBuffer;
+
   } catch (err) {
     console.error('❌ [generateImageWithPadding] Sharp error:', err);
     throw err instanceof Error ? err : new Error(String(err));
   }
+
 }
 
 let mainWindow: BrowserWindow | null = null;
 let shouldQuit = false; // Flag สำหรับบอกว่าเราต้องการปิดแอปจริงๆ หรือไม่
 let powerSaveBlockerId: number | null = null; // ID สำหรับ powerSaveBlocker
-let currentRoute: string = '/'; // Track current React route
-
-// Rate limiting สำหรับ device alerts (5 นาที)
-const ALERT_RATE_LIMIT_MS = 2000; // 2 วินาที
-const lastDeviceAlertTime: Record<'printer' | 'camera', number> = {
-  printer: 0,
-  camera: 0,
-};
-
-/**
- * ส่ง device alert พร้อม rate limiting (5 นาที)
- * @param deviceType ประเภทของอุปกรณ์ (printer หรือ camera)
- * @param deviceName ชื่ออุปกรณ์
- * @param availableDevices รายการอุปกรณ์ที่มีอยู่
- */
-async function sendDeviceAlertWithRateLimit(
-  deviceType: 'printer' | 'camera',
-  deviceName: string,
-  availableDevices: string[],
-): Promise<boolean> {
-  const now = Date.now();
-  const lastAlertTime = lastDeviceAlertTime[deviceType];
-
-  // ตรวจสอบ Rate Limit (2 วินาที)
-  if (now - lastAlertTime < ALERT_RATE_LIMIT_MS) {
-    // ปรับการแสดงผลวินาทีให้เหมาะสม (ใช้หน่วยวินาทีแทนนาทีเพื่อให้เมคเซนส์ขึ้น)
-    const remainingSeconds = (
-      (ALERT_RATE_LIMIT_MS - (now - lastAlertTime)) /
-      1000
-    ).toFixed(1);
-
-    console.log(
-      `⏳ [Main] Device alert for ${deviceType} skipped (rate limited, ${remainingSeconds}s remaining)`,
-    );
-    return false;
-  }
-
-  // อัปเดตเวลาล่าสุดที่ส่ง Alert
-  lastDeviceAlertTime[deviceType] = now;
-
-  try {
-    await machineService.sendDeviceAlert(
-      deviceType,
-      deviceName,
-      availableDevices,
-    );
-
-    return true;
-  } catch (err) {
-    console.error(`❌ [Main] Failed to send ${deviceType} alert:`, err);
-    return false;
-  }
-}
-
 let cachedInitData: {
   machine?: { prices?: unknown[] };
   prices?: unknown[];
   theme?: any;
-  paperPosition?: {
-    _id: string;
-    scale: number;
-    horizontal: number;
-    vertical: number;
-  } | null;
+  paperPosition?: { _id: string; scale: number; horizontal: number; vertical: number } | null;
 } | null = null;
 
 const installExtensions = async () => {
@@ -1206,6 +1021,7 @@ const installExtensions = async () => {
 };
 
 const createWindow = async () => {
+
   if (
     process.env.NODE_ENV === 'development' ||
     process.env.DEBUG_PROD === 'true'
@@ -1519,17 +1335,14 @@ sseClient.on(MachineEventType.SSE_DISCONNECTED, (_, data) => {
 
 app.on('window-all-closed', () => {
   // หยุด power save blocker เมื่อปิด app
-  if (
-    powerSaveBlockerId !== null &&
-    powerSaveBlocker.isStarted(powerSaveBlockerId)
-  ) {
+  if (powerSaveBlockerId !== null && powerSaveBlocker.isStarted(powerSaveBlockerId)) {
     powerSaveBlocker.stop(powerSaveBlockerId);
     log.info('[Main] Power save blocker stopped');
     powerSaveBlockerId = null;
   }
 
-  // ⭐ Disconnect SSE Client
-  try {
+   // ⭐ Disconnect SSE Client
+   try {
     sseClient.destroy();
     log.info('[Main] SSE Client disconnected');
   } catch (error) {
@@ -1556,110 +1369,11 @@ app
   .then(() => {
     log.info('[Main] App ready - starting initialization');
 
-    // const testConfig = {
-    //   main: {
-    //     printerName: "_127_0_0_1",
-    //     displayName: "Test Printer Mac",
-    //     paperSize: "6x4" as const,
-    //     canCut: false
-    //   }
-    // };
-
-    // savePrinterConfig(testConfig);
-
     sseClient.on('connected', (_, data) => {
       console.log('✅ SSE Connected:', data);
       if (mainWindow) {
         mainWindow.webContents.send('sse-connected', data);
       }
-    });
-
-    // ========== LISTEN TO ROUTE CHANGES ==========
-    ipcMain.on('route-changed', (_event, route: string) => {
-      log.info('[Main] Route changed to:', route);
-      currentRoute = route;
-    });
-    console.log('[Main] Route change listener registered');
-
-    // ========== SMART DEVICE CHECK LOGIC ==========
-    let deviceCheckTimeout: NodeJS.Timeout | null = null;
-    let isChecking = false;
-
-    async function runSmartDeviceCheck(): Promise<void> {
-      if (isChecking) return;
-      isChecking = true;
-
-      try {
-        // 1. แยกกลุ่มหน้าตามความสำคัญ (Logic การข้าม)
-        const criticalRoutes = ['/photo-prepare', '/main-shooting'];
-
-        // หน้าที่ควรข้ามการเช็คเพื่อป้องกันอาการ Lag
-        if (criticalRoutes.includes(currentRoute)) {
-          log.debug(
-            `[Main] On critical page ${currentRoute}, skipping device check`,
-          );
-        } else {
-          await checkConfiguredDevices();
-        }
-
-        // 2. กำหนดความเร็ว (Delay) สำหรับแต่ละ Path ให้ครบตามลิสต์
-        let nextCheckDelay = 10000; // Default: 10 วินาที
-
-        switch (currentRoute) {
-          case '/system-maintenance':
-            nextCheckDelay = 5000; // หน้าช่าง: 5 วินาที
-            break;
-
-          case '/photo-prepare':
-            nextCheckDelay = 3000;
-            break;
-
-          case '/payment':
-          case '/payment-qr':
-          case '/select-print':
-            nextCheckDelay = 5000; // หน้าสำคัญที่ต้องชัวร์เรื่องเครื่องพิมพ์: 5 วินาที
-            break;
-
-          case '/discount-coupon':
-          case '/frame-selection':
-          case '/photo-confirmation':
-          case '/photo-decorate':
-          case '/photo-filter':
-            nextCheckDelay = 10000; // หน้าเลือกของ/แต่งรูป: 10 วินาที (มาตรฐาน)
-            break;
-
-          case '/main-shooting':
-          case '/photo-result':
-            nextCheckDelay = 30000; // หน้าที่กำลังถ่าย: รอนานหน่อยค่อยเช็คใหม่ (ลดภาระเครื่อง)
-            break;
-
-          default:
-            nextCheckDelay = 10000; // หน้า Welcome หรืออื่นๆ: 10 วินาที
-        }
-
-        // ล้างค่าเก่าและตั้งรอบถัดไป
-        if (deviceCheckTimeout) clearTimeout(deviceCheckTimeout);
-        deviceCheckTimeout = setTimeout(() => {
-          runSmartDeviceCheck();
-        }, nextCheckDelay);
-      } catch (err) {
-        log.error('[Main] Error in SmartDeviceCheck:', err);
-        deviceCheckTimeout = setTimeout(() => runSmartDeviceCheck(), 10000);
-      } finally {
-        isChecking = false;
-      }
-    }
-
-    // เริ่มรันครั้งแรก
-    runSmartDeviceCheck();
-
-    // ========== CLEANUP ON QUIT ==========
-    app.on('before-quit', () => {
-      if (deviceCheckTimeout) {
-        clearTimeout(deviceCheckTimeout);
-      }
-      sseClient.updateMachineInfo({ status: 'offline' });
-      log.info('[Main] Smart device check timeout cleared');
     });
 
     // ========== POWER SAVE BLOCKER ==========
@@ -1670,14 +1384,8 @@ app
       powerSaveBlockerId = powerSaveBlocker.start('prevent-display-sleep');
 
       if (powerSaveBlocker.isStarted(powerSaveBlockerId)) {
-        log.info(
-          '[Main] Power save blocker started with ID:',
-          powerSaveBlockerId,
-        );
-        log.info(
-          '[Main] Power save blocker is active:',
-          powerSaveBlocker.isStarted(powerSaveBlockerId),
-        );
+        log.info('[Main] Power save blocker started with ID:', powerSaveBlockerId);
+        log.info('[Main] Power save blocker is active:', powerSaveBlocker.isStarted(powerSaveBlockerId));
       } else {
         log.error('[Main] Power save blocker failed to start');
         powerSaveBlockerId = null;
@@ -1686,6 +1394,7 @@ app
       log.error('[Main] Error starting power save blocker:', error);
       powerSaveBlockerId = null;
     }
+
 
     // ตั้งค่า permissions ก่อนสร้าง window
     // ตั้งค่า permissions สำหรับกล้องและไมโครโฟนใน default session
@@ -1722,33 +1431,36 @@ app
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
       if (mainWindow === null) createWindow();
+
+
     });
   })
   .catch(console.log);
 
-app.on('before-quit', async (event) => {
-  const pendingCount = await backgroundUploadService.getPendingCount();
+  app.on('before-quit', async (event) => {
+    const pendingCount = await backgroundUploadService.getPendingCount();
 
-  if (pendingCount > 0) {
-    console.log(`⏳ [Main] Waiting for ${pendingCount} pending uploads...`);
-    event.preventDefault(); // ยกเลิกการปิดชั่วคราว
+    if (pendingCount > 0) {
+      console.log(`⏳ [Main] Waiting for ${pendingCount} pending uploads...`);
+      event.preventDefault(); // ยกเลิกการปิดชั่วคราว
 
-    // รอ uploads เสร็จ (max 30 วินาที)
-    const maxWaitTime = 30000;
-    const startTime = Date.now();
+      // รอ uploads เสร็จ (max 30 วินาที)
+      const maxWaitTime = 30000;
+      const startTime = Date.now();
 
-    const checkInterval = setInterval(async () => {
-      const remaining = await backgroundUploadService.getPendingCount();
-      const elapsed = Date.now() - startTime;
+      const checkInterval = setInterval(async () => {
+        const remaining = await backgroundUploadService.getPendingCount();
+        const elapsed = Date.now() - startTime;
 
-      if (remaining === 0 || elapsed > maxWaitTime) {
-        clearInterval(checkInterval);
-        console.log('✅ [Main] All uploads completed or timeout, quitting');
-        app.quit();
-      }
-    }, 1000);
-  }
-});
+        if (remaining === 0 || elapsed > maxWaitTime) {
+          clearInterval(checkInterval);
+          console.log('✅ [Main] All uploads completed or timeout, quitting');
+          app.quit();
+        }
+      }, 1000);
+    }
+  });
+
 
 interface PrintConfig {
   imageDataUrl: string;
@@ -1770,11 +1482,11 @@ const PRINT_DEBOUNCE_MS = 3000; // ป้องกันการพิมพ์
 // สร้าง hash จาก imageDataUrl เพื่อตรวจสอบว่าเป็นรูปเดียวกันหรือไม่
 const getImageHash = (imageDataUrl: string): string => {
   // ใช้ส่วนแรกของ base64 data เป็น hash (ประมาณ 100 ตัวอักษร)
-  const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
+  const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, "");
   return base64Data.substring(0, 100);
 };
 
-ipcMain.on('print-photo', async (event, printConfig) => {
+ipcMain.on("print-photo", async (event, printConfig) => {
   const now = Date.now();
   const imageHash = getImageHash(printConfig.imageDataUrl);
 
@@ -1789,9 +1501,9 @@ ipcMain.on('print-photo', async (event, printConfig) => {
   // ตรวจสอบว่ากำลังพิมพ์อยู่หรือไม่
   if (isPrinting) {
     log.warn('🖨️ [Print] Already printing, rejecting request');
-    event.reply('print-response', {
+    event.reply("print-response", {
       success: false,
-      error: 'กำลังพิมพ์อยู่ กรุณารอสักครู่',
+      error: "กำลังพิมพ์อยู่ กรุณารอสักครู่"
     });
     return;
   }
@@ -1802,9 +1514,9 @@ ipcMain.on('print-photo', async (event, printConfig) => {
     now - lastPrintTime < PRINT_DEBOUNCE_MS
   ) {
     log.warn('🖨️ [Print] Duplicate print detected, rejecting request');
-    event.reply('print-response', {
+    event.reply("print-response", {
       success: false,
-      error: 'รูปภาพนี้เพิ่งพิมพ์ไปเมื่อสักครู่',
+      error: "รูปภาพนี้เพิ่งพิมพ์ไปเมื่อสักครู่"
     });
     return;
   }
@@ -1861,10 +1573,10 @@ ipcMain.on('print-photo', async (event, printConfig) => {
       orientation,
       horizontal,
       vertical,
-      scale,
+      scale
     );
 
-    const tempDir = app.getPath('temp');
+    const tempDir = app.getPath("temp");
     // ใช้ .png เพื่อรักษาสีต้นฉบับ (ไม่มี compression loss)
     const pngPath = path.join(tempDir, `photo-${Date.now()}.png`);
     await fs.writeFile(pngPath, paddedImageBuffer);
@@ -1885,7 +1597,7 @@ ipcMain.on('print-photo', async (event, printConfig) => {
     });
 
     // ดึง printer name จาก config ก่อน
-    let printerName = 'DP-QW410';
+    let printerName = "DP-QW410";
 
     // 1. ลองดึงจาก printer config ที่บันทึกไว้
     const printerConfig = await getPrinterConfig();
@@ -1907,41 +1619,18 @@ ipcMain.on('print-photo', async (event, printConfig) => {
         selectedPrinter: printerName,
         selectedCanCut: activePrinter.canCut,
       });
-
-      // เช็คว่า printer ที่เลือกยังเชื่อมต่ออยู่หรือไม่ — ถ้าหายไปไม่ fallback ไปตัวอื่น
-      if (mainWindow) {
-        const systemPrinters = await mainWindow.webContents.getPrintersAsync();
-        const printerStillConnected = systemPrinters.some(
-          (p) => p.name === printerName,
-        );
-        if (!printerStillConnected) {
-          log.error(
-            `🖨️ [Print] Configured printer disconnected: ${printerName}`,
-          );
-          isPrinting = false;
-          event.reply('print-response', {
-            success: false,
-            error: `เครื่องปริ้น "${printerName}" ขาดการเชื่อมต่อ กรุณาตรวจสอบสาย USB และเสียบเครื่องปริ้นใหม่`,
-          });
-          return;
-        }
-      }
     } else if (mainWindow) {
-      // 2. ถ้าไม่มี config → ไม่ auto-detect แจ้ง error กลับ
-      log.warn('🖨️ [Print] No printer config found, cannot print');
-      isPrinting = false;
-      event.reply('print-response', {
-        success: false,
-        error:
-          'ไม่พบการตั้งค่าเครื่องปริ้น กรุณาตั้งค่าเครื่องปริ้นก่อนใช้งาน',
-      });
-      return;
+      // 2. ถ้าไม่มี config ให้หา QW410 จากรายการ printers
+      const printers = await mainWindow.webContents.getPrintersAsync();
+      const target = printers.find(p => p.name.toLowerCase().includes("qw410"));
+      if (target) printerName = target.name;
+      log.info('🖨️ [Print] Using auto-detected printer:', printerName);
     }
 
     // พิมพ์หลายครั้งตาม copies
     let completedPrints = 0;
     let hasError = false;
-    let errorMessage = '';
+    let errorMessage = "";
 
     const printNext = async (copyNumber: number) => {
       if (copyNumber > copies) {
@@ -1949,21 +1638,11 @@ ipcMain.on('print-photo', async (event, printConfig) => {
         setTimeout(() => fs.unlink(pngPath).catch(() => {}), 2000);
 
         if (hasError) {
-          log.error('🖨️ [Print] Print failed:', {
-            error: errorMessage,
-            completedPrints,
-            totalCopies: copies,
-          });
-          event.reply('print-response', {
-            success: false,
-            error: errorMessage,
-          });
+          log.error('🖨️ [Print] Print failed:', { error: errorMessage, completedPrints, totalCopies: copies });
+          event.reply("print-response", { success: false, error: errorMessage });
         } else {
-          log.info('🖨️ [Print] Print completed successfully:', {
-            completedPrints,
-            totalCopies: copies,
-          });
-          event.reply('print-response', { success: true });
+          log.info('🖨️ [Print] Print completed successfully:', { completedPrints, totalCopies: copies });
+          event.reply("print-response", { success: true });
         }
 
         // ปลดล็อคหลังพิมพ์เสร็จ (รอสักครู่เพื่อป้องกันการพิมพ์ซ้ำ)
@@ -1981,25 +1660,16 @@ ipcMain.on('print-photo', async (event, printConfig) => {
         // หมายเหตุ: วิธีนี้ส่งไฟล์รูปไปยัง printer โดยตรงโดยไม่ผ่าน HTML rendering
         // ทำให้ไม่มีการ scale หรือ resampling ที่อาจทำให้ภาพเบลอ
         const printCmd = `rundll32 shimgvw.dll,ImageView_PrintTo /pt "${pngPath}" "${printerName}"`;
-        log.info('🖨️ [Print] Using rundll32 shimgvw.dll:', {
-          copyNumber,
-          printerName,
-          pngPath,
-        });
+        log.info('🖨️ [Print] Using rundll32 shimgvw.dll:', { copyNumber, printerName, pngPath });
 
         exec(printCmd, (err) => {
           if (err) {
-            log.error(
-              `🖨️ [Print] Print error (copy ${copyNumber}):`,
-              err.message,
-            );
+            log.error(`🖨️ [Print] Print error (copy ${copyNumber}):`, err.message);
             hasError = true;
             errorMessage = err.message;
           } else {
             completedPrints++;
-            log.info(
-              `🖨️ [Print] Copy ${copyNumber} sent to printer successfully (shimgvw.dll)`,
-            );
+            log.info(`🖨️ [Print] Copy ${copyNumber} sent to printer successfully (shimgvw.dll)`);
           }
 
           // พิมพ์ copy ถัดไป (รอสักครู่เพื่อให้เครื่องพิมพ์พร้อม)
@@ -2007,6 +1677,7 @@ ipcMain.on('print-photo', async (event, printConfig) => {
             printNext(copyNumber + 1);
           }, 1000);
         });
+
       } else {
         // macOS และ Linux: ใช้ command line เหมือนเดิม
         let printCmd: string;
@@ -2019,25 +1690,16 @@ ipcMain.on('print-photo', async (event, printConfig) => {
           printCmd = `lp -d "${printerName}" "${pngPath}"`;
         }
 
-        log.info('🖨️ [Print] Executing print command:', {
-          copyNumber,
-          printerName,
-          platform,
-        });
+        log.info('🖨️ [Print] Executing print command:', { copyNumber, printerName, platform });
 
         exec(printCmd, (err) => {
           if (err) {
-            log.error(
-              `🖨️ [Print] Print error (copy ${copyNumber}):`,
-              err.message,
-            );
+            log.error(`🖨️ [Print] Print error (copy ${copyNumber}):`, err.message);
             hasError = true;
             errorMessage = err.message;
           } else {
             completedPrints++;
-            log.info(
-              `🖨️ [Print] Copy ${copyNumber} sent to printer successfully`,
-            );
+            log.info(`🖨️ [Print] Copy ${copyNumber} sent to printer successfully`);
           }
 
           // พิมพ์ copy ถัดไป (รอสักครู่เพื่อให้เครื่องพิมพ์พร้อม)
@@ -2052,11 +1714,12 @@ ipcMain.on('print-photo', async (event, printConfig) => {
     printNext(1).then(() => {
       machineService.reducePaperLevel(copies);
     });
+
   } catch (err) {
     log.error('🖨️ [Print] Exception during print:', err);
-    event.reply('print-response', {
+    event.reply("print-response", {
       success: false,
-      error: err instanceof Error ? err.message : 'Unknown error',
+      error: err instanceof Error ? err.message : "Unknown error"
     });
     isPrinting = false;
   }
@@ -2064,106 +1727,96 @@ ipcMain.on('print-photo', async (event, printConfig) => {
 
 // ============ Sharp Image Encoding IPC Handler ============
 // ใช้ Sharp (libjpeg-turbo/libpng) แทน canvas.toDataURL เพื่อคุณภาพที่ดีกว่า
-ipcMain.handle(
-  'encode-image-sharp',
-  async (
-    _event,
-    options: {
-      rawData: Uint8Array | number[]; // RGBA pixel data
-      width: number;
-      height: number;
-      format: 'png' | 'jpeg';
-      quality?: number; // JPEG quality 1-100
-    },
-  ) => {
-    try {
-      const startTime = Date.now();
-      const { rawData, width, height, format, quality = 92 } = options;
+ipcMain.handle('encode-image-sharp', async (
+  _event,
+  options: {
+    rawData: Uint8Array | number[];  // RGBA pixel data
+    width: number;
+    height: number;
+    format: 'png' | 'jpeg';
+    quality?: number;  // JPEG quality 1-100
+  }
+) => {
+  try {
+    const startTime = Date.now();
+    const { rawData, width, height, format, quality = 92 } = options;
 
-      // แปลง array/Uint8Array เป็น Buffer
-      const inputBuffer = Buffer.from(rawData);
+    // แปลง array/Uint8Array เป็น Buffer
+    const inputBuffer = Buffer.from(rawData);
 
-      console.log(
-        `🖼️ [Sharp Encode] Starting ${format.toUpperCase()} encode:`,
-        {
-          width,
-          height,
-          inputSize: `${(inputBuffer.length / 1024 / 1024).toFixed(2)} MB`,
-          quality: format === 'jpeg' ? quality : 'N/A (PNG)',
-        },
-      );
+    console.log(`🖼️ [Sharp Encode] Starting ${format.toUpperCase()} encode:`, {
+      width,
+      height,
+      inputSize: `${(inputBuffer.length / 1024 / 1024).toFixed(2)} MB`,
+      quality: format === 'jpeg' ? quality : 'N/A (PNG)',
+    });
 
-      // สร้าง Sharp instance จาก raw RGBA data
-      let image = sharp(inputBuffer, {
-        raw: {
-          width,
-          height,
-          channels: 4, // RGBA
-        },
-      });
-
-      let outputBuffer: Buffer;
-      let mimeType: string;
-
-      if (format === 'jpeg') {
-        // JPEG: ใช้ mozjpeg encoder (คุณภาพดีกว่า standard libjpeg)
-        outputBuffer = await image
-          .jpeg({
-            quality,
-            mozjpeg: true, // ใช้ mozjpeg สำหรับ compression ที่ดีกว่า
-            chromaSubsampling: '4:4:4', // ไม่ลด chroma สำหรับคุณภาพสูงสุด
-          })
-          .toBuffer();
-        mimeType = 'image/jpeg';
-      } else {
-        // PNG: lossless
-        outputBuffer = await image
-          .png({
-            compressionLevel: 6,
-            adaptiveFiltering: true,
-          })
-          .toBuffer();
-        mimeType = 'image/png';
+    // สร้าง Sharp instance จาก raw RGBA data
+    let image = sharp(inputBuffer, {
+      raw: {
+        width,
+        height,
+        channels: 4  // RGBA
       }
+    });
 
-      // แปลงเป็น base64 data URL
-      const base64 = outputBuffer.toString('base64');
-      const dataUrl = `data:${mimeType};base64,${base64}`;
+    let outputBuffer: Buffer;
+    let mimeType: string;
 
-      const endTime = Date.now();
-      const compressionRatio = (
-        (1 - outputBuffer.length / inputBuffer.length) *
-        100
-      ).toFixed(1);
-
-      console.log(
-        `🖼️ [Sharp Encode] ${format.toUpperCase()} encode complete:`,
-        {
-          outputSize: `${(outputBuffer.length / 1024 / 1024).toFixed(2)} MB`,
-          compressionRatio: `${compressionRatio}%`,
-          duration: `${endTime - startTime}ms`,
-        },
-      );
-
-      return {
-        success: true,
-        dataUrl,
-        stats: {
-          inputSize: inputBuffer.length,
-          outputSize: outputBuffer.length,
-          compressionRatio: parseFloat(compressionRatio),
-          duration: endTime - startTime,
-        },
-      };
-    } catch (err) {
-      console.error('❌ [Sharp Encode] Error:', err);
-      return {
-        success: false,
-        error: err instanceof Error ? err.message : 'Unknown error',
-      };
+    if (format === 'jpeg') {
+      // JPEG: ใช้ mozjpeg encoder (คุณภาพดีกว่า standard libjpeg)
+      outputBuffer = await image
+        .jpeg({
+          quality,
+          mozjpeg: true,  // ใช้ mozjpeg สำหรับ compression ที่ดีกว่า
+          chromaSubsampling: '4:4:4',  // ไม่ลด chroma สำหรับคุณภาพสูงสุด
+        })
+        .toBuffer();
+      mimeType = 'image/jpeg';
+    } else {
+      // PNG: lossless
+      outputBuffer = await image
+        .png({
+          compressionLevel: 6,
+          adaptiveFiltering: true,
+        })
+        .toBuffer();
+      mimeType = 'image/png';
     }
-  },
-);
+
+    // แปลงเป็น base64 data URL
+    const base64 = outputBuffer.toString('base64');
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+
+    const endTime = Date.now();
+    const compressionRatio = ((1 - outputBuffer.length / inputBuffer.length) * 100).toFixed(1);
+
+    console.log(`🖼️ [Sharp Encode] ${format.toUpperCase()} encode complete:`, {
+      outputSize: `${(outputBuffer.length / 1024 / 1024).toFixed(2)} MB`,
+      compressionRatio: `${compressionRatio}%`,
+      duration: `${endTime - startTime}ms`,
+    });
+
+    return {
+      success: true,
+      dataUrl,
+      stats: {
+        inputSize: inputBuffer.length,
+        outputSize: outputBuffer.length,
+        compressionRatio: parseFloat(compressionRatio),
+        duration: endTime - startTime,
+      }
+    };
+
+  } catch (err) {
+    console.error('❌ [Sharp Encode] Error:', err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error'
+    };
+  }
+});
+
 
 // // KSher Payment IPC handlers
 // ipcMain.handle(
@@ -2196,20 +1849,9 @@ ipcMain.handle(
 // Machine Payment API handler
 ipcMain.handle(
   'create-machine-payment',
-  async (
-    event,
-    amount: number,
-    numberPhoto: number,
-    channel: string = 'promptpay',
-    couponCodeId?: string,
-  ) => {
+  async (event, amount: number, numberPhoto: number, channel: string = 'promptpay', couponCodeId?: string) => {
     try {
-      const result = await machineService.createPayment(
-        amount,
-        numberPhoto,
-        channel,
-        couponCodeId,
-      );
+      const result = await machineService.createPayment(amount, numberPhoto, channel, couponCodeId);
       return result;
     } catch (error) {
       console.error('Error in create-machine-payment handler:', error);
@@ -2221,17 +1863,20 @@ ipcMain.handle(
 );
 
 // Machine Coupon API handler
-ipcMain.handle('check-machine-coupon', async (event, code: string) => {
-  try {
-    const result = await machineService.checkCoupon(code);
-    return result;
-  } catch (error) {
-    console.error('Error in check-machine-coupon handler:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    return { valid: false, message: errorMessage };
-  }
-});
+ipcMain.handle(
+  'check-machine-coupon',
+  async (event, code: string) => {
+    try {
+      const result = await machineService.checkCoupon(code);
+      return result;
+    } catch (error) {
+      console.error('Error in check-machine-coupon handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return { valid: false, message: errorMessage };
+    }
+  },
+);
 
 ipcMain.handle(
   'check-machine-payment-status',
@@ -2288,8 +1933,7 @@ ipcMain.handle('get-machine-data', async () => {
     if (printerConfig) {
       // ใช้ main.canCut เป็นค่าหลัก
       // ถ้ามี secondary ที่ canCut=true ก็ถือว่าระบบตัดได้
-      canCut =
-        printerConfig.main.canCut || (printerConfig.secondary?.canCut ?? false);
+      canCut = printerConfig.main.canCut || (printerConfig.secondary?.canCut ?? false);
     }
 
     if (cachedInitData?.machine) {
@@ -2343,13 +1987,13 @@ ipcMain.handle('force-init', async () => {
 
     return {
       success: true,
-      data: initResponse,
+      data: initResponse
     };
   } catch (error) {
-    console.error('❌ [Main] Force init failed:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMessage };
+     console.error('❌ [Main] Force init failed:', error);
+     const errorMessage =
+       error instanceof Error ? error.message : 'Unknown error';
+     return { success: false, error: errorMessage };
   }
 });
 
@@ -2382,87 +2026,73 @@ ipcMain.handle('save-temp-video', async (event, arrayBuffer: ArrayBuffer) => {
 });
 
 // Handler สำหรับ apply LUT to video
-ipcMain.handle(
-  'apply-lut-to-video',
-  async (event, videoPath: string, lutFileName: string) => {
-    try {
-      const outputPath = await applyLutToVideo(videoPath, lutFileName);
-      return {
-        success: true,
-        path: outputPath,
-      };
-    } catch (error) {
-      console.error('❌ [Main] Error applying LUT to video:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      return {
-        success: false,
-        error: errorMessage,
-      };
-    }
-  },
-);
+ipcMain.handle('apply-lut-to-video', async (event, videoPath: string, lutFileName: string) => {
+  try {
+    const outputPath = await applyLutToVideo(videoPath, lutFileName);
+    return {
+      success: true,
+      path: outputPath,
+    };
+  } catch (error) {
+    console.error('❌ [Main] Error applying LUT to video:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+});
 
 // Handler สำหรับ create boomerang with LUT
-ipcMain.handle(
-  'create-boomerang-with-lut',
-  async (event, videoPath: string, lutFileName: string) => {
-    try {
-      const outputPath = await createBoomerangWithLut(videoPath, lutFileName);
+ipcMain.handle('create-boomerang-with-lut', async (event, videoPath: string, lutFileName: string) => {
+  try {
+    const outputPath = await createBoomerangWithLut(videoPath, lutFileName);
+    return {
+      success: true,
+      path: outputPath,
+    };
+  } catch (error) {
+    console.error('❌ [Main] Error creating boomerang with LUT:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+});
+
+// Handler สำหรับ convert WebM to MP4 (iPhone/Safari compatibility)
+ipcMain.handle('convert-to-mp4', async (event, videoPath: string, returnBase64: boolean = false) => {
+  try {
+    console.log('🎬 [Main] Converting WebM to MP4:', videoPath, 'returnBase64:', returnBase64);
+
+    if (returnBase64) {
+      // Return as Base64 data URL (useful for direct download/embedding)
+      const dataUrl = await convertWebmToMp4Base64(videoPath);
+      return {
+        success: true,
+        dataUrl,
+      };
+    } else {
+      // Return file path
+      const outputPath = await convertWebmToMp4(videoPath);
       return {
         success: true,
         path: outputPath,
       };
-    } catch (error) {
-      console.error('❌ [Main] Error creating boomerang with LUT:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      return {
-        success: false,
-        error: errorMessage,
-      };
     }
-  },
-);
-
-// Handler สำหรับ convert WebM to MP4 (iPhone/Safari compatibility)
-ipcMain.handle(
-  'convert-to-mp4',
-  async (event, videoPath: string, returnBase64: boolean = false) => {
-    try {
-      console.log(
-        '🎬 [Main] Converting WebM to MP4:',
-        videoPath,
-        'returnBase64:',
-        returnBase64,
-      );
-
-      if (returnBase64) {
-        // Return as Base64 data URL (useful for direct download/embedding)
-        const dataUrl = await convertWebmToMp4Base64(videoPath);
-        return {
-          success: true,
-          dataUrl,
-        };
-      } else {
-        // Return file path
-        const outputPath = await convertWebmToMp4(videoPath);
-        return {
-          success: true,
-          path: outputPath,
-        };
-      }
-    } catch (error) {
-      console.error('❌ [Main] Error converting to MP4:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      return {
-        success: false,
-        error: errorMessage,
-      };
-    }
-  },
-);
+  } catch (error) {
+    console.error('❌ [Main] Error converting to MP4:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+});
 
 // Handler สำหรับ List DShow Video Devices
 ipcMain.handle('list-video-devices', async () => {
@@ -2482,33 +2112,20 @@ ipcMain.handle('list-video-devices', async () => {
 });
 
 // Handler สำหรับเริ่มอัด Native (DirectShow)
-ipcMain.handle(
-  'start-native-recording',
-  async (
-    event,
-    deviceName: string,
-    outputPath: string,
-    options?: {
-      saturation?: number;
-      contrast?: number;
-      brightness?: number;
-      gamma?: number;
-    },
-  ) => {
-    try {
-      await startRecordingCallback(deviceName, outputPath, options);
-      return {
-        success: true,
-      };
-    } catch (error) {
-      console.error('❌ [Main] Error start native recording:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  },
-);
+ipcMain.handle('start-native-recording', async (event, deviceName: string, outputPath: string, options?: { saturation?: number, contrast?: number, brightness?: number, gamma?: number }) => {
+  try {
+    await startRecordingCallback(deviceName, outputPath, options);
+    return {
+      success: true,
+    };
+  } catch (error) {
+    console.error('❌ [Main] Error start native recording:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
 
 // Handler สำหรับหยุดอัด Native
 ipcMain.handle('stop-native-recording', async () => {
@@ -2533,39 +2150,32 @@ ipcMain.handle('stop-native-recording', async () => {
 // ============================================================================
 
 // Start native camera live view (FFmpeg pipes JPEG frames)
-ipcMain.handle(
-  'native-camera-start-live-view',
-  async (
-    event,
-    deviceName: string,
-    options?: {
-      width?: number;
-      height?: number;
-      frameRate?: number;
-      quality?: number;
-    },
-  ) => {
-    try {
-      await nativeCameraService.startLiveView(deviceName, options);
+ipcMain.handle('native-camera-start-live-view', async (event, deviceName: string, options?: {
+  width?: number;
+  height?: number;
+  frameRate?: number;
+  quality?: number;
+}) => {
+  try {
+    await nativeCameraService.startLiveView(deviceName, options);
 
-      // Setup frame forwarding to renderer
-      const forwardFrame = (frameData: string) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('native-camera-frame', frameData);
-        }
-      };
-      nativeCameraService.addFrameListener(forwardFrame);
+    // Setup frame forwarding to renderer
+    const forwardFrame = (frameData: string) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('native-camera-frame', frameData);
+      }
+    };
+    nativeCameraService.addFrameListener(forwardFrame);
 
-      return { success: true };
-    } catch (error) {
-      console.error('❌ [Main] Error starting native camera live view:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  },
-);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ [Main] Error starting native camera live view:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
 
 // Stop native camera live view
 ipcMain.handle('native-camera-stop-live-view', async () => {
@@ -2587,35 +2197,27 @@ ipcMain.handle('native-camera-get-live-view-status', async () => {
 });
 
 // Start native camera recording (FFmpeg encodes directly to MP4)
-ipcMain.handle(
-  'native-camera-start-recording',
-  async (
-    event,
-    deviceName: string,
-    outputPath: string,
-    options?: {
-      width?: number;
-      height?: number;
-      frameRate?: number;
-      duration?: number;
-      saturation?: number;
-      contrast?: number;
-      brightness?: number;
-      gamma?: number;
-    },
-  ) => {
-    try {
-      await nativeCameraService.startRecording(deviceName, outputPath, options);
-      return { success: true };
-    } catch (error) {
-      console.error('❌ [Main] Error starting native camera recording:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  },
-);
+ipcMain.handle('native-camera-start-recording', async (event, deviceName: string, outputPath: string, options?: {
+  width?: number;
+  height?: number;
+  frameRate?: number;
+  duration?: number;
+  saturation?: number;
+  contrast?: number;
+  brightness?: number;
+  gamma?: number;
+}) => {
+  try {
+    await nativeCameraService.startRecording(deviceName, outputPath, options);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ [Main] Error starting native camera recording:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
 
 // Stop native camera recording
 ipcMain.handle('native-camera-stop-recording', async () => {
@@ -2637,113 +2239,82 @@ ipcMain.handle('native-camera-get-recording-status', async () => {
 });
 
 // Capture single JPEG frame from camera
-ipcMain.handle(
-  'native-camera-capture-frame',
-  async (
-    event,
-    deviceName: string,
-    options?: {
-      width?: number;
-      height?: number;
-      quality?: number;
-    },
-  ) => {
-    try {
-      const dataUrl = await nativeCameraService.captureFrame(
-        deviceName,
-        options,
-      );
-      return { success: true, dataUrl };
-    } catch (error) {
-      console.error('❌ [Main] Error capturing frame:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  },
-);
+ipcMain.handle('native-camera-capture-frame', async (event, deviceName: string, options?: {
+  width?: number;
+  height?: number;
+  quality?: number;
+}) => {
+  try {
+    const dataUrl = await nativeCameraService.captureFrame(deviceName, options);
+    return { success: true, dataUrl };
+  } catch (error) {
+    console.error('❌ [Main] Error capturing frame:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
 
 // Capture single frame to file
-ipcMain.handle(
-  'native-camera-capture-frame-to-file',
-  async (
-    event,
-    deviceName: string,
-    outputPath: string,
-    options?: {
-      width?: number;
-      height?: number;
-      quality?: number;
-    },
-  ) => {
-    try {
-      const filePath = await nativeCameraService.captureFrameToFile(
-        deviceName,
-        outputPath,
-        options,
-      );
-      return { success: true, filePath };
-    } catch (error) {
-      console.error('❌ [Main] Error capturing frame to file:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  },
-);
+ipcMain.handle('native-camera-capture-frame-to-file', async (event, deviceName: string, outputPath: string, options?: {
+  width?: number;
+  height?: number;
+  quality?: number;
+}) => {
+  try {
+    const filePath = await nativeCameraService.captureFrameToFile(deviceName, outputPath, options);
+    return { success: true, filePath };
+  } catch (error) {
+    console.error('❌ [Main] Error capturing frame to file:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
 
 // Start live view and recording simultaneously
-ipcMain.handle(
-  'native-camera-start-live-and-record',
-  async (
-    event,
-    deviceName: string,
-    recordingPath: string,
-    liveViewOptions?: {
-      width?: number;
-      height?: number;
-      frameRate?: number;
-      quality?: number;
-    },
-    recordingOptions?: {
-      width?: number;
-      height?: number;
-      frameRate?: number;
-      duration?: number;
-      saturation?: number;
-      contrast?: number;
-      brightness?: number;
-      gamma?: number;
-    },
-  ) => {
-    try {
-      await nativeCameraService.startLiveViewAndRecording(
-        deviceName,
-        recordingPath,
-        liveViewOptions,
-        recordingOptions,
-      );
+ipcMain.handle('native-camera-start-live-and-record', async (event, deviceName: string, recordingPath: string, liveViewOptions?: {
+  width?: number;
+  height?: number;
+  frameRate?: number;
+  quality?: number;
+}, recordingOptions?: {
+  width?: number;
+  height?: number;
+  frameRate?: number;
+  duration?: number;
+  saturation?: number;
+  contrast?: number;
+  brightness?: number;
+  gamma?: number;
+}) => {
+  try {
+    await nativeCameraService.startLiveViewAndRecording(
+      deviceName,
+      recordingPath,
+      liveViewOptions,
+      recordingOptions
+    );
 
-      // Setup frame forwarding
-      const forwardFrame = (frameData: string) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('native-camera-frame', frameData);
-        }
-      };
-      nativeCameraService.addFrameListener(forwardFrame);
+    // Setup frame forwarding
+    const forwardFrame = (frameData: string) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('native-camera-frame', frameData);
+      }
+    };
+    nativeCameraService.addFrameListener(forwardFrame);
 
-      return { success: true };
-    } catch (error) {
-      console.error('❌ [Main] Error starting live view and recording:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  },
-);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ [Main] Error starting live view and recording:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
 
 // Stop all native camera processes
 ipcMain.handle('native-camera-stop-all', async () => {
@@ -2751,10 +2322,7 @@ ipcMain.handle('native-camera-stop-all', async () => {
     const result = await nativeCameraService.stopAll();
     return { success: true, ...result };
   } catch (error) {
-    console.error(
-      '❌ [Main] Error stopping all native camera processes:',
-      error,
-    );
+    console.error('❌ [Main] Error stopping all native camera processes:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -2775,25 +2343,22 @@ ipcMain.handle('get-machine-config', async () => {
   }
 });
 
-ipcMain.handle(
-  'save-machine-config',
-  async (event, config: { machineId: string; machinePort: string }) => {
-    try {
-      const success = await saveMachineConfig(config);
-      if (success) {
-        // Clear cache เพื่อให้อ่าน config ใหม่
-        clearEnvConfigCache();
-        return { success: true };
-      }
-      return { success: false, error: 'Failed to save config' };
-    } catch (error) {
-      console.error('❌ [Main] Error saving machine config:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
+ipcMain.handle('save-machine-config', async (event, config: { machineId: string; machinePort: string }) => {
+  try {
+    const success = await saveMachineConfig(config);
+    if (success) {
+      // Clear cache เพื่อให้อ่าน config ใหม่
+      clearEnvConfigCache();
+      return { success: true };
     }
-  },
-);
+    return { success: false, error: 'Failed to save config' };
+  } catch (error) {
+    console.error('❌ [Main] Error saving machine config:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
 
 ipcMain.handle('has-machine-config', async () => {
   try {
@@ -2838,6 +2403,35 @@ ipcMain.handle('get-config-file-path', async () => {
     return { success: false, error: errorMessage };
   }
 });
+
+/**
+ * [DEV] แสดงหน้า maintenance แบบจำลองเมื่อไม่พบ camera หรือ printer
+ * ใช้สำหรับพัฒนา/ทดสอบ UI หน้า system-maintenance
+ * เรียกจาก DevTools: await window.electron.dev.showMaintenance('camera') หรือ ('printer')
+ */
+ipcMain.handle(
+  'dev:show-maintenance',
+  async (
+    _event,
+    deviceType: 'camera' | 'printer',
+  ): Promise<{ success: boolean }> => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return { success: false };
+    }
+    const deviceName =
+      deviceType === 'camera'
+        ? 'Camera (dev simulation)'
+        : 'Printer (dev simulation)';
+    mainWindow.webContents.send('device-not-found', {
+      deviceType,
+      deviceName,
+    });
+    console.log(
+      `🛠️ [Main] [DEV] show-maintenance triggered: ${deviceType} - ${deviceName}`,
+    );
+    return { success: true };
+  },
+);
 
 // Handler สำหรับ read video file
 ipcMain.handle('read-video-file', async (event, filePath: string) => {
@@ -2895,37 +2489,28 @@ ipcMain.handle('get-paper-position-config', async () => {
   }
 });
 
-ipcMain.handle(
-  'save-paper-position-config',
-  async (event, config: PaperPositionConfig) => {
-    try {
-      const success = await savePaperPositionConfig(config);
-      if (success) {
-        return { success: true };
-      }
-      return { success: false, error: 'Failed to save config' };
-    } catch (error) {
-      console.error('Error in save-paper-position-config handler:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
+ipcMain.handle('save-paper-position-config', async (event, config: PaperPositionConfig) => {
+  try {
+    const success = await savePaperPositionConfig(config);
+    if (success) {
+      return { success: true };
     }
-  },
-);
+    return { success: false, error: 'Failed to save config' };
+  } catch (error) {
+    console.error('Error in save-paper-position-config handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
 
 ipcMain.handle('get-default-paper-position-config', async () => {
   try {
     console.log('📋 [Main] get-default-paper-position-config called');
-    console.log(
-      '📋 [Main] DEFAULT_PAPER_POSITION_CONFIG:',
-      DEFAULT_PAPER_POSITION_CONFIG,
-    );
+    console.log('📋 [Main] DEFAULT_PAPER_POSITION_CONFIG:', DEFAULT_PAPER_POSITION_CONFIG);
     return { success: true, config: DEFAULT_PAPER_POSITION_CONFIG };
   } catch (error) {
-    console.error(
-      '❌ [Main] Error in get-default-paper-position-config handler:',
-      error,
-    );
+    console.error('❌ [Main] Error in get-default-paper-position-config handler:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage };
@@ -2985,28 +2570,29 @@ ipcMain.handle('get-print-test-position', async () => {
   }
 });
 
-ipcMain.handle(
-  'save-print-test-position',
-  async (event, position: PrintTestPosition) => {
-    try {
-      const success = await savePrintTestPosition(position);
-      if (success) {
-        return { success: true };
-      }
-      return { success: false, error: 'Failed to save position' };
-    } catch (error) {
-      console.error('Error in save-print-test-position handler:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
+ipcMain.handle('save-print-test-position', async (event, position: PrintTestPosition) => {
+  try {
+    const success = await savePrintTestPosition(position);
+    if (success) {
+      return { success: true };
     }
-  },
-);
+    return { success: false, error: 'Failed to save position' };
+  } catch (error) {
+    console.error('Error in save-print-test-position handler:', error);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
 
 // Handler สำหรับสร้าง photo session
 ipcMain.handle(
   'create-photo-session',
-  async (event, transactionId: string, transactionCode?: string) => {
+  async (
+    event,
+    transactionId: string,
+    transactionCode?: string,
+  ) => {
     try {
       const result = await machineService.createPhotoSession(
         transactionId,
@@ -3033,80 +2619,15 @@ ipcMain.handle(
   },
 );
 
-// Handler สำหรับสร้าง presigned upload URLs (Presigned Upload flow)
+// Handler สำหรับ upload files ไปยัง session
 ipcMain.handle(
-  'create-presign-upload',
-  async (
-    event,
-    transactionId: string,
-    files: Array<{ type: 'photo' | 'video'; contentType: string }>,
-    transactionCode?: string,
-  ) => {
-    try {
-      const result = await machineService.createPresignUpload(
-        transactionId,
-        files,
-        transactionCode,
-      );
-      return result;
-    } catch (error) {
-      console.error('❌ [Main] Error in create-presign-upload handler:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      return {
-        success: false,
-        message: errorMessage,
-        error: errorMessage,
-        photoSession: {
-          id: '',
-          transactionId,
-          numPhotosSelected: 0,
-          status: 'failed',
-        },
-        qrcodeStorageUrl: '',
-        uploadUrls: [],
-        expiresIn: 0,
-        expiresAt: '',
-      };
-    }
-  },
-);
-
-// Handler สำหรับ confirm upload (Presigned Upload flow)
-ipcMain.handle(
-  'confirm-upload',
+  'upload-files-to-session',
   async (
     event,
     sessionId: string,
-    uploadedFiles: Array<{
-      key: string;
-      type: 'photo' | 'video';
-      order: number;
-    }>,
+    photos: string[],
+    videos: string[] = [],
   ) => {
-    try {
-      const result = await machineService.confirmUpload(
-        sessionId,
-        uploadedFiles,
-      );
-      return result;
-    } catch (error) {
-      console.error('❌ [Main] Error in confirm-upload handler:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      return {
-        success: false,
-        message: errorMessage,
-        error: errorMessage,
-      };
-    }
-  },
-);
-
-// Handler สำหรับ upload files ไปยัง session (Legacy - ใช้ presigned upload แทน)
-ipcMain.handle(
-  'upload-files-to-session',
-  async (event, sessionId: string, photos: string[], videos: string[] = []) => {
     try {
       const result = await machineService.uploadFilesToSession(
         sessionId,
@@ -3115,10 +2636,7 @@ ipcMain.handle(
       );
       return result;
     } catch (error) {
-      console.error(
-        '❌ [Main] Error in upload-files-to-session handler:',
-        error,
-      );
+      console.error('❌ [Main] Error in upload-files-to-session handler:', error);
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       return {
@@ -3174,8 +2692,8 @@ ipcMain.handle(
   },
 );
 
-// Handler สำหรับ background upload (Presigned Upload flow)
-// ส่ง job ไป queue และ return ทันที - ใช้ presigned URLs สำหรับ PUT ตรงไป Storage
+// Handler สำหรับ background upload (ส่ง job ไป queue และ return ทันที)
+// ใช้เมื่อต้องการให้ upload ทำงานเบื้องหลังโดยไม่ต้องรอ
 // ถ้าส่ง webmVideoPath มาด้วย จะแปลง WebM→MP4 ในเบื้องหลังก่อน upload
 ipcMain.handle(
   'queue-background-upload',
@@ -3185,28 +2703,12 @@ ipcMain.handle(
     photos: string[],
     videos: string[] = [],
     webmVideoPath?: string,
-    uploadUrls?: Array<{
-      type: 'photo' | 'video';
-      order: number;
-      uploadUrl: string;
-      key: string;
-      publicUrl: string;
-      contentType: string;
-    }>,
   ) => {
     try {
-      console.log('📤 [Main] Queueing background presigned upload...');
-      console.log(
-        `📤 [Main] Session: ${sessionId}, Photos: ${photos.length}, Videos: ${videos.length}, UploadUrls: ${uploadUrls?.length || 0}`,
-      );
+      console.log('📤 [Main] Queueing background upload...');
+      console.log(`📤 [Main] Session: ${sessionId}, Photos: ${photos.length}, Videos: ${videos.length}`);
       if (webmVideoPath) {
-        console.log(
-          `📤 [Main] WebM video path: ${webmVideoPath} (will convert in background)`,
-        );
-      }
-
-      if (!uploadUrls || uploadUrls.length === 0) {
-        throw new Error('uploadUrls is required for presigned upload');
+        console.log(`📤 [Main] WebM video path: ${webmVideoPath} (will convert in background)`);
       }
 
       const result = await backgroundUploadService.queueUpload(
@@ -3214,7 +2716,6 @@ ipcMain.handle(
         photos,
         videos,
         webmVideoPath,
-        uploadUrls,
       );
 
       console.log(`✅ [Main] Upload queued with job ID: ${result.jobId}`);
@@ -3224,10 +2725,7 @@ ipcMain.handle(
         message: 'Upload queued successfully',
       };
     } catch (error) {
-      console.error(
-        '❌ [Main] Error in queue-background-upload handler:',
-        error,
-      );
+      console.error('❌ [Main] Error in queue-background-upload handler:', error);
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       return {
@@ -3265,10 +2763,7 @@ ipcMain.handle('get-pending-uploads-count', async () => {
       count,
     };
   } catch (error) {
-    console.error(
-      '❌ [Main] Error in get-pending-uploads-count handler:',
-      error,
-    );
+    console.error('❌ [Main] Error in get-pending-uploads-count handler:', error);
     return {
       success: false,
       count: 0,
@@ -3374,43 +2869,57 @@ ipcMain.handle('get-camera-config', async () => {
   }
 });
 
-// NOTE: camera-availability-result is now handled via ipcMain.once inside checkCamera()
-// Persistent listener removed to prevent duplicate event handling
-
-/**
- * webcam-instant-status: รับผลจาก renderer เมื่อ USB device เปลี่ยน (devicechange event)
- * ใช้สำหรับ instant detection ไม่ต้องรอ polling 10 วินาที
- */
-ipcMain.on('webcam-instant-status', async (_event, data) => {
-  const { found, configuredLabel } = data;
-  const previousStatus = deviceStatus.camera; // สมมติว่าเริ่มต้นเป็น true
-
-  // อัปเดตสถานะปัจจุบัน
-  deviceStatus.camera = found;
-
-  console.log(
-    `⚡ [Main] Status Change: ${previousStatus} -> ${found} (${configuredLabel})`,
-  );
-
-  // เคส 1: กล้องหาย (จากเคยมีอยู่ true กลายเป็นไม่มี false)
-  if (previousStatus === true && found === false) {
-    console.log('❌ Camera Lost - Sending Alert');
-    await sendDeviceAlertWithRateLimit(
-      'camera',
-      configuredLabel || 'Webcam',
-      [],
-    );
-    sendDeviceStatus({
-      deviceType: 'camera',
-      deviceName: configuredLabel || 'Webcam',
-    });
+// Handler สำหรับรับผลการเช็ค camera availability จาก renderer
+ipcMain.on('camera-availability-result', async (event, result: {
+  found: boolean;
+  configuredDeviceId: string;
+  configuredLabel: string;
+  availableDevices: string[];
+}) => {
+  if (!result.found) {
+    console.warn(`⚠️ [Main] Configured camera not found: ${result.configuredLabel} (${result.configuredDeviceId})`);
+    if (mainWindow) {
+      mainWindow.webContents.send('device-not-found', {
+        deviceType: 'camera',
+        deviceName: result.configuredLabel,
+      });
+    }
+    sendDeviceAlertToBackendIfAllowed('camera', result.configuredLabel, result.availableDevices);
+  } else {
+    console.log(`✅ [Main] Configured camera found: ${result.configuredLabel}`);
+    notifyDeviceReconnectedIfNeeded('camera', result.configuredLabel);
   }
-  // เคส 2: กล้องกลับมา (จากเคยไม่มี false กลายเป็นมี true)
-  else if (previousStatus === false && found === true) {
-    console.log('✅ Camera Recovered - Clear Alert');
-    sendDeviceStatus(); // ส่ง status เพื่อบอกว่าทุกอย่าง OK แล้ว
+});
+
+// หน้าตั้งค่ากล้องแจ้งว่าเข้าถึงกล้องไม่ได้ → อัปเดตสถานะให้กล่องดำแสดงไม่เชื่อมต่อ
+ipcMain.on('camera-access-failed', async () => {
+  try {
+    const config = await getCameraConfig();
+    if (!config) {
+      if (mainWindow) {
+        mainWindow.webContents.send('device-not-found', {
+          deviceType: 'camera',
+          deviceName: 'Webcam',
+        });
+      }
+      return;
+    }
+    const deviceName =
+      config.type === 'webcam' ? config.label : config.cameraName;
+    if (mainWindow) {
+      mainWindow.webContents.send('device-not-found', {
+        deviceType: 'camera',
+        deviceName,
+      });
+    }
+  } catch {
+    if (mainWindow) {
+      mainWindow.webContents.send('device-not-found', {
+        deviceType: 'camera',
+        deviceName: 'Webcam',
+      });
+    }
   }
-  // เคสอื่นๆ (เช่น false -> false หรือ true -> true) ไม่ต้องทำอะไร
 });
 
 ipcMain.handle('save-camera-config', async (event, config: CameraConfig) => {
@@ -3456,10 +2965,12 @@ ipcMain.handle('get-printers', async () => {
       return { success: false, error: 'Main window not available' };
     }
     const printers = await mainWindow.webContents.getPrintersAsync();
+    // status: Windows ใช้ bitmask (เช่น 0x400 = offline), ส่งไปให้ renderer เช็คสัญญาณจริง
     const printerList = printers.map((p) => ({
       name: p.name,
       displayName: p.displayName || p.name,
       isDefault: p.isDefault || false,
+      status: (p as any).status ?? undefined,
     }));
     return { success: true, printers: printerList };
   } catch (error) {
@@ -3485,6 +2996,12 @@ ipcMain.handle('get-printer-config', async () => {
 ipcMain.handle('save-printer-config', async (event, config: PrinterConfig) => {
   try {
     const success = await savePrinterConfig(config);
+    if (success && mainWindow && !mainWindow.isDestroyed()) {
+      // เช็คเครื่องปริ้นที่เพิ่งสลับไปทันที (มีสัญญาณหรือไม่) แล้วอัปเดตกล่องสถานะ
+      checkPrinter().catch((err) =>
+        console.warn('⚠️ [Main] checkPrinter after save failed:', err)
+      );
+    }
     return { success };
   } catch (error) {
     console.error('Error in save-printer-config handler:', error);
