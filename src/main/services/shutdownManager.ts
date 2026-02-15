@@ -31,7 +31,8 @@ export interface ShutdownManagerCallbacks {
 
 // ค่า default
 const DEFAULT_COUNTDOWN_MINUTES = 2;
-const SHUTDOWN_DELAY_SECONDS = 2; // รอให้ SSE disconnect ก่อน shutdown OS
+/** รอหลัง destroy() เพื่อให้ backend รับ connection close แล้ว mark offline + ส่ง Telegram ก่อนที่ OS จะปิด */
+const POST_DESTROY_DELAY_SECONDS = 3;
 
 export class ShutdownManager {
   private state: ShutdownState = {
@@ -371,13 +372,14 @@ export class ShutdownManager {
     this.clearCountdownTimer();
     this.callbacks.onShutdownStarting?.();
 
-    // รอให้ SSE disconnect ก่อน shutdown OS
-    console.log(`⏳ [ShutdownManager] Waiting ${SHUTDOWN_DELAY_SECONDS}s before shutdown...`);
-    await new Promise((resolve) => setTimeout(resolve, SHUTDOWN_DELAY_SECONDS * 1000));
-
-    // Shutdown OS
     try {
+      // ตัด SSE ก่อน เพื่อให้ backend รับรู้และส่ง noti "เครื่องออฟไลน์" ได้
+      console.log('🔌 [ShutdownManager] Disconnecting SSE before shutdown...');
       await sseClient.destroy();
+
+      // รอให้ backend รับ connection close + mark offline + ส่ง Telegram ก่อนปิดเครื่อง
+      console.log(`⏳ [ShutdownManager] Waiting ${POST_DESTROY_DELAY_SECONDS}s for backend to process...`);
+      await new Promise((resolve) => setTimeout(resolve, POST_DESTROY_DELAY_SECONDS * 1000));
 
       const platform = process.platform;
       let shutdownCmd: string;
