@@ -1529,6 +1529,34 @@ export class MachineService {
       };
     }
   }
+
+  /**
+   * แจ้งเตือนเมื่อ device (กล้อง/เครื่องปริ้น) กลับมาเชื่อมต่อแล้ว
+   */
+  async sendDeviceReconnected(
+    deviceType: 'camera' | 'printer',
+    deviceName?: string,
+  ): Promise<{ success: boolean; message: string; notificationSent: boolean }> {
+    try {
+      const result = await this.makeRequest<{
+        success: boolean;
+        message: string;
+        notificationSent: boolean;
+      }>('/api/machines-public/device-reconnected', 'POST', { deviceType, deviceName });
+
+      console.log(
+        `✅ [MachineService] Device reconnected sent: ${deviceType}${deviceName ? ` (${deviceName})` : ''}`,
+      );
+      return result;
+    } catch (error) {
+      console.error('❌ [MachineService] Send device reconnected failed:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        notificationSent: false,
+      };
+    }
+  }
 }
 
 // ==================== Default Instance ====================

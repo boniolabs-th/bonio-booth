@@ -479,7 +479,18 @@ function sendDeviceAlertToBackendIfAllowed(
     .catch((err) => console.warn('⚠️ [Main] sendDeviceAlert failed:', err));
 }
 
-function setDeviceStateFound(deviceType: 'camera' | 'printer'): void {
+/**
+ * อัปเดตสถานะเป็น "เชื่อมต่อแล้ว" — ถ้าก่อนหน้านี้แจ้ง "ไม่พบ" ไปแล้ว จะยิงแจ้ง "กลับมาเชื่อมต่อแล้ว" ไป Telegram
+ */
+function notifyDeviceReconnectedIfNeeded(
+  deviceType: 'camera' | 'printer',
+  deviceName?: string,
+): void {
+  if (lastDeviceState[deviceType] === 'not_found') {
+    machineService
+      .sendDeviceReconnected(deviceType, deviceName)
+      .catch((err) => console.warn('⚠️ [Main] sendDeviceReconnected failed:', err));
+  }
   lastDeviceState[deviceType] = 'found';
 }
 
@@ -517,9 +528,9 @@ async function checkConfiguredDevices(): Promise<void> {
   // 2. เช็ค Printer (คืนค่าสถานะสำหรับรายงาน)
   const printerStatus = await checkPrinter();
 
-  // อัปเดตสถานะ "เชื่อมต่อแล้ว" เพื่อให้รอบถัดไปถ้าหลุดถึงจะแจ้ง noti ได้อีก (toggle)
-  if (cameraStatus?.found) setDeviceStateFound('camera');
-  if (printerStatus?.found) setDeviceStateFound('printer');
+  // อัปเดตสถานะ "เชื่อมต่อแล้ว" — ถ้าก่อนหน้านี้แจ้ง "ไม่พบ" ไปแล้ว จะแจ้ง "กลับมาเชื่อมต่อแล้ว" ไป Telegram
+  if (cameraStatus?.found) notifyDeviceReconnectedIfNeeded('camera', cameraStatus.deviceName);
+  if (printerStatus?.found) notifyDeviceReconnectedIfNeeded('printer', printerStatus.deviceDetail);
 
   // 3. ครั้งแรกหลังเปิดเครื่อง: ส่งรายงานสถานะไป backend → Telegram
   if (!hasSentStartupDeviceReport && cameraStatus && printerStatus) {
@@ -2876,7 +2887,7 @@ ipcMain.on('camera-availability-result', async (event, result: {
     sendDeviceAlertToBackendIfAllowed('camera', result.configuredLabel, result.availableDevices);
   } else {
     console.log(`✅ [Main] Configured camera found: ${result.configuredLabel}`);
-    setDeviceStateFound('camera');
+    notifyDeviceReconnectedIfNeeded('camera', result.configuredLabel);
   }
 });
 
