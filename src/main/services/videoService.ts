@@ -489,12 +489,49 @@ export const cleanupTempFiles = async (filePaths: string[]): Promise<void> => {
 };
 
 /**
+ * Probe video duration using FFmpeg
+ * Parse "Duration: HH:MM:SS.xx" from FFmpeg stderr output
+ *
+ * @param videoPath - Path to video file
+ * @returns Duration in seconds (0 if cannot determine)
+ */
+const getVideoDuration = (videoPath: string): Promise<number> => {
+  return new Promise((resolve) => {
+    const ffmpeg = spawn(getFFmpegPath(), ['-i', videoPath, '-f', 'null', '-']);
+    let stderrOutput = '';
+
+    ffmpeg.stderr.on('data', (data) => {
+      stderrOutput += data.toString();
+    });
+
+    ffmpeg.on('close', () => {
+      // Parse "Duration: HH:MM:SS.xx" from stderr
+      const match = stderrOutput.match(/Duration:\s*(\d+):(\d+):(\d+\.\d+)/);
+      if (match) {
+        const hours = parseInt(match[1], 10);
+        const minutes = parseInt(match[2], 10);
+        const seconds = parseFloat(match[3]);
+        resolve(hours * 3600 + minutes * 60 + seconds);
+      } else {
+        resolve(0); // ไม่สามารถอ่าน duration → ไม่ trim
+      }
+    });
+
+    ffmpeg.on('error', () => resolve(0));
+  });
+};
+
+/**
  * Convert WebM video to MP4 (H.264) for iPhone/Safari compatibility
  * iPhone/Safari does not support WebM format, so we need to convert to MP4
  *
  * NOTE (guideVideo.md Section 8):
  * WebM -> MP4 can only get "close" to original colors, never exact.
  * For best results, use FFmpeg Native Recording instead of MediaRecorder.
+ *
+ * Auto-trim: ถ้า input video ยาวกว่า targetDuration + 0.1 วินาที
+ * จะตัดต้น 0.1 วิออก เพื่อแก้ปัญหา freeze ช่วงแรก (MediaRecorder init delay)
+ * ทำให้ video loop กลับมาเล่นซ้ำได้โดยไม่สะดุด
  *
  * @param inputVideoPath - Path to input WebM file
  * @param outputPath - Optional output path
@@ -505,6 +542,18 @@ export const convertWebmToMp4 = async (
   outputPath?: string,
   targetDuration: number = 9,
 ): Promise<string> => {
+  // Probe input duration เพื่อตัดสินว่าจะ trim ต้นหรือไม่
+  const TRIM_START_SECONDS = 0.1;
+  const inputDuration = await getVideoDuration(inputVideoPath);
+  const shouldTrimStart = inputDuration > targetDuration + TRIM_START_SECONDS;
+
+  console.log('🎬 [convertWebmToMp4] Duration probe:', {
+    inputDuration: inputDuration.toFixed(2),
+    targetDuration,
+    threshold: targetDuration + TRIM_START_SECONDS,
+    shouldTrimStart,
+  });
+
   return new Promise((resolve, reject) => {
     const output =
       outputPath ||
@@ -517,6 +566,8 @@ export const convertWebmToMp4 = async (
     // BT.709 Colorspace Contract (guideVideo.md Section 7)
     console.log('==========================convertWebmToMp4==========================');
     const args = [
+      // ถ้า input ยาวเกิน targetDuration + 0.1 → ตัดต้น 0.1 วิ (แก้ freeze ช่วงแรก)
+      ...(shouldTrimStart ? ['-ss', String(TRIM_START_SECONDS)] : []),
       '-i',
       inputVideoPath,
       '-t',
