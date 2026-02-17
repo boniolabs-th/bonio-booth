@@ -2173,6 +2173,8 @@ export default function PhotoResult() {
       hasFinalImage: !!state?.finalImage,
       hasReferenceId: !!state?.referenceId,
       hasTransactionId: !!state?.transactionId,
+      hasSessionId: !!sessionId,
+      hasUploadUrls: uploadUrls.length > 0,
       hasUploaded: hasUploaded.current,
     });
 
@@ -2183,8 +2185,20 @@ export default function PhotoResult() {
       state?.transactionId &&
       !hasUploaded.current
     ) {
+      // ตรวจสอบว่า presign session พร้อมหรือยัง
+      if (!sessionId || uploadUrls.length === 0) {
+        console.log(
+          '⏳ [PhotoResult] Presign session not ready yet, waiting for sessionId and uploadUrls...',
+          {
+            sessionId,
+            uploadUrlsCount: uploadUrls.length,
+          },
+        );
+        return; // รอให้ presign session พร้อมก่อน (useEffect จะ trigger อีกครั้งเมื่อ sessionId/uploadUrls เปลี่ยน)
+      }
+
       console.log(
-        '🔄 [PhotoResult] Video became available, triggering upload now',
+        '🔄 [PhotoResult] Video became available and presign session ready, triggering upload now',
       );
       // เรียก handleAutoPrint โดยตรง
       const triggerUpload = async () => {
@@ -2347,17 +2361,18 @@ export default function PhotoResult() {
                 }
               }
 
-              // ตรวจสอบว่ามี sessionId + uploadUrls หรือไม่
+              // ตรวจสอบว่ามี sessionId + uploadUrls หรือไม่ (ควรมีแล้วจาก dependency check)
               if (!sessionId || uploadUrls.length === 0) {
-                console.warn(
-                  '⚠️ [PhotoResult] No sessionId/uploadUrls found! Waiting for presign session...',
+                console.error(
+                  '❌ [PhotoResult] Session ID and uploadUrls are required but not found!',
+                  {
+                    sessionId,
+                    uploadUrlsCount: uploadUrls.length,
+                  },
                 );
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-                if (!sessionId || uploadUrls.length === 0) {
-                  throw new Error(
-                    'Session ID and uploadUrls are required. Please ensure presign session was created successfully.',
-                  );
-                }
+                throw new Error(
+                  'Session ID and uploadUrls are required. Please ensure presign session was created successfully.',
+                );
               }
 
               // ใช้ queueBackgroundUpload (Presigned Upload) พร้อม uploadUrls + webmVideoPath
@@ -2411,6 +2426,8 @@ export default function PhotoResult() {
     state?.finalImage,
     state?.referenceId,
     state?.transactionId,
+    sessionId, // เพิ่ม dependency เพื่อให้ trigger เมื่อ presign session พร้อม
+    uploadUrls.length, // เพิ่ม dependency เพื่อให้ trigger เมื่อ uploadUrls พร้อม
   ]);
 
   const handleFinish = () => {
