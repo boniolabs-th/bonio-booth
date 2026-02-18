@@ -2634,6 +2634,45 @@ ipcMain.handle(
   },
 );
 
+// Handler สำหรับสร้าง presigned upload session
+ipcMain.handle(
+  'create-presign-upload',
+  async (
+    event,
+    transactionId: string,
+    files: Array<{ type: 'photo' | 'video'; contentType: string }>,
+    transactionCode?: string,
+  ) => {
+    try {
+      const result = await machineService.createPresignUpload(
+        transactionId,
+        files,
+        transactionCode,
+      );
+      return result;
+    } catch (error) {
+      console.error('❌ [Main] Error in create-presign-upload handler:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        message: errorMessage,
+        error: errorMessage,
+        photoSession: {
+          id: '',
+          transactionId,
+          numPhotosSelected: 0,
+          status: 'failed',
+        },
+        qrcodeStorageUrl: '',
+        uploadUrls: [],
+        expiresIn: 0,
+        expiresAt: '',
+      };
+    }
+  },
+);
+
 // Handler สำหรับ upload files ไปยัง session
 ipcMain.handle(
   'upload-files-to-session',
@@ -2718,6 +2757,14 @@ ipcMain.handle(
     photos: string[],
     videos: string[] = [],
     webmVideoPath?: string,
+    uploadUrls?: Array<{
+      type: 'photo' | 'video';
+      order: number;
+      uploadUrl: string;
+      key: string;
+      publicUrl: string;
+      contentType: string;
+    }>,
   ) => {
     try {
       console.log('📤 [Main] Queueing background upload...');
@@ -2725,12 +2772,16 @@ ipcMain.handle(
       if (webmVideoPath) {
         console.log(`📤 [Main] WebM video path: ${webmVideoPath} (will convert in background)`);
       }
+      if (uploadUrls) {
+        console.log(`📤 [Main] Upload URLs count: ${uploadUrls.length}`);
+      }
 
       const result = await backgroundUploadService.queueUpload(
         sessionId,
         photos,
         videos,
         webmVideoPath,
+        uploadUrls || [],
       );
 
       console.log(`✅ [Main] Upload queued with job ID: ${result.jobId}`);
