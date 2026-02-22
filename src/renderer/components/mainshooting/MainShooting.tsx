@@ -488,15 +488,22 @@ export default function MainShooting() {
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           recordedChunksRef.current.push(event.data);
         }
       };
 
-      mediaRecorder.start();
+      mediaRecorder.onerror = (event) => {
+        console.error('❌ [Webcam] MediaRecorder error:', event);
+        setIsRecording(false);
+      };
+
+      // ใช้ timeslice 500ms เพื่อให้คายข้อมูลออกมาเรื่อยๆ ลดภาระ Memory และป้องกันไฟล์เสียถ้าแอปแครช
+      mediaRecorder.start(500);
       setIsRecording(true);
-    } catch {
-      // Error starting recording
+    } catch (error) {
+      console.error('❌ [Webcam] Failed to start recording:', error);
+      setIsRecording(false);
     }
   }, []);
 
